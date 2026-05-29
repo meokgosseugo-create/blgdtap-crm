@@ -4,7 +4,7 @@ import {
   Car, List, ArrowLeft, Save, Image as ImageIcon, CheckCircle2, FileText, 
   Trash2, TrendingUp, UserCircle, Briefcase, Calendar as CalendarIcon, 
   ChevronLeft, ChevronRight, Phone, User, ArrowUpCircle, Upload, XCircle, Lock,
-  Map, CalendarDays, Percent
+  KeyRound, ShieldCheck, Map, CalendarDays, Percent
 } from 'lucide-react';
 
 const getYield = (sale, deposit, rent) => {
@@ -63,6 +63,7 @@ const initialProperties = [
     date: '2026-05-27',
     registrant: '손태호',
     status: '보류',
+    workLogs: [],
     images: []
   },
   {
@@ -93,12 +94,14 @@ const initialProperties = [
     date: '2026-05-26',
     registrant: '손태호',
     status: '완료',
+    workLogs: [],
     images: []
   }
 ];
 
 const initialEmployees = [
-  { id: 'E-001', loginId: 'admin', password: '123', name: '손태호', phone: '010-1234-5678', department: '중개법인 대표', date: '2026-05-27' }
+  { id: 'E-001', loginId: 'admin', password: '123', name: '손태호', phone: '010-1234-5678', department: '중개법인 대표', date: '2026-05-27' },
+  { id: 'E-002', loginId: 'kim123', password: '123', name: '김과장', phone: '010-1111-2222', department: '영업1팀', date: '2026-05-27' }
 ];
 
 const initialCustomers = [
@@ -413,7 +416,7 @@ function AuthView({ onAuth }) {
           {errorMsg && <div className="p-3 bg-red-50 text-red-600 text-sm font-bold rounded-lg text-center border border-red-100">{errorMsg}</div>}
 
           <button type="submit" className="w-full py-4 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-all shadow-md shadow-blue-200 mt-4 flex items-center justify-center gap-2 text-lg">
-            {isLoginMode ? '안전하게 로그인' : '계정 생성 및 접속'}
+            {isLoginMode ? <><ShieldCheck className="w-5 h-5" /> 안전하게 로그인</> : '계정 생성 및 접속'}
           </button>
         </form>
       </div>
@@ -438,6 +441,44 @@ function SpecRow({ icon, label, value }) {
     <div className="flex items-center justify-between p-4 border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors">
       <div className="flex items-center gap-3 text-slate-500 text-sm">{React.cloneElement(icon, { className: 'w-4 h-4 text-slate-400' })} {label}</div>
       <div className="font-semibold text-slate-800 text-sm">{value}</div>
+    </div>
+  );
+}
+
+function FloorMoneyInput({ label, value, onChange }) {
+  return (
+    <div className="flex-1 min-w-[120px]">
+      <div className="flex items-center border border-slate-300 rounded-lg bg-white focus-within:border-blue-500 focus-within:ring-2 overflow-hidden shadow-sm transition-all">
+        <span className="bg-slate-100 text-xs font-bold text-slate-600 px-2 py-2 border-r border-slate-200 whitespace-nowrap">{label}</span>
+        <input type="number" value={value || ''} onChange={onChange} className="w-full py-2 px-2 text-right text-sm font-bold outline-none bg-transparent [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" placeholder="0" />
+        <span className="text-xs font-bold text-slate-500 pr-2 pl-1 whitespace-nowrap">만원</span>
+      </div>
+      <span className="text-[11px] text-blue-600 font-bold text-right block pr-1 min-h-[16px] mt-0.5">{formatKoreanCurrency(value)}</span>
+    </div>
+  );
+}
+
+function FloorTextInput({ value, onChange }) {
+  return (
+    <div className="w-20 shrink-0">
+      <div className="flex items-center border border-slate-300 rounded-lg bg-white focus-within:border-blue-500 focus-within:ring-2 overflow-hidden shadow-sm transition-all">
+        <span className="bg-slate-100 text-xs font-bold text-slate-600 px-2 py-2 border-r border-slate-200 whitespace-nowrap">층</span>
+        <input type="text" value={value || ''} onChange={onChange} className="w-full py-2 px-1 text-center text-sm font-bold outline-none bg-transparent" placeholder="1층" />
+      </div>
+      <span className="text-sm text-transparent block min-h-[16px] mt-0.5">.</span>
+    </div>
+  );
+}
+
+function FloorMoneyInputReadOnly({ label, value }) {
+  return (
+    <div className="flex-1 min-w-[120px]">
+      <div className="flex items-center border border-blue-200 rounded-lg bg-white overflow-hidden shadow-sm transition-all">
+        <span className="bg-blue-100 text-xs font-bold text-blue-800 px-2 py-2 border-r border-blue-200 whitespace-nowrap">{label}</span>
+        <div className="w-full py-2 px-2 text-right text-sm font-extrabold text-slate-900 bg-transparent truncate">{value.toLocaleString()}</div>
+        <span className="text-xs font-bold text-slate-500 pr-2 pl-1 whitespace-nowrap">만원</span>
+      </div>
+      <span className="text-[11px] text-blue-600 font-bold text-right block pr-1 min-h-[16px] mt-0.5">{formatKoreanCurrency(value)}</span>
     </div>
   );
 }
@@ -681,44 +722,6 @@ function PropertyDetailView({ property, onBack, onEdit, onDelete, currentUser, o
   );
 }
 
-function FloorMoneyInput({ label, value, onChange }) {
-  return (
-    <div className="flex-1 min-w-[100px]">
-      <div className="flex items-center border border-slate-300 rounded-lg bg-white focus-within:border-blue-500 focus-within:ring-1 overflow-hidden shadow-sm">
-        <span className="bg-slate-100 text-xs font-bold text-slate-600 px-2 py-2 border-r border-slate-200 whitespace-nowrap">{label}</span>
-        <input type="number" value={value || ''} onChange={onChange} className="w-full py-2 px-2 text-right text-sm font-bold outline-none bg-transparent [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" placeholder="0" />
-        <span className="text-xs font-bold text-slate-500 pr-2 pl-1 whitespace-nowrap">만원</span>
-      </div>
-      <span className="text-[11px] text-blue-600 font-bold text-right block pr-1 min-h-[16px] mt-0.5">{formatKoreanCurrency(value)}</span>
-    </div>
-  );
-}
-
-function FloorTextInput({ value, onChange }) {
-  return (
-    <div className="w-20 shrink-0">
-      <div className="flex items-center border border-slate-300 rounded-lg bg-white focus-within:border-blue-500 focus-within:ring-1 overflow-hidden shadow-sm">
-        <span className="bg-slate-100 text-xs font-bold text-slate-600 px-2 py-2 border-r border-slate-200 whitespace-nowrap">층</span>
-        <input type="text" value={value || ''} onChange={onChange} className="w-full py-2 px-1 text-center text-sm font-bold outline-none bg-transparent" placeholder="1층" />
-      </div>
-      <span className="text-sm text-transparent block min-h-[16px] mt-0.5">.</span>
-    </div>
-  );
-}
-
-function FloorMoneyInputReadOnly({ label, value }) {
-  return (
-    <div className="flex-1 min-w-[100px]">
-      <div className="flex items-center border border-blue-200 rounded-lg bg-white overflow-hidden shadow-sm">
-        <span className="bg-blue-100 text-xs font-bold text-blue-800 px-2 py-2 border-r border-blue-200 whitespace-nowrap">{label}</span>
-        <div className="w-full py-2 px-2 text-right text-sm font-extrabold text-slate-900 bg-transparent truncate">{value.toLocaleString()}</div>
-        <span className="text-xs font-bold text-slate-500 pr-2 pl-1 whitespace-nowrap">만원</span>
-      </div>
-      <span className="text-[11px] text-blue-600 font-bold text-right block pr-1 min-h-[16px] mt-0.5">{formatKoreanCurrency(value)}</span>
-    </div>
-  );
-}
-
 function PropertyFormView({ initialData, onBack, onSave, currentUser }) {
   const [newLog, setNewLog] = useState('');
   const [formData, setFormData] = useState(() => {
@@ -764,8 +767,6 @@ function PropertyFormView({ initialData, onBack, onSave, currentUser }) {
   });
 
   const handleChange = (e) => setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
-  
-  const handleFloorChange = (id, field, value) => setFormData(prev => ({ ...prev, floorDetails: prev.floorDetails.map(f => f.id === id ? { ...f, [field]: value } : f) }));
   
   const handleImageUpload = (e) => {
     const files = Array.from(e.target.files);
@@ -1038,10 +1039,10 @@ function CustomerFormView({ onBack, onSave }) {
       <div className="flex justify-between items-center mb-6"><h2 className="text-2xl font-bold text-slate-800">신규 손님 등록</h2><button onClick={onBack} className="text-slate-500 hover:text-slate-800 text-sm font-medium">취소 및 돌아가기</button></div>
       <form onSubmit={(e) => { e.preventDefault(); onSave(formData); }} className="space-y-6 bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
         <h3 className="text-lg font-bold text-slate-800 mb-5 pb-3 border-b border-slate-100 flex items-center gap-2"><Users className="w-5 h-5 text-blue-500" /> 손님(매수자) 정보</h3>
-        <div className="grid grid-cols-2 gap-4"><FormGroup label="이름"><input required type="text" name="name" onChange={handleChange} className="form-input w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" /></FormGroup><FormGroup label="전화번호"><input required type="tel" name="phone" onChange={handleChange} className="form-input w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" /></FormGroup></div>
-        <FormGroup label="금액 (단위: 만원)"><input required type="number" name="budget" onChange={handleChange} className="form-input w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-right" /></FormGroup>
-        <FormGroup label="지역"><input required type="text" name="region" onChange={handleChange} className="form-input w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" /></FormGroup>
-        <FormGroup label="구매사유"><textarea required name="reason" onChange={handleChange} rows={3} className="form-input w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none resize-none" /></FormGroup>
+        <div className="grid grid-cols-2 gap-4"><FormGroup label="이름"><input required type="text" name="name" onChange={handleChange} className="form-input w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="김투자" /></FormGroup><FormGroup label="전화번호"><input required type="tel" name="phone" onChange={handleChange} className="form-input w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="010-0000-0000" /></FormGroup></div>
+        <FormGroup label="금액 (단위: 만원)"><input required type="number" name="budget" onChange={handleChange} className="form-input w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-right" placeholder="예: 50000" /></FormGroup>
+        <FormGroup label="지역"><input required type="text" name="region" onChange={handleChange} className="form-input w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="예: 성남시 분당구 일대" /></FormGroup>
+        <FormGroup label="구매사유"><textarea required name="reason" onChange={handleChange} rows={3} className="form-input w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none resize-none" placeholder="예: 사옥 이전, 임대수익 목적 등" /></FormGroup>
         <div className="flex justify-end pt-4"><button type="submit" className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold">손님 등록</button></div>
       </form>
     </div>
@@ -1050,12 +1051,13 @@ function CustomerFormView({ onBack, onSave }) {
 
 function CalendarView() {
   const [date, setDate] = useState(new Date());
-  const [memos, setMemos] = useState({ '2026-05-27': ['엠파이어 빌딩 매수자 미팅', '오후 3시 현장 답사'], '2026-05-28': ['창민빌라 전세 계약'] });
+  const [memos, setMemos] = useState({ '2026-05-27': [{ id: 1, text: '엠파이어 빌딩 매수자 미팅' }, { id: 2, text: '오후 3시 현장 답사' }], '2026-05-28': [{ id: 3, text: '창민빌라 전세 계약' }] });
   const [editingDate, setEditingDate] = useState(null);
   const [newMemo, setNewMemo] = useState('');
 
   const year = date.getFullYear();
   const month = date.getMonth();
+
   const handleAddMemo = (e, dayStr) => { e.stopPropagation(); setEditingDate(dayStr); setNewMemo(''); };
   const saveMemo = (e, dayStr) => { e.stopPropagation(); if (newMemo.trim()) setMemos(prev => ({ ...prev, [dayStr]: [...(prev[dayStr] || []), { id: Date.now(), text: newMemo.trim() }] })); setEditingDate(null); };
   const deleteMemo = (e, dayStr, idx) => { e.stopPropagation(); setMemos(prev => { const newMemos = [...(prev[dayStr] || [])]; newMemos.splice(idx, 1); return { ...prev, [dayStr]: newMemos }; }); };
@@ -1072,7 +1074,7 @@ function CalendarView() {
       const currentDayOfWeek = new Date(year, month, d).getDay();
       const dayColor = currentDayOfWeek === 0 ? 'text-red-500' : currentDayOfWeek === 6 ? 'text-blue-500' : 'text-slate-700';
 
-      const currentMemos = (memos[dayStr] || []).map(m => typeof m === 'string' ? {id: Math.random(), text: m} : m);
+      const currentMemos = (memos[dayStr] || []);
 
       days.push(
         <div key={d} onClick={(e) => { if(!editingDate) handleAddMemo(e, dayStr) }} className={`group relative min-h-[120px] p-2 border border-slate-100 rounded-lg cursor-pointer hover:border-blue-300 transition-colors ${isToday ? 'bg-blue-50/30 border-blue-200' : 'bg-white'}`}>
