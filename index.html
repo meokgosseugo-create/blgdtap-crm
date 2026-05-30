@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>원프로젝트 CRM</title>
+  <title>빌딩탭</title>
   
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -11,6 +11,9 @@
   <!-- FontAwesome Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   
+  <!-- Supabase JS Library (추후 연동을 위해 미리 추가) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
   <!-- React & ReactDOM -->
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -19,22 +22,120 @@
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
   <style>
-    /* 폰트 및 스크롤바 커스텀 */
     body { font-family: 'Pretendard', -apple-system, sans-serif; background-color: #f8fafc; }
     ::-webkit-scrollbar { width: 6px; height: 6px; }
     ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
     ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
-    /* 모바일에서 입력창 터치 시 하이라이트 제거 */
     input, textarea, button, select, a { -webkit-tap-highlight-color: transparent; }
+    
+    /* 숫자 입력칸 위아래 화살표(스피너) 완벽 제거 */
+    input[type="number"]::-webkit-outer-spin-button,
+    input[type="number"]::-webkit-inner-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+    input[type="number"] {
+      -moz-appearance: textfield;
+    }
   </style>
 </head>
 <body>
   <div id="root"></div>
 
   <script type="text/babel">
-    const { useState, useMemo, useEffect } = React;
+    const { useState, useMemo, useEffect, useRef } = React;
 
-    // --- 호환성을 위한 아이콘 렌더링 컴포넌트 ---
+    // =====================================================================
+    // [1] SUPABASE 설정 및 데이터베이스 뼈대 (Skeleton)
+    // =====================================================================
+    let globalUsers = [
+      { id: 'user-001', loginId: 'admin', password: '123', name: '손태호', phone: '010-1234-5678', department: '중개법인 대표' },
+      { id: 'user-002', loginId: 'kim123', password: '123', name: '김과장', phone: '010-1111-2222', department: '영업1팀' }
+    ];
+
+    let globalProperties = [
+      {
+        id: 'P-001',
+        user_id: 'admin', 
+        name: '엠파이어 빌딩',
+        ownerName: '홍길동',
+        ownerPhone: '010-1234-5678',
+        type: '빌딩',
+        transactionType: '매매',
+        address: '경기도 성남시 분당구 정자동 124',
+        zoning: '일반상업지역',
+        landArea: 330,
+        totalFloorArea: 1500,
+        buildingArea: 198,
+        buildingCoverage: 60,
+        floorAreaRatio: 450,
+        floorUnderground: 1,
+        floorGround: 5,
+        elevators: 2,
+        parking: 12,
+        completionYear: '2015-08',
+        price: { sale: 59000, deposit: 35000, rent: 800, maintenance: 5 },
+        floorDetails: [{ id: 1, floor: '1층', companyName: '스타벅스', deposit: 10000, rent: 500, maintenance: 20 }],
+        direction: '남향',
+        description: '본 물건은 메인 상권 빌딩입니다.',
+        date: '2026-05-27',
+        registrant: '손태호',
+        registrantPhone: '010-1234-5678',
+        status: '완료',
+        isShared: true, 
+        workLogs: [],
+        images: []
+      },
+      {
+        id: 'P-002',
+        user_id: 'kim123', 
+        name: '강남 에비뉴 타워',
+        ownerName: '이건물',
+        ownerPhone: '010-9876-5432',
+        type: '빌딩',
+        transactionType: '매매',
+        address: '서울시 강남구 역삼동 888-1',
+        zoning: '일반상업지역',
+        landArea: 660,
+        totalFloorArea: 3500,
+        buildingArea: 350,
+        buildingCoverage: 53.0,
+        floorAreaRatio: 530.3,
+        floorUnderground: 2,
+        floorGround: 10,
+        elevators: 2,
+        parking: 30,
+        completionYear: '2020-03',
+        price: { sale: 120000, deposit: 100000, rent: 4500, maintenance: 150 },
+        floorDetails: [],
+        direction: '남향',
+        description: '강남역 초역세권 A급 빌딩입니다.',
+        date: '2026-05-28',
+        registrant: '김과장',
+        registrantPhone: '010-1111-2222',
+        status: '매매',
+        isShared: false, 
+        workLogs: [],
+        images: []
+      }
+    ];
+
+    let globalCustomers = [];
+    
+    let globalChatRooms = [
+      {
+        id: 'room-001',
+        participants: ['손태호', '김과장'],
+        messages: [
+          { id: 1, sender: '김과장', text: '대표님, 청담 더 클래스 물건 문의드립니다.', time: '오전 10:30', type: 'text' },
+          { id: 2, sender: '손태호', text: '네, 말씀하세요.', time: '오전 10:35', type: 'text' }
+        ]
+      }
+    ];
+
+    // =====================================================================
+    // [2] UI 아이콘 및 유틸리티 함수
+    // =====================================================================
     const Icon = ({ name, className }) => {
       let textClass = 'text-base';
       if (className?.includes('w-3')) textClass = 'text-xs';
@@ -43,7 +144,6 @@
       else if (className?.includes('w-6')) textClass = 'text-xl';
       else if (className?.includes('w-8')) textClass = 'text-3xl';
       else if (className?.includes('w-12')) textClass = 'text-5xl';
-      
       const cleanClassName = (className || '').replace(/\bw-\d+\b/g, '').replace(/\bh-\d+\b/g, '').trim();
       return <i className={`fas ${name} ${textClass} ${cleanClassName} flex items-center justify-center`}></i>;
     };
@@ -84,7 +184,9 @@
     const Percent = (p) => <Icon name="fa-percentage" {...p} />;
     const Bars = (p) => <Icon name="fa-bars" {...p} />;
     const Times = (p) => <Icon name="fa-times" {...p} />;
-    // ------------------------------------------
+    const Share2 = (p) => <Icon name="fa-share-nodes" {...p} />;
+    const MessageCircle = (p) => <Icon name="fa-comment" {...p} />;
+    const Send = (p) => <Icon name="fa-paper-plane" {...p} />;
 
     const getYield = (sale, deposit, rent) => {
       const s = Number(sale) || 0;
@@ -94,16 +196,9 @@
       return (((r * 12) / (s - d)) * 100).toFixed(1);
     };
 
-    const getPricePerPyeong = (sale, landArea) => {
-      if (!sale || !landArea) return 0;
-      const pyeong = landArea * 0.3025;
-      if (pyeong <= 0) return 0;
-      return Math.round(sale / pyeong);
-    };
-
     const formatKoreanCurrency = (val) => {
-      const num = Number(val);
-      if (!num || isNaN(num) || num === 0) return '0원';
+      let num = Math.round(Number(val) || 0);
+      if (num === 0) return '0원';
       const eok = Math.floor(num / 10000);
       const man = num % 10000;
       let result = '';
@@ -112,115 +207,164 @@
       return result.trim() + '원';
     };
 
-    const initialProperties = [
-      {
-        id: 'P-001',
-        name: '엠파이어 빌딩',
-        ownerName: '홍길동',
-        ownerPhone: '010-1234-5678',
-        type: '빌딩',
-        transactionType: '매매',
-        address: '경기도 성남시 분당구 정자동 124',
-        zoning: '일반상업지역',
-        landArea: 330,
-        totalFloorArea: 1500,
-        buildingArea: 198,
-        buildingCoverage: 60,
-        floorAreaRatio: 450,
-        floorUnderground: 1,
-        floorGround: 5,
-        elevators: 2,
-        parking: 12,
-        completionYear: '2015-08',
-        price: { sale: 59000, deposit: 35000, rent: 800, maintenance: 5 },
-        floorDetails: [
-          { id: 1, floor: '1층', deposit: 10000, rent: 500, maintenance: 20, note: '스타벅스 입점' },
-          { id: 2, floor: '2층', deposit: 5000, rent: 300, maintenance: 10, note: '피부과' }
-        ],
-        direction: '남향',
-        description: '본 물건은 성남시 분당구 정자동 124번지에 위치한 역세권 메인 상권 빌딩입니다. 안정적인 임대 수익이 발생 중이며 가시성이 뛰어납니다.',
-        date: '2026-05-27',
-        registrant: '손태호',
-        status: '보류',
-        workLogs: [],
-        images: []
-      },
-      {
-        id: 'P-002',
-        name: '창민빌라 301호',
-        ownerName: '김철수',
-        ownerPhone: '010-9876-5432',
-        type: '빌라',
-        transactionType: '전세',
-        address: '경기도 성남시 분당구 정자동 124-1',
-        zoning: '제2종일반주거지역',
-        landArea: 50,
-        totalFloorArea: 85,
-        buildingArea: 45,
-        buildingCoverage: 50,
-        floorAreaRatio: 180,
-        floorUnderground: 0,
-        floorGround: 4,
-        elevators: 0,
-        parking: 1,
-        completionYear: '2018-02',
-        price: { sale: 0, deposit: 29000, rent: 0, maintenance: 5 },
-        floorDetails: [
-          { id: 1, floor: '3층', deposit: 29000, rent: 0, maintenance: 5, note: '주거용' }
-        ],
-        direction: '동향',
-        description: '깔끔하게 관리된 창민빌라입니다. 즉시 입주 가능하며 채광이 좋습니다.',
-        date: '2026-05-26',
-        registrant: '손태호',
-        status: '완료',
-        workLogs: [],
-        images: []
+    const formatShortCurrency = (val) => {
+      const num = Number(val);
+      if (!num || isNaN(num) || num === 0) return '0원';
+      if (num >= 10000) {
+        const eok = num / 10000;
+        return `${Number.isInteger(eok) ? eok : eok.toFixed(1).replace(/\.0$/, '')}억`;
       }
-    ];
+      return `${num.toLocaleString()}만`;
+    };
 
-    const initialEmployees = [
-      { id: 'E-001', loginId: 'admin', password: '123', name: '손태호', phone: '010-1234-5678', department: '중개법인 대표', date: '2026-05-27' },
-      { id: 'E-002', loginId: 'kim123', password: '123', name: '김과장', phone: '010-1111-2222', department: '영업1팀', date: '2026-05-27' }
-    ];
+    // 상태 버튼 옵션 및 색상 (매매는 파란색으로 변경)
+    const STATUS_OPTIONS = ['보류', '완료', '매매'];
+    const STATUS_COLORS = {
+      '보류': 'bg-white text-slate-700 shadow-[0_2px_8px_rgba(0,0,0,0.08)]',
+      '완료': 'bg-red-500 text-white shadow-[0_4px_12px_rgba(239,68,68,0.4)]',
+      '매매': 'bg-blue-500 text-white shadow-[0_4px_12px_rgba(59,130,246,0.4)]'
+    };
+    const STATUS_BADGE_COLORS = {
+      '보류': 'bg-slate-200 text-slate-600',
+      '완료': 'bg-red-500 text-white shadow-sm',
+      '매매': 'bg-blue-500 text-white shadow-sm'
+    };
 
-    const initialCustomers = [
-      { id: 'C-001', name: '이투자', phone: '010-9999-8888', budget: 50000, region: '성남시 분당구', reason: '사옥 이전 목적', date: '2026-05-27' }
-    ];
+    const autoFormatAddress = (addr) => {
+      if (!addr) return '';
+      let s = addr.replace(/\s+/g, '');
+      s = s.replace(/([가-힣]+[시도])([가-힣]+[구군시])/g, '$1 $2');
+      s = s.replace(/([가-힣]+[구군시])([가-힣]+[동읍면로길])/g, '$1 $2');
+      s = s.replace(/([가-힣]+[동읍면로길])(\d)/g, '$1 $2');
+      return s.replace(/\s+/g, ' ').trim();
+    };
 
+    // =====================================================================
+    // [3] UI 공통 컴포넌트들
+    // =====================================================================
+    function SidebarItem({ icon, label, active, onClick }) {
+      return (
+        <button onClick={onClick} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${active ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
+          {React.cloneElement(icon, { className: 'w-5 h-5' })} {label}
+        </button>
+      );
+    }
+
+    function FormGroup({ label, children }) {
+      return <div className="flex flex-col gap-1.5 w-full"><label className="text-sm font-semibold text-slate-700">{label}</label>{children}</div>;
+    }
+
+    function SpecRow({ icon, label, value }) {
+      return (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors gap-1 sm:gap-4">
+          <div className="flex items-center gap-3 text-slate-500 text-sm shrink-0">{React.cloneElement(icon, { className: 'w-4 h-4 text-slate-400' })} {label}</div>
+          <div className="font-semibold text-slate-800 text-sm sm:text-right break-all sm:break-normal">{value}</div>
+        </div>
+      );
+    }
+
+    function FloorMoneyInput({ label, value, onChange }) {
+      return (
+        <div className="flex-1 w-full min-w-[120px]">
+          <div className="flex items-center border border-slate-300 rounded-lg bg-white focus-within:border-blue-500 focus-within:ring-1 overflow-hidden shadow-sm transition-all">
+            <span className="bg-slate-100 text-xs font-bold text-slate-600 px-2 py-3 sm:py-2 border-r border-slate-200 whitespace-nowrap">{label}</span>
+            <input type="number" value={value || ''} onChange={onChange} className="w-full py-3 sm:py-2 px-2 text-right text-sm font-bold outline-none bg-transparent" placeholder="0" />
+            <span className="text-xs font-bold text-slate-500 pr-2 pl-1 whitespace-nowrap">만원</span>
+          </div>
+          <span className="text-[11px] text-blue-600 font-bold text-right block pr-1 min-h-[16px] mt-0.5">{formatKoreanCurrency(value)}</span>
+        </div>
+      );
+    }
+
+    function FloorTextInput({ value, onChange, onBlur, autoFocus }) {
+      return (
+        <div className="w-full sm:w-20 shrink-0">
+          <div className="flex items-center border border-slate-300 rounded-lg bg-white focus-within:border-blue-500 focus-within:ring-1 overflow-hidden shadow-sm transition-all">
+            <span className="bg-slate-100 text-xs font-bold text-slate-600 px-2 py-3 sm:py-2 border-r border-slate-200 whitespace-nowrap sm:hidden md:inline-block">층수</span>
+            <input type="text" value={value || ''} onChange={onChange} onBlur={onBlur} autoFocus={autoFocus} className="w-full py-3 sm:py-2 px-2 text-center text-sm font-bold outline-none bg-transparent" placeholder="1층" />
+          </div>
+          <span className="text-sm text-transparent block min-h-[16px] mt-0.5 hidden sm:block">.</span>
+        </div>
+      );
+    }
+
+    function CompanyTextInput({ value, onChange }) {
+      return (
+        <div className="flex-1 min-w-[140px]">
+          <div className="flex items-center border border-slate-300 rounded-lg bg-white focus-within:border-blue-500 focus-within:ring-1 overflow-hidden shadow-sm transition-all">
+            <span className="bg-slate-100 text-xs font-bold text-slate-600 px-2 py-3 sm:py-2 border-r border-slate-200 whitespace-nowrap">업체명</span>
+            <input type="text" value={value || ''} onChange={onChange} className="w-full py-3 sm:py-2 px-2 text-sm font-bold outline-none bg-transparent" placeholder="상호명/비고" />
+          </div>
+          <span className="text-sm text-transparent block min-h-[16px] mt-0.5 hidden sm:block">.</span>
+        </div>
+      );
+    }
+
+    function FloorMoneyInputReadOnly({ label, value }) {
+      return (
+        <div className="flex-1 w-full min-w-[120px]">
+          <div className="flex items-center border border-blue-200 rounded-lg bg-white overflow-hidden shadow-sm transition-all">
+            <span className="bg-blue-100 text-xs font-bold text-blue-800 px-2 py-3 sm:py-2 border-r border-blue-200 whitespace-nowrap">{label}</span>
+            <div className="w-full py-3 sm:py-2 px-2 text-right text-sm font-extrabold text-slate-900 bg-transparent truncate">{value.toLocaleString()}</div>
+            <span className="text-xs font-bold text-slate-500 pr-2 pl-1 whitespace-nowrap">만원</span>
+          </div>
+          <span className="text-[11px] text-blue-600 font-bold text-right block pr-1 min-h-[16px] mt-0.5">{formatKoreanCurrency(value)}</span>
+        </div>
+      );
+    }
+
+    // =====================================================================
+    // [4] 메인 APP 컴포넌트
+    // =====================================================================
     function App() {
       const [isAuthenticated, setIsAuthenticated] = useState(false);
       const [currentUser, setCurrentUser] = useState(null);
 
-      const [properties, setProperties] = useState(initialProperties);
+      const [myProperties, setMyProperties] = useState([]);
+      const [sharedProperties, setSharedProperties] = useState([]);
+      const [chatRooms, setChatRooms] = useState([]);
+      const [refreshTrigger, setRefreshTrigger] = useState(0); 
+
       const [currentView, setCurrentView] = useState('list'); 
       const [selectedProperty, setSelectedProperty] = useState(null);
       const [activeTab, setActiveTab] = useState('properties');
+      
+      const [currentChatRoomId, setCurrentChatRoomId] = useState(null);
 
-      const [employees, setEmployees] = useState(initialEmployees);
+      const [employees, setEmployees] = useState(globalUsers);
       const [currentEmployeeView, setCurrentEmployeeView] = useState('list');
 
-      const [customers, setCustomers] = useState(initialCustomers);
+      const [customers, setCustomers] = useState(globalCustomers);
       const [currentCustomerView, setCurrentCustomerView] = useState('list');
 
       const [searchTerm, setSearchTerm] = useState('');
-      
-      // 모바일 메뉴 상태
       const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-      // 모바일 메뉴 외부 클릭 시 닫기
+      useEffect(() => {
+        if (!currentUser) return;
+        const fetchData = async () => {
+          const mine = globalProperties.filter(p => p.user_id === currentUser.loginId);
+          const shared = globalProperties.filter(p => p.isShared === true);
+          setMyProperties(mine);
+          setSharedProperties(shared);
+
+          const myRooms = globalChatRooms.filter(r => r.participants.includes(currentUser.name));
+          setChatRooms(myRooms);
+        };
+        fetchData();
+      }, [currentUser, refreshTrigger]);
+
       useEffect(() => {
         const handleClickOutside = (e) => {
-          if (isMobileMenuOpen && e.target.closest('#sidebar-overlay')) {
-            setIsMobileMenuOpen(false);
-          }
+          if (isMobileMenuOpen && e.target.closest('#sidebar-overlay')) setIsMobileMenuOpen(false);
         };
         document.addEventListener('click', handleClickOutside);
         return () => document.removeEventListener('click', handleClickOutside);
       }, [isMobileMenuOpen]);
 
-      const handleAuth = (type, data) => {
+      const handleAuth = async (type, data) => {
         if (type === 'login') {
-          const user = employees.find(emp => emp.loginId === data.loginId && emp.password === data.password);
+          const user = globalUsers.find(u => u.loginId === data.loginId && u.password === data.password);
           if (user) {
             setCurrentUser(user);
             setIsAuthenticated(true);
@@ -228,14 +372,11 @@
           }
           return { success: false, message: '아이디 또는 비밀번호가 일치하지 않습니다.' };
         } 
-        
         if (type === 'signup') {
-          const exists = employees.some(emp => emp.loginId === data.loginId);
-          if (exists) {
-            return { success: false, message: '이미 존재하는 아이디입니다.' };
-          }
+          const exists = globalUsers.some(emp => emp.loginId === data.loginId);
+          if (exists) return { success: false, message: '이미 존재하는 아이디입니다.' };
           const newUser = {
-            id: `E-00${employees.length + 1}`,
+            id: `user-${Date.now()}`,
             loginId: data.loginId,
             password: data.password,
             name: data.name,
@@ -243,7 +384,7 @@
             department: data.department || '신규 사원',
             date: new Date().toISOString().split('T')[0]
           };
-          setEmployees([newUser, ...employees]);
+          globalUsers.unshift(newUser);
           setCurrentUser(newUser);
           setIsAuthenticated(true);
           return { success: true };
@@ -256,25 +397,34 @@
         setIsMobileMenuOpen(false);
       };
 
-      const handleSaveProperty = (savedProperty) => {
-        if (savedProperty.id) {
-          setProperties(prev => prev.map(p => p.id === savedProperty.id ? savedProperty : p));
-          setSelectedProperty(savedProperty);
-          setCurrentView('detail');
-        } else {
-          const newProperty = { 
-            ...savedProperty, 
-            id: `P-00${properties.length + 1}`, 
-            date: new Date().toISOString().split('T')[0],
-            registrant: currentUser ? currentUser.name : '시스템' 
-          };
-          setProperties([newProperty, ...properties]);
-          setCurrentView('list');
+      const handleSaveProperty = async (prop) => {
+        const finalProp = { 
+          ...prop, 
+          user_id: currentUser.loginId, 
+          registrant: currentUser.name,
+          registrantPhone: currentUser.phone
+        };
+        
+        if (!finalProp.id) {
+          finalProp.id = `P-${Date.now()}`;
+          finalProp.date = new Date().toISOString().split('T')[0];
         }
+
+        const existingIdx = globalProperties.findIndex(p => p.id === finalProp.id);
+        if (existingIdx >= 0) globalProperties[existingIdx] = finalProp;
+        else globalProperties.unshift(finalProp);
+
+        setRefreshTrigger(prev => prev + 1); 
+        
+        setSelectedProperty(finalProp);
+        setCurrentView('detail');
+        const scrollArea = document.getElementById('main-scroll-area');
+        if (scrollArea) scrollArea.scrollTo({ top: 0, behavior: 'smooth' });
       };
 
-      const handleDeleteProperty = (propertyId) => {
-        setProperties(prev => prev.filter(p => p.id !== propertyId));
+      const handleDeleteProperty = async (propertyId) => {
+        globalProperties = globalProperties.filter(p => p.id !== propertyId);
+        setRefreshTrigger(prev => prev + 1);
         setCurrentView('list');
         setSelectedProperty(null);
       };
@@ -282,18 +432,57 @@
       const changeTab = (tab) => {
         setActiveTab(tab);
         setSearchTerm('');
-        setIsMobileMenuOpen(false); // 탭 변경 시 모바일 메뉴 닫기
+        setIsMobileMenuOpen(false); 
       };
 
-      const filteredProperties = properties.filter(p => 
+      const handleStartChat = (targetUserName) => {
+        if (!targetUserName || targetUserName === currentUser.name) return;
+        
+        let room = globalChatRooms.find(r => r.participants.includes(currentUser.name) && r.participants.includes(targetUserName));
+        
+        if (!room) {
+          room = {
+            id: `room-${Date.now()}`,
+            participants: [currentUser.name, targetUserName],
+            messages: []
+          };
+          globalChatRooms.unshift(room);
+        }
+        
+        setRefreshTrigger(prev => prev + 1);
+        setCurrentChatRoomId(room.id);
+        setActiveTab('chatRoom');
+      };
+
+      const handleSendMessage = (roomId, text, type = 'text') => {
+        const roomIdx = globalChatRooms.findIndex(r => r.id === roomId);
+        if (roomIdx >= 0) {
+          globalChatRooms[roomIdx].messages.push({
+            id: Date.now(),
+            sender: currentUser.name,
+            text,
+            time: new Date().toLocaleTimeString('ko-KR', {hour: '2-digit', minute:'2-digit'}),
+            type
+          });
+          setRefreshTrigger(prev => prev + 1);
+        }
+      };
+
+      const filteredMyProperties = myProperties.filter(p => 
+        p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+        p.address.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+
+      const filteredSharedProperties = sharedProperties.filter(p => 
         p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
         p.address.toLowerCase().includes(searchTerm.toLowerCase())
       );
 
       const filteredEmployees = employees.filter(e =>
-        e.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        currentUser && e.loginId === currentUser.loginId && // 나만 보이도록 처리 (에러 방지 방어코드 추가)
+        (e.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         e.department.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        e.loginId.toLowerCase().includes(searchTerm.toLowerCase())
+        e.loginId.toLowerCase().includes(searchTerm.toLowerCase()))
       );
 
       const filteredCustomers = customers.filter(c =>
@@ -307,97 +496,93 @@
 
       return (
         <div className="flex flex-col md:flex-row h-screen bg-slate-50 font-sans text-slate-800">
-          
-          {/* 모바일 상단 네비게이션 바 */}
           <div className="md:hidden flex items-center justify-between bg-slate-900 text-white p-4 z-30 shadow-md sticky top-0">
             <div className="flex items-center gap-2">
               <Building2 className="w-6 h-6 text-blue-400" />
-              <h1 className="text-lg font-bold tracking-tight">원프로젝트</h1>
+              <h1 className="text-lg font-bold tracking-tight">빌딩탭</h1>
             </div>
             <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 -mr-2 text-slate-300 hover:text-white transition-colors">
               {isMobileMenuOpen ? <Times className="w-6 h-6" /> : <Bars className="w-6 h-6" />}
             </button>
           </div>
 
-          {/* 오버레이 (모바일에서 메뉴 열렸을 때 배경 어둡게) */}
-          {isMobileMenuOpen && (
-            <div id="sidebar-overlay" className="md:hidden fixed inset-0 bg-black/50 z-40"></div>
-          )}
+          {isMobileMenuOpen && <div id="sidebar-overlay" className="md:hidden fixed inset-0 bg-black/50 z-40"></div>}
 
-          {/* 사이드바 (모바일에서는 슬라이드, PC에서는 고정) */}
           <aside className={`${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 fixed md:static inset-y-0 left-0 z-50 w-64 bg-slate-900 text-white flex flex-col shadow-2xl md:shadow-xl transition-transform duration-300 ease-in-out`}>
             <div className="p-6 border-b border-slate-800 hidden md:block">
               <div className="flex items-center gap-3">
                 <Building2 className="w-8 h-8 text-blue-400" />
-                <h1 className="text-xl font-bold tracking-tight">원프로젝트</h1>
+                <h1 className="text-xl font-bold tracking-tight">빌딩탭</h1>
               </div>
-              <p className="text-xs text-slate-400 mt-2">부동산 종합 관리 시스템</p>
+              <p className="text-[11px] text-slate-400 mt-2">부동산 종합 관리 시스템</p>
             </div>
             
             <nav className="flex-1 p-4 space-y-2 overflow-y-auto mt-4 md:mt-0">
               <SidebarItem icon={<CalendarIcon />} label="캘린더" active={activeTab === 'calendar'} onClick={() => changeTab('calendar')} />
-              <SidebarItem icon={<List />} label="물건 관리" active={activeTab === 'properties'} onClick={() => { changeTab('properties'); setCurrentView('list'); }} />
-              <SidebarItem icon={<UserCircle />} label="사원 관리" active={activeTab === 'employees'} onClick={() => { changeTab('employees'); setCurrentEmployeeView('list'); }} />
+              <SidebarItem icon={<List />} label="내 물건 관리" active={activeTab === 'properties'} onClick={() => { changeTab('properties'); setCurrentView('list'); }} />
+              <SidebarItem icon={<Share2 />} label="공유물건 게시판" active={activeTab === 'shared'} onClick={() => changeTab('shared')} />
+              <SidebarItem icon={<MessageCircle />} label="채팅창" active={activeTab === 'chatList' || activeTab === 'chatRoom'} onClick={() => changeTab('chatList')} />
               <SidebarItem icon={<Users />} label="고객 관리(매수자)" active={activeTab === 'customers'} onClick={() => { changeTab('customers'); setCurrentCustomerView('list'); }} />
-              <div className="pt-4 mt-4 border-t border-slate-800">
-                <SidebarItem icon={<Lock />} label="로그아웃" active={false} onClick={handleLogout} />
-              </div>
+              <SidebarItem icon={<UserCircle />} label="사원 관리" active={activeTab === 'employees'} onClick={() => { changeTab('employees'); setCurrentEmployeeView('list'); }} />
             </nav>
             
             <div className="p-4 border-t border-slate-800 mt-auto bg-slate-900">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center font-bold shadow-inner shrink-0">
-                  {currentUser ? currentUser.name.charAt(0) : 'U'}
-                </div>
-                <div className="truncate">
-                  <p className="text-sm font-medium truncate">{currentUser ? currentUser.name : '사용자'} 님</p>
-                  <p className="text-xs text-slate-400 truncate">{currentUser ? currentUser.department : '관리자'}</p>
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center font-bold shadow-inner shrink-0">
+                    {currentUser ? currentUser.name.charAt(0) : 'U'}
+                  </div>
+                  <div className="truncate">
+                    <p className="text-sm font-medium truncate">{currentUser ? currentUser.name : '사용자'} 님</p>
+                    <p className="text-xs text-slate-400 truncate">{currentUser ? currentUser.department : '관리자'}</p>
+                  </div>
                 </div>
               </div>
+              <button onClick={handleLogout} className="w-full flex items-center justify-center gap-2 py-2 text-sm font-bold text-slate-300 bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors">
+                <Lock className="w-4 h-4" /> 로그아웃
+              </button>
             </div>
           </aside>
 
           <main className="flex-1 flex flex-col h-[calc(100vh-60px)] md:h-screen overflow-hidden w-full relative">
-            <header className="bg-white border-b border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 md:px-8 shadow-sm z-10 gap-4 shrink-0">
-              <h2 className="text-lg md:text-xl font-semibold text-slate-800">
-                {activeTab === 'properties' ? '물건 관리' : 
-                 activeTab === 'employees' ? '사원 관리' :
-                 activeTab === 'customers' ? '고객 관리(매수자)' :
-                 activeTab === 'calendar' ? '개인 캘린더' : '관리 메뉴'}
-              </h2>
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
-                <div className="relative w-full sm:w-auto">
-                  <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
-                  <input 
-                    type="text" 
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    placeholder="검색어 입력..." 
-                    className="w-full sm:w-56 md:w-64 pl-9 pr-4 py-2.5 sm:py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50 transition-all focus:bg-white"
-                  />
+            {activeTab !== 'chatRoom' && activeTab !== 'chatList' && (
+              <header className="bg-white border-b border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 md:px-8 shadow-sm z-10 gap-4 shrink-0">
+                <h2 className="text-lg md:text-xl font-semibold text-slate-800">
+                  {activeTab === 'properties' ? '내 물건 관리' : 
+                   activeTab === 'shared' ? '공유물건 게시판' :
+                   activeTab === 'employees' ? '사원 관리' :
+                   activeTab === 'customers' ? '고객 관리(매수자)' :
+                   activeTab === 'calendar' ? '개인 캘린더' : '관리 메뉴'}
+                </h2>
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
+                  <div className="relative w-full sm:w-auto">
+                    <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
+                    <input type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="검색어 입력..." className="w-full sm:w-56 md:w-64 pl-9 pr-4 py-2.5 sm:py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50 transition-all focus:bg-white" />
+                  </div>
+                  
+                  {activeTab === 'properties' && currentView === 'list' && (
+                    <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 sm:py-2 rounded-lg text-sm font-bold transition-colors flex items-center justify-center gap-2 whitespace-nowrap shadow-sm w-full sm:w-auto" onClick={() => { setSelectedProperty(null); setCurrentView('form'); }}>
+                      <Plus className="w-4 h-4" /> 신규 등록
+                    </button>
+                  )}
+                  {activeTab === 'employees' && currentEmployeeView === 'list' && (
+                    <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 sm:py-2 rounded-lg text-sm font-bold transition-colors flex items-center justify-center gap-2 shadow-sm w-full sm:w-auto" onClick={() => setCurrentEmployeeView('form')}>
+                      <Plus className="w-4 h-4" /> 사원 추가
+                    </button>
+                  )}
+                  {activeTab === 'customers' && currentCustomerView === 'list' && (
+                    <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 sm:py-2 rounded-lg text-sm font-bold transition-colors flex items-center justify-center gap-2 shadow-sm w-full sm:w-auto" onClick={() => setCurrentCustomerView('form')}>
+                      <Plus className="w-4 h-4" /> 손님 등록
+                    </button>
+                  )}
                 </div>
-                {activeTab === 'properties' && currentView === 'list' && (
-                  <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 sm:py-2 rounded-lg text-sm font-bold transition-colors flex items-center justify-center gap-2 whitespace-nowrap shadow-sm w-full sm:w-auto" onClick={() => { setSelectedProperty(null); setCurrentView('form'); }}>
-                    <Plus className="w-4 h-4" /> 신규 등록
-                  </button>
-                )}
-                {activeTab === 'employees' && currentEmployeeView === 'list' && (
-                  <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 sm:py-2 rounded-lg text-sm font-bold transition-colors flex items-center justify-center gap-2 shadow-sm w-full sm:w-auto" onClick={() => setCurrentEmployeeView('form')}>
-                    <Plus className="w-4 h-4" /> 사원 추가
-                  </button>
-                )}
-                {activeTab === 'customers' && currentCustomerView === 'list' && (
-                  <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 sm:py-2 rounded-lg text-sm font-bold transition-colors flex items-center justify-center gap-2 shadow-sm w-full sm:w-auto" onClick={() => setCurrentCustomerView('form')}>
-                    <Plus className="w-4 h-4" /> 손님 등록
-                  </button>
-                )}
-              </div>
-            </header>
+              </header>
+            )}
 
-            <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-8 relative">
+            <div id="main-scroll-area" className={`flex-1 overflow-y-auto overflow-x-hidden ${(activeTab === 'chatRoom' || activeTab === 'chatList') ? 'bg-slate-100 p-0 sm:p-4 md:p-8' : 'p-4 md:p-8'} relative`}>
               {activeTab === 'properties' && (
                 <>
-                  {currentView === 'list' && <PropertyListView properties={filteredProperties} onViewDetail={(p) => { setSelectedProperty(p); setCurrentView('detail'); }} />}
+                  {currentView === 'list' && <PropertyListView properties={filteredMyProperties} onViewDetail={(p) => { setSelectedProperty(p); setCurrentView('detail'); }} />}
                   {currentView === 'detail' && (
                     <PropertyDetailView 
                       property={selectedProperty} 
@@ -405,10 +590,7 @@
                       onEdit={() => setCurrentView('form')} 
                       onDelete={handleDeleteProperty} 
                       currentUser={currentUser}
-                      onUpdate={(updatedProperty) => {
-                        setProperties(prev => prev.map(p => p.id === updatedProperty.id ? updatedProperty : p));
-                        setSelectedProperty(updatedProperty);
-                      }}
+                      onUpdate={handleSaveProperty}
                     />
                   )}
                   {currentView === 'form' && (
@@ -421,6 +603,9 @@
                   )}
                 </>
               )}
+              {activeTab === 'shared' && <SharedPropertyListView sharedList={filteredSharedProperties} onStartChat={handleStartChat} currentUser={currentUser} />}
+              {activeTab === 'chatList' && <ChatListView rooms={chatRooms} onSelectRoom={(id) => { setCurrentChatRoomId(id); setActiveTab('chatRoom'); }} currentUser={currentUser} />}
+              {activeTab === 'chatRoom' && <ChatRoomView room={chatRooms.find(r => r.id === currentChatRoomId)} currentUser={currentUser} onBack={() => setActiveTab('chatList')} onSendMessage={handleSendMessage} />}
               {activeTab === 'employees' && (
                 <>
                   {currentEmployeeView === 'list' && <EmployeeListView employees={filteredEmployees} />}
@@ -456,6 +641,10 @@
       );
     }
 
+    // =====================================================================
+    // [5] 상세/하위 뷰 컴포넌트들
+    // =====================================================================
+
     function AuthView({ onAuth }) {
       const [isLoginMode, setIsLoginMode] = useState(true);
       const [errorMsg, setErrorMsg] = useState('');
@@ -477,7 +666,7 @@
               <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-4 shadow-inner">
                 <Building2 className="w-8 h-8 text-blue-600" />
               </div>
-              <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">원프로젝트 CRM</h1>
+              <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">빌딩탭</h1>
               <p className="text-sm text-slate-500 mt-2 text-center">부동산 매물 관리의 시작</p>
             </div>
 
@@ -527,7 +716,7 @@
               {errorMsg && <div className="p-3 bg-red-50 text-red-600 text-sm font-bold rounded-lg text-center border border-red-100">{errorMsg}</div>}
 
               <button type="submit" className="w-full py-4 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-all shadow-md shadow-blue-200 mt-6 flex items-center justify-center gap-2 text-lg">
-                {isLoginMode ? <><ShieldCheck className="w-5 h-5" /> 안전하게 로그인</> : '계정 생성 및 접속'}
+                {isLoginMode ? <><ShieldCheck className="w-5 h-5" /> 로그인</> : '계정 생성 및 접속'}
               </button>
             </form>
           </div>
@@ -535,100 +724,292 @@
       );
     }
 
-    function SidebarItem({ icon, label, active, onClick }) {
-      return (
-        <button onClick={onClick} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${active ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
-          {React.cloneElement(icon, { className: 'w-5 h-5' })} {label}
-        </button>
-      );
-    }
+    function SharedPropertyListView({ sharedList, onStartChat, currentUser }) {
+      const getShortAddress = (addr) => {
+        if(!addr) return '지역 미상';
+        const parts = addr.split(' ');
+        const result = [];
+        for (let p of parts) {
+          result.push(p);
+          if (p.endsWith('구') || (p.endsWith('군') && !addr.includes('구'))) break;
+        }
+        return result.join(' ');
+      };
 
-    function FormGroup({ label, children }) {
-      return <div className="flex flex-col gap-1.5 w-full"><label className="text-sm font-semibold text-slate-700">{label}</label>{children}</div>;
-    }
+      const getAreaRange = (sqm) => {
+        const pyeong = Math.round((sqm || 0) * 0.3025);
+        if (pyeong === 0) return '미등록';
+        let rounded = Math.round(pyeong / 100) * 100;
+        if (rounded === 0 && pyeong > 0) {
+           rounded = Math.round(pyeong / 10) * 10; 
+           if (rounded === 0) rounded = pyeong;
+        }
+        return `약 ${rounded}평`;
+      };
 
-    function SpecRow({ icon, label, value }) {
       return (
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors gap-1 sm:gap-4">
-          <div className="flex items-center gap-3 text-slate-500 text-sm shrink-0">{React.cloneElement(icon, { className: 'w-4 h-4 text-slate-400' })} {label}</div>
-          <div className="font-semibold text-slate-800 text-sm sm:text-right break-all sm:break-normal">{value}</div>
+        <div className="w-full">
+          <div className="flex items-center gap-3 mb-6 bg-indigo-50 p-4 rounded-xl border border-indigo-100 shadow-sm">
+            <Share2 className="w-6 h-6 text-indigo-600" />
+            <h2 className="text-lg md:text-xl font-bold text-indigo-900">공유물건 게시판</h2>
+            <span className="text-indigo-600 bg-indigo-200 px-2.5 py-0.5 rounded-full text-xs font-bold shadow-sm">{sharedList.length}</span>
+            <p className="text-xs text-indigo-500 ml-auto hidden sm:block">상세 정보가 보호되어 안전하게 노출됩니다.</p>
+          </div>
+          
+          {sharedList.length === 0 ? (
+            <div className="bg-white rounded-2xl p-10 md:p-20 text-center text-slate-400 border border-slate-200 shadow-sm">
+              <Share2 className="w-12 h-12 md:w-16 md:h-16 mx-auto mb-4 opacity-30 text-indigo-500" />
+              <p className="text-sm md:text-base font-medium">현재 공유 중인 물건이 없습니다.<br/>내 물건 등록 화면에서 '공유하기' 스위치를 켜보세요.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 sm:gap-6 auto-rows-fr">
+              {sharedList.map(prop => (
+                <div key={prop.id} className="bg-[#fef9c3] p-5 rounded-2xl shadow-md border border-[#fde047] transform transition-transform duration-300 hover:-translate-y-1 relative group flex flex-col justify-between min-h-[220px]">
+                  
+                  <div>
+                    <div className="flex justify-between items-start border-b border-[#fde047] pb-3 mb-3">
+                      <h3 className="font-extrabold text-slate-800 text-[15px] sm:text-[17px] leading-tight line-clamp-2 w-full">{getShortAddress(prop.address)}</h3>
+                    </div>
+                    
+                    <div className="space-y-2 text-slate-700 font-medium text-sm">
+                      <div className="flex items-center bg-[#fef08a]/40 px-2 py-1.5 rounded gap-3">
+                        <span className="text-slate-600 text-[11px] font-bold w-12 shrink-0">대지</span> 
+                        <span className="font-extrabold flex-1 text-right truncate text-[14px]">{getAreaRange(prop.landArea)}</span>
+                      </div>
+                      <div className="flex items-center bg-[#fef08a]/40 px-2 py-1.5 rounded gap-3">
+                        <span className="text-slate-600 text-[11px] font-bold w-12 shrink-0">연면적</span> 
+                        <span className="font-extrabold flex-1 text-right truncate text-[14px]">{getAreaRange(prop.totalFloorArea)}</span>
+                      </div>
+                      
+                      <div className="pt-3 mt-3 border-t border-[#fde047] flex flex-col gap-1">
+                        <div className="flex justify-between items-baseline mb-1">
+                          <span className="text-xs font-bold text-indigo-600">{prop.transactionType}가</span>
+                          <span className="text-xl sm:text-2xl font-black text-red-600 tracking-tight leading-none truncate">
+                            {prop.transactionType === '매매' ? formatShortCurrency(prop.price?.sale) : 
+                             prop.transactionType === '전세' ? formatShortCurrency(prop.price?.deposit) : 
+                             `${formatShortCurrency(prop.price?.deposit)}`}
+                          </span>
+                        </div>
+                        <div className="flex flex-col gap-1.5 mt-1">
+                          <div className="flex justify-between items-center bg-[#fef08a]/60 px-2 py-1.5 rounded">
+                            <span className="text-[11px] font-bold text-slate-600">보증금</span>
+                            <span className="text-sm font-extrabold text-slate-800">{formatShortCurrency(prop.price?.deposit)}</span>
+                          </div>
+                          <div className="flex justify-between items-center bg-[#fef08a]/60 px-2 py-1.5 rounded">
+                            <span className="text-[11px] font-bold text-slate-600">월세</span>
+                            <span className="text-sm font-extrabold text-slate-800">{formatShortCurrency(prop.price?.rent)}</span>
+                          </div>
+                          {prop.transactionType === '매매' && (
+                            <div className="flex justify-between items-center bg-emerald-100/60 px-2 py-1.5 rounded mt-1 border border-emerald-200">
+                              <span className="text-xs font-bold text-emerald-700">수익률</span>
+                              <span className="text-sm font-extrabold text-emerald-700">{getYield(prop.price?.sale, prop.price?.deposit, prop.price?.rent)}%</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-5 pt-3 border-t border-[#fde047] flex flex-col gap-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-500">담당자</span>
+                      {prop.registrant !== currentUser?.name ? (
+                        <button onClick={() => onStartChat(prop.registrant)} className="bg-yellow-400 hover:bg-yellow-500 text-yellow-900 px-2.5 py-1.5 rounded shadow-sm text-[11px] font-bold transition-colors flex items-center gap-1.5">
+                          <MessageCircle className="w-4 h-4" /> 채팅
+                        </button>
+                      ) : (
+                        <span className="text-[10px] text-slate-400 font-bold bg-white/50 px-2 py-1 rounded">내 물건</span>
+                      )}
+                    </div>
+                    <div className="text-sm font-bold text-slate-800 flex items-center truncate">
+                      <i className="fas fa-user-circle mr-1.5 opacity-70 text-slate-500"></i>{prop.registrant || '미상'}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       );
     }
 
-    function FloorMoneyInput({ label, value, onChange }) {
+    function ChatListView({ rooms, onSelectRoom, currentUser }) {
       return (
-        <div className="flex-1 w-full min-w-[120px]">
-          <div className="flex items-center border border-slate-300 rounded-lg bg-white focus-within:border-blue-500 focus-within:ring-2 overflow-hidden shadow-sm transition-all">
-            <span className="bg-slate-100 text-xs font-bold text-slate-600 px-2 py-3 sm:py-2 border-r border-slate-200 whitespace-nowrap">{label}</span>
-            <input type="number" value={value || ''} onChange={onChange} className="w-full py-3 sm:py-2 px-2 text-right text-sm font-bold outline-none bg-transparent [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" placeholder="0" />
-            <span className="text-xs font-bold text-slate-500 pr-2 pl-1 whitespace-nowrap">만원</span>
+        <div className="h-full flex flex-col w-full max-w-[420px] mx-auto bg-white shadow-2xl sm:rounded-3xl border border-slate-200 overflow-hidden">
+          <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
+            <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2"><MessageCircle className="w-5 h-5 text-indigo-500" /> 채팅 목록</h2>
+            <span className="bg-indigo-100 text-indigo-600 font-bold text-xs px-2 py-1 rounded-full">{rooms.length}</span>
           </div>
-          <span className="text-[11px] text-blue-600 font-bold text-right block pr-1 min-h-[16px] mt-0.5">{formatKoreanCurrency(value)}</span>
+          <div className="flex-1 overflow-y-auto bg-white">
+            {rooms.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full text-slate-400">
+                <MessageCircle className="w-12 h-12 mb-3 opacity-30 text-indigo-400" />
+                <p className="text-sm">진행 중인 대화가 없습니다.<br/>공유 게시판에서 대화를 시작해보세요.</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {rooms.map(room => {
+                  const otherUser = room.participants.find(p => p !== currentUser.name) || '알 수 없음';
+                  const lastMsg = room.messages[room.messages.length - 1];
+                  return (
+                    <div key={room.id} onClick={() => onSelectRoom(room.id)} className="flex items-center gap-4 p-4 hover:bg-slate-50 cursor-pointer transition-colors">
+                      <div className="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-2xl flex items-center justify-center font-bold text-lg shrink-0 shadow-inner">
+                        {otherUser.charAt(0)}
+                      </div>
+                      <div className="flex-1 overflow-hidden">
+                        <div className="flex justify-between items-center mb-1">
+                          <h4 className="font-bold text-slate-800 truncate">{otherUser}</h4>
+                          <span className="text-[10px] text-slate-400 shrink-0">{lastMsg?.time || ''}</span>
+                        </div>
+                        <p className="text-xs text-slate-500 truncate">{lastMsg?.type === 'file' ? '📁 파일이 전송되었습니다.' : (lastMsg?.text || '새로운 채팅방이 개설되었습니다.')}</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
       );
     }
 
-    function FloorTextInput({ value, onChange }) {
-      return (
-        <div className="w-full sm:w-20 shrink-0">
-          <div className="flex items-center border border-slate-300 rounded-lg bg-white focus-within:border-blue-500 focus-within:ring-2 overflow-hidden shadow-sm transition-all">
-            <span className="bg-slate-100 text-xs font-bold text-slate-600 px-2 py-3 sm:py-2 border-r border-slate-200 whitespace-nowrap sm:hidden md:inline-block">층</span>
-            <input type="text" value={value || ''} onChange={onChange} className="w-full py-3 sm:py-2 px-2 text-center text-sm font-bold outline-none bg-transparent" placeholder="1층" />
-          </div>
-          <span className="text-sm text-transparent block min-h-[16px] mt-0.5 hidden sm:block">.</span>
-        </div>
-      );
-    }
+    function ChatRoomView({ room, currentUser, onBack, onSendMessage }) {
+      const [input, setInput] = useState('');
+      const messagesEndRef = useRef(null);
 
-    function FloorMoneyInputReadOnly({ label, value }) {
+      const scrollToBottom = () => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      }
+
+      useEffect(() => {
+        scrollToBottom();
+      }, [room?.messages]);
+
+      if (!room) return null;
+
+      const otherUser = room.participants.find(p => p !== currentUser.name) || '상대방';
+
+      const handleSend = (e) => {
+        e.preventDefault();
+        if(!input.trim()) return;
+        onSendMessage(room.id, input.trim(), 'text');
+        setInput('');
+      };
+
+      const handleAttachFile = (e) => {
+        const file = e.target.files[0];
+        if(file) {
+          if (file.type.startsWith('image/')) {
+            const fileUrl = URL.createObjectURL(file);
+            onSendMessage(room.id, fileUrl, 'image');
+          } else {
+            const fileUrl = URL.createObjectURL(file);
+            onSendMessage(room.id, JSON.stringify({ name: file.name, url: fileUrl }), 'file');
+          }
+        }
+      };
+
       return (
-        <div className="flex-1 w-full min-w-[120px]">
-          <div className="flex items-center border border-blue-200 rounded-lg bg-white overflow-hidden shadow-sm transition-all">
-            <span className="bg-blue-100 text-xs font-bold text-blue-800 px-2 py-3 sm:py-2 border-r border-blue-200 whitespace-nowrap">{label}</span>
-            <div className="w-full py-3 sm:py-2 px-2 text-right text-sm font-extrabold text-slate-900 bg-transparent truncate">{value.toLocaleString()}</div>
-            <span className="text-xs font-bold text-slate-500 pr-2 pl-1 whitespace-nowrap">만원</span>
+        <div className="flex flex-col h-full w-full max-w-[420px] mx-auto bg-[#b2c7d9] shadow-2xl sm:rounded-3xl border border-slate-200 overflow-hidden relative">
+          <div className="bg-white/90 backdrop-blur-sm p-4 flex items-center gap-3 border-b shadow-sm z-10 shrink-0">
+            <button onClick={onBack} className="p-2 -ml-2 rounded-full hover:bg-slate-100 transition-colors"><ArrowLeft className="w-5 h-5 text-slate-600" /></button>
+            <div className="flex items-center gap-2">
+              <div className="w-9 h-9 bg-indigo-500 rounded-xl flex items-center justify-center text-white font-bold text-sm shadow-sm">{otherUser.charAt(0)}</div>
+              <span className="font-bold text-lg text-slate-800">{otherUser}</span>
+            </div>
           </div>
-          <span className="text-[11px] text-blue-600 font-bold text-right block pr-1 min-h-[16px] mt-0.5">{formatKoreanCurrency(value)}</span>
+          
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            <div className="text-center"><span className="bg-black/10 text-white px-3 py-1 rounded-full text-xs font-medium">오늘</span></div>
+            {room.messages.map((msg) => {
+              const isMe = msg.sender === currentUser?.name;
+              return (
+                <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
+                  {!isMe && (
+                    <div className="w-9 h-9 bg-indigo-500 rounded-xl flex items-center justify-center text-white font-bold text-sm shadow-sm shrink-0 mr-2 mt-1">{msg.sender.charAt(0)}</div>
+                  )}
+                  <div className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} max-w-[75%]`}>
+                    {!isMe && <span className="text-xs text-slate-700 mb-1 ml-1">{msg.sender}</span>}
+                    <div className="flex items-end gap-1.5">
+                      {isMe && <span className="text-[10px] text-slate-500 mb-1">{msg.time}</span>}
+                      <div className={`px-2.5 py-1.5 text-[13px] shadow-sm leading-snug break-words ${isMe ? 'bg-[#fef01b] text-slate-900 rounded-2xl rounded-tr-sm' : 'bg-white text-slate-800 rounded-2xl rounded-tl-sm'}`}>
+                        {msg.type === 'file' ? (
+                          (() => {
+                            let fileData = { name: msg.text, url: '#' };
+                            try { fileData = JSON.parse(msg.text); } catch(e) { fileData.name = msg.text; }
+                            return (
+                              <div className="flex items-center gap-2">
+                                <div className="p-2 bg-black/5 rounded"><FileText className="w-4 h-4 text-slate-600" /></div>
+                                <div className="flex flex-col">
+                                  <span className="font-bold text-slate-700">{fileData.name}</span>
+                                  <a href={fileData.url} download={fileData.name} className="flex items-center gap-1 text-[10px] text-blue-600 hover:text-blue-800 mt-1 font-bold">
+                                    <Upload className="w-3 h-3 rotate-180" /> 다운로드
+                                  </a>
+                                </div>
+                              </div>
+                            );
+                          })()
+                        ) : msg.type === 'image' ? (
+                          <div className="rounded-xl overflow-hidden -m-1">
+                             <img src={msg.text} alt="전송된 사진" className="max-w-[200px] h-auto object-cover" />
+                          </div>
+                        ) : (
+                          msg.text
+                        )}
+                      </div>
+                      {!isMe && <span className="text-[10px] text-slate-500 mb-1">{msg.time}</span>}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+            <div ref={messagesEndRef} />
+          </div>
+
+          <div className="bg-white p-3 shrink-0 border-t border-slate-200">
+            <form onSubmit={handleSend} className="flex items-center gap-2">
+              <label htmlFor="chat-attach" className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-slate-100 rounded-full cursor-pointer transition-colors shrink-0">
+                <Plus className="w-6 h-6" />
+              </label>
+              <input type="file" id="chat-attach" className="hidden" onChange={handleAttachFile} />
+              
+              <div className="flex-1 flex items-center bg-slate-100 p-1.5 rounded-full border border-slate-200 focus-within:border-indigo-300 focus-within:ring-2 focus-within:ring-indigo-100 transition-all">
+                <input type="text" value={input} onChange={(e) => setInput(e.target.value)} placeholder="메시지 입력..." className="flex-1 bg-transparent px-4 py-1.5 outline-none text-sm w-full" />
+                <button type="submit" className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors shadow-sm shrink-0 ${input.trim() ? 'bg-yellow-400 text-yellow-900 hover:bg-yellow-500' : 'bg-slate-300 text-white cursor-not-allowed'}`}>
+                  <Send className="w-4 h-4 ml-[-2px]" />
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       );
     }
 
     function PropertyListView({ properties, onViewDetail }) {
-      // 필터 및 정렬 상태
       const [statusFilter, setStatusFilter] = useState('전체');
       const [minPrice, setMinPrice] = useState('');
       const [maxPrice, setMaxPrice] = useState('');
       const [sortConfig, setSortConfig] = useState({ key: 'date', direction: 'desc' });
 
-      // 정렬 핸들러
       const handleSort = (key) => {
         let direction = 'desc';
         if (sortConfig.key === key && sortConfig.direction === 'desc') direction = 'asc';
         setSortConfig({ key, direction });
       };
 
-      // 목록 필터링 및 정렬 연산
       const filteredAndSortedProperties = useMemo(() => {
         let result = [...properties];
+        if (statusFilter !== '전체') result = result.filter(p => (p.status || '보류') === statusFilter);
 
-        // 1. 상태 필터 적용
-        if (statusFilter !== '전체') {
-          result = result.filter(p => (p.status || '보류') === statusFilter);
-        }
-
-        // 2. 금액 필터 적용 (억 단위 -> 만원 단위 변환, 1억 = 10,000만원)
         if (minPrice !== '' || maxPrice !== '') {
           const min = minPrice !== '' ? Number(minPrice) * 10000 : 0;
           const max = maxPrice !== '' ? Number(maxPrice) * 10000 : Infinity;
-          
           result = result.filter(p => {
             const priceVal = p.transactionType === '매매' ? (p.price?.sale || 0) : (p.price?.deposit || 0);
             return priceVal >= min && priceVal <= max;
           });
         }
 
-        // 3. 정렬 적용
         result.sort((a, b) => {
           if (sortConfig.key === 'date') {
             const dateA = new Date(a.date).getTime();
@@ -650,7 +1031,7 @@
           <div className="p-4 md:p-5 border-b border-slate-200 flex flex-col lg:flex-row justify-between items-start lg:items-center bg-slate-50/50 gap-4">
             <h3 className="font-semibold text-slate-800 flex items-center gap-2 text-sm md:text-base shrink-0">
               <List className="w-5 h-5 text-blue-600" />
-              등록된 물건 <span className="text-blue-600 bg-blue-100 px-2 py-0.5 rounded-full text-xs">{filteredAndSortedProperties.length}</span>
+              내 물건 목록 <span className="text-blue-600 bg-blue-100 px-2 py-0.5 rounded-full text-xs">{filteredAndSortedProperties.length}</span>
             </h3>
 
             <div className="flex flex-col sm:flex-row items-stretch sm:items-end gap-3 w-full lg:w-auto">
@@ -689,11 +1070,12 @@
 
             </div>
           </div>
+
           <div className="overflow-x-auto w-full">
             <table className="w-full text-left border-collapse whitespace-nowrap min-w-[800px]">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200 text-[11px] uppercase tracking-wider text-slate-500">
-                  <th className="p-3 font-medium">거래/상태</th>
+                  <th className="p-3 font-medium">상태</th>
                   <th className="p-3 font-medium">물건명 / 소재지</th>
                   <th className="p-3 font-medium text-center">대지(평)</th>
                   <th className="p-3 font-medium text-center">연면(평)</th>
@@ -713,35 +1095,27 @@
                   <tr key={prop.id} className="hover:bg-blue-50/50 transition-colors group cursor-pointer sm:cursor-auto" onClick={(e) => { if(window.innerWidth < 640) onViewDetail(prop); }}>
                     <td className="p-3">
                       <div className="flex gap-1.5 items-center flex-wrap">
-                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${prop.status === '완료' ? 'bg-red-500 text-white shadow-sm' : 'bg-slate-200 text-slate-600'}`}>
-                          {prop.status || '보류'}
-                        </span>
-                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${prop.transactionType === '매매' ? 'bg-red-100 text-red-700' : prop.transactionType === '전세' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>
-                          {prop.transactionType}
-                        </span>
+                        <span className={`px-2 py-0.5 rounded text-[11px] font-bold ${STATUS_BADGE_COLORS[prop.status || '보류']}`}>{prop.status || '보류'}</span>
                       </div>
                     </td>
                     <td className="p-3 max-w-[150px] sm:max-w-[200px]">
                       <div className="flex flex-col gap-1">
-                        <span onClick={(e) => { e.stopPropagation(); onViewDetail(prop); }} className="font-bold text-blue-600 sm:cursor-pointer sm:hover:underline hover:text-blue-800 transition-colors truncate text-sm" title={prop.name}>{prop.name}</span>
+                        <span onClick={(e) => { e.stopPropagation(); onViewDetail(prop); }} className="font-bold text-blue-600 sm:cursor-pointer sm:hover:underline hover:text-blue-800 transition-colors truncate text-sm" title={prop.name}>
+                          {prop.isShared && <Share2 className="w-3 h-3 inline mr-1 text-indigo-500 opacity-70" />}
+                          {prop.name}
+                        </span>
                         <span className="text-[11px] text-slate-400 truncate flex items-center gap-0.5" title={prop.address}><MapPin className="w-3 h-3 opacity-70 shrink-0" /> {prop.address}</span>
                       </div>
                     </td>
-                    <td className="p-3 text-center text-slate-600">{Math.round((prop.landArea || 0) * 0.3025)}</td>
-                    <td className="p-3 text-center text-slate-600">{Math.round((prop.totalFloorArea || 0) * 0.3025)}</td>
+                    <td className="p-3 text-center text-slate-600">{((prop.landArea || 0) * 0.3025).toFixed(2)}</td>
+                    <td className="p-3 text-center text-slate-600">{((prop.totalFloorArea || 0) * 0.3025).toFixed(2)}</td>
                     <td className="p-3 text-right font-bold text-red-600">{formatKoreanCurrency(prop.price?.sale || 0)}</td>
                     <td className="p-3 text-right text-slate-700">{formatKoreanCurrency(prop.price?.deposit || 0)}</td>
                     <td className="p-3 text-right text-slate-700">{formatKoreanCurrency(prop.price?.rent || 0)}</td>
                     <td className="p-3 text-center font-bold text-emerald-600">{prop.transactionType === '매매' ? `${getYield(prop.price?.sale, prop.price?.deposit, prop.price?.rent)}%` : '-'}</td>
                     <td className="p-3 text-center text-slate-500">{prop.date}</td>
                   </tr>
-                )) : (
-                  <tr>
-                    <td colSpan="9" className="p-8 text-center text-slate-500 font-medium bg-slate-50">
-                      검색 조건에 맞는 물건이 없습니다.
-                    </td>
-                  </tr>
-                )}
+                )) : <tr><td colSpan="9" className="p-8 text-center text-slate-500 font-medium bg-slate-50">등록된 내 물건이 없습니다.</td></tr>}
               </tbody>
             </table>
           </div>
@@ -796,6 +1170,7 @@
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <button onClick={onBack} className="flex items-center gap-2 text-slate-500 hover:text-slate-800 transition-colors px-3 py-2 sm:-ml-3 rounded-lg hover:bg-slate-100 font-bold"><ArrowLeft className="w-4 h-4" /> 목록으로 돌아가기</button>
             <div className="flex gap-2 w-full sm:w-auto">
+              {property.isShared && <div className="hidden sm:flex items-center px-3 bg-indigo-50 border border-indigo-100 rounded-xl text-indigo-600 text-xs font-bold mr-2"><Share2 className="w-3 h-3 mr-1" /> 공유 게시됨</div>}
               <button onClick={onEdit} className="flex-1 sm:flex-none px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-bold text-blue-600 hover:bg-blue-50 transition-colors shadow-sm text-center">수정하기</button>
               <button onClick={() => setShowDeleteConfirm(true)} className="flex-1 sm:flex-none px-4 py-2.5 bg-white border border-red-200 text-red-600 rounded-xl text-sm font-bold hover:bg-red-50 transition-colors shadow-sm text-center">삭제하기</button>
             </div>
@@ -804,7 +1179,7 @@
           <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-start gap-4">
             <div className="w-full md:w-auto">
               <div className="flex flex-wrap gap-2 mb-3 items-center">
-                <span className={`px-2.5 py-1 rounded text-xs sm:text-sm font-bold shadow-sm ${property.status === '완료' ? 'bg-red-500 text-white' : 'bg-slate-200 text-slate-700'}`}>{property.status || '보류'}</span>
+                <span className={`px-2.5 py-1 rounded text-xs sm:text-sm font-bold shadow-sm ${STATUS_BADGE_COLORS[property.status || '보류']}`}>{property.status || '보류'}</span>
                 <span className={`px-2.5 py-1 rounded text-xs sm:text-sm font-bold shadow-sm ${property.transactionType === '매매' ? 'bg-red-500 text-white' : property.transactionType === '전세' ? 'bg-blue-500 text-white' : 'bg-emerald-500 text-white'}`}>{property.transactionType}</span>
                 <span className="px-2.5 py-1 rounded text-xs sm:text-sm font-medium bg-slate-100 text-slate-600 border border-slate-200">{property.type}</span>
                 <span className="px-2.5 py-1 rounded text-xs sm:text-sm font-medium bg-slate-800 text-white shadow-sm">No. {property.id}</span>
@@ -828,8 +1203,7 @@
                       (토지 평단가: 약 {getPricePerPyeong(property.price?.sale, property.landArea).toLocaleString()}만원)
                     </span>
                   )}
-                  <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-lg border border-emerald-200 text-xs sm:text-sm font-bold shadow-sm"><TrendingUp className="w-3 h-3 sm:w-4 sm:h-4" /> 예상 수익률: <span className="text-sm sm:text-base">{getYield(property.price?.sale, property.price?.deposit, property.price?.rent)}%</span></div>
-                  <span className="text-[11px] sm:text-xs text-slate-500 font-medium">(실제 연 수익금: {formatKoreanCurrency((property.price?.rent || 0) * 12)})</span>
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-lg border border-emerald-200 text-xs sm:text-sm font-bold shadow-sm"><TrendingUp className="w-3 h-3 sm:w-4 sm:h-4" /> 수익률: <span className="text-sm sm:text-base">{getYield(property.price?.sale, property.price?.deposit, property.price?.rent)}%</span></div>
                 </div>
               )}
             </div>
@@ -852,7 +1226,7 @@
                     <SpecRow icon={<Banknote />} label="보증금 (총액)" value={formatKoreanCurrency(property.price?.deposit || 0)} />
                     <SpecRow icon={<Banknote />} label="월세 (총액)" value={formatKoreanCurrency(property.price?.rent || 0)} />
                     <SpecRow icon={<Banknote />} label="관리비" value={formatKoreanCurrency(property.price?.maintenance || 0)} />
-                    {property.transactionType === '매매' && <SpecRow icon={<TrendingUp />} label="실제 연 수익금" value={`${formatKoreanCurrency((property.price?.rent || 0) * 12)} (수익률 ${getYield(property.price?.sale, property.price?.deposit, property.price?.rent)}%)`} />}
+                    {property.transactionType === '매매' && <SpecRow icon={<TrendingUp />} label="수익률" value={`${getYield(property.price?.sale, property.price?.deposit, property.price?.rent)}%`} />}
                   </div>
                 </div>
             </div>
@@ -861,9 +1235,9 @@
               <div className="p-3 sm:p-4 bg-slate-50 border-b border-slate-200"><h3 className="font-bold text-slate-800 flex items-center gap-2 text-sm sm:text-base"><Building2 className="w-4 h-4 sm:w-5 sm:h-5 text-blue-500" /> 건물 정보</h3></div>
               <div className="p-0">
                 <SpecRow icon={<MapIcon />} label="용도지역" value={property.zoning || '-'} />
-                <SpecRow icon={<Maximize />} label="대지면적" value={<span>{Math.round((property.landArea || 0) * 0.3025)}평 <span className="text-slate-400 font-normal ml-1">({property.landArea || 0}㎡)</span></span>} />
-                <SpecRow icon={<Maximize />} label="연면적" value={<span>{Math.round((property.totalFloorArea || 0) * 0.3025)}평 <span className="text-slate-400 font-normal ml-1">({property.totalFloorArea || 0}㎡)</span></span>} />
-                <SpecRow icon={<Maximize />} label="건축면적" value={<span>{Math.round((property.buildingArea || 0) * 0.3025)}평 <span className="text-slate-400 font-normal ml-1">({property.buildingArea || 0}㎡)</span></span>} />
+                <SpecRow icon={<Maximize />} label="대지면적" value={<span>{((property.landArea || 0) * 0.3025).toFixed(2)}평 <span className="text-slate-400 font-normal ml-1">({property.landArea || 0}㎡)</span></span>} />
+                <SpecRow icon={<Maximize />} label="연면적" value={<span>{((property.totalFloorArea || 0) * 0.3025).toFixed(2)}평 <span className="text-slate-400 font-normal ml-1">({property.totalFloorArea || 0}㎡)</span></span>} />
+                <SpecRow icon={<Maximize />} label="건축면적" value={<span>{((property.buildingArea || 0) * 0.3025).toFixed(2)}평 <span className="text-slate-400 font-normal ml-1">({property.buildingArea || 0}㎡)</span></span>} />
                 <SpecRow icon={<Percent />} label="건폐율 / 용적률" value={`${property.buildingCoverage || 0}% / ${property.floorAreaRatio || 0}%`} />
                 <SpecRow icon={<Building2 />} label="건물 층수" value={`지하 ${property.floorUnderground || 0}층 / 지상 ${property.floorGround || 0}층`} />
                 <SpecRow icon={<Car />} label="주차대수" value={`${property.parking || 0}대`} />
@@ -880,22 +1254,22 @@
             <div className="p-0 overflow-x-auto w-full">
               <table className="w-full text-left border-collapse min-w-[500px]">
                 <thead>
-                  <tr className="bg-white text-slate-500 text-xs sm:text-sm border-b border-slate-200"><th className="p-3 sm:p-4 font-medium">층수</th><th className="p-3 sm:p-4 font-medium text-right">보증금</th><th className="p-3 sm:p-4 font-medium text-right">월세</th><th className="p-3 sm:p-4 font-medium text-right">관리비</th><th className="p-3 sm:p-4 font-medium">비고/상호명</th></tr>
+                  <tr className="bg-white text-slate-500 text-xs sm:text-sm border-b border-slate-200"><th className="p-3 sm:p-4 font-medium">층수</th><th className="p-3 sm:p-4 font-medium">업체명</th><th className="p-3 sm:p-4 font-medium text-right">보증금</th><th className="p-3 sm:p-4 font-medium text-right">월세</th><th className="p-3 sm:p-4 font-medium text-right">관리비</th></tr>
                 </thead>
                 <tbody>
                   {property.floorDetails && property.floorDetails.length > 0 ? property.floorDetails.map(floor => (
                     <tr key={floor.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50 text-xs sm:text-sm transition-colors">
                       <td className="p-3 sm:p-4 text-slate-800 font-bold">{floor.floor}</td>
+                      <td className="p-3 sm:p-4 text-slate-800 font-semibold">{floor.companyName || '-'}</td>
                       <td className="p-3 sm:p-4 text-slate-800 font-semibold text-right">{formatKoreanCurrency(floor.deposit || 0)}</td>
                       <td className="p-3 sm:p-4 text-slate-800 font-semibold text-right">{formatKoreanCurrency(floor.rent || 0)}</td>
                       <td className="p-3 sm:p-4 text-slate-800 font-semibold text-right">{formatKoreanCurrency(floor.maintenance || 0)}</td>
-                      <td className="p-3 sm:p-4 text-slate-600 truncate max-w-[150px]">{floor.note}</td>
                     </tr>
                   )) : <tr><td colSpan="5" className="p-6 sm:p-8 text-center text-slate-400 text-xs sm:text-sm">등록된 층별 내역이 없습니다.</td></tr>}
                 </tbody>
                 {property.floorDetails && property.floorDetails.length > 0 && (
                   <tfoot className="bg-blue-50/50 border-t-2 border-blue-200">
-                    <tr><td className="p-3 sm:p-4 text-blue-800 font-bold text-center text-xs sm:text-sm">전체 합계</td><td className="p-3 sm:p-4 text-blue-800 font-extrabold text-right text-sm sm:text-base">{formatKoreanCurrency(floorTotals.deposit)}</td><td className="p-3 sm:p-4 text-blue-800 font-extrabold text-right text-sm sm:text-base">{formatKoreanCurrency(floorTotals.rent)}</td><td className="p-3 sm:p-4 text-blue-800 font-extrabold text-right text-sm sm:text-base">{formatKoreanCurrency(floorTotals.maintenance)}</td><td className="p-3 sm:p-4"></td></tr>
+                    <tr><td colSpan="2" className="p-3 sm:p-4 text-blue-800 font-bold text-center text-xs sm:text-sm">전체 합계</td><td className="p-3 sm:p-4 text-blue-800 font-extrabold text-right text-sm sm:text-base">{formatKoreanCurrency(floorTotals.deposit)}</td><td className="p-3 sm:p-4 text-blue-800 font-extrabold text-right text-sm sm:text-base">{formatKoreanCurrency(floorTotals.rent)}</td><td className="p-3 sm:p-4 text-blue-800 font-extrabold text-right text-sm sm:text-base">{formatKoreanCurrency(floorTotals.maintenance)}</td></tr>
                   </tfoot>
                 )}
               </table>
@@ -906,8 +1280,19 @@
             <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-sm border border-slate-200">
               <h3 className="text-base sm:text-lg font-bold text-slate-800 mb-3 sm:mb-4 pb-2 sm:pb-3 border-b border-slate-100 flex items-center gap-2"><ImageIcon className="w-4 h-4 sm:w-5 sm:h-5 text-blue-500" /> 등록된 사진</h3>
               {property.images && property.images.length > 0 ? (
-                <><div className="aspect-video bg-slate-100 rounded-xl flex items-center justify-center overflow-hidden mb-2 sm:mb-3"><img src={property.images[0]} alt="대표 사진" className="w-full h-full object-cover" /></div><div className="grid grid-cols-4 gap-2">{property.images.slice(1, 5).map((imgUrl, i) => (<div key={i} className="aspect-square bg-slate-100 rounded-lg overflow-hidden border border-slate-200"><img src={imgUrl} alt={`추가 사진 ${i+1}`} className="w-full h-full object-cover" /></div>))}</div></>
-              ) : <div className="aspect-video bg-slate-50 border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center text-slate-400 p-4"><ImageIcon className="w-8 h-8 sm:w-12 sm:h-12 mb-2 opacity-50" /><p className="text-xs sm:text-sm">등록된 사진이 없습니다</p></div>}
+                <>
+                  <div className="aspect-[3/4] max-h-[600px] w-full max-w-sm mx-auto bg-slate-100 rounded-xl flex items-center justify-center overflow-hidden mb-2 sm:mb-3">
+                    <img src={property.images[0]} alt="대표 사진" className="w-full h-full object-contain bg-black/5" />
+                  </div>
+                  <div className="grid grid-cols-4 gap-2">
+                    {property.images.slice(1, 5).map((imgUrl, i) => (
+                      <div key={i} className="aspect-[3/4] bg-slate-100 rounded-lg overflow-hidden border border-slate-200">
+                        <img src={imgUrl} alt={`추가 사진 ${i+1}`} className="w-full h-full object-cover" />
+                      </div>
+                    ))}
+                  </div>
+                </>
+              ) : <div className="aspect-[3/4] max-h-[400px] bg-slate-50 border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center text-slate-400 p-4"><ImageIcon className="w-8 h-8 sm:w-12 sm:h-12 mb-2 opacity-50" /><p className="text-xs sm:text-sm">등록된 사진이 없습니다</p></div>}
             </div>
 
             <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col">
@@ -932,50 +1317,31 @@
 
     function PropertyFormView({ initialData, onBack, onSave, currentUser }) {
       const [newLog, setNewLog] = useState('');
+      const [addressError, setAddressError] = useState('');
       const [formData, setFormData] = useState(() => {
-        if (initialData) {
-          return {
-            id: initialData.id,
-            name: initialData.name || '',
-            ownerName: initialData.ownerName || '',
-            ownerPhone: initialData.ownerPhone || '',
-            type: initialData.type || '빌딩',
-            transactionType: initialData.transactionType || '매매',
-            address: initialData.address || '',
-            zoning: initialData.zoning || '',
-            landArea: initialData.landArea || '',
-            totalFloorArea: initialData.totalFloorArea || '',
-            buildingArea: initialData.buildingArea || '',
-            buildingCoverage: initialData.buildingCoverage || '',
-            floorAreaRatio: initialData.floorAreaRatio || '',
-            floorUnderground: initialData.floorUnderground || '',
-            floorGround: initialData.floorGround || '',
-            elevators: initialData.elevators || '',
-            parking: initialData.parking || '',
-            completionYear: initialData.completionYear || '',
-            sale: initialData.price?.sale || '',
-            deposit: initialData.price?.deposit || '',
-            rent: initialData.price?.rent || '',
-            maintenance: initialData.price?.maintenance || '',
-            floorDetails: initialData.floorDetails || [{ id: Date.now(), floor: '1층', deposit: '', rent: '', maintenance: '', note: '' }],
-            direction: initialData.direction || '남향',
-            workLogs: initialData.workLogs || [],
-            status: initialData.status || '보류',
-            images: initialData.images || []
-          };
-        }
+        if (initialData) return { ...initialData };
         return {
           name: '', ownerName: '', ownerPhone: '',
           type: '빌딩', transactionType: '매매', address: '', zoning: '',
           landArea: '', totalFloorArea: '', buildingArea: '', buildingCoverage: '', floorAreaRatio: '', floorUnderground: '', floorGround: '', elevators: '', parking: '', completionYear: '',
           sale: '', deposit: '', rent: '', maintenance: '',
-          floorDetails: [{ id: Date.now(), floor: '1층', deposit: '', rent: '', maintenance: '', note: '' }],
-          direction: '남향', workLogs: [], status: '보류', images: []
+          floorDetails: [{ id: Date.now(), floor: '1층', companyName: '', deposit: '', rent: '', maintenance: '' }],
+          direction: '남향', workLogs: [], status: '보류', isShared: false, images: [],
+          registrant: currentUser ? currentUser.name : '시스템',
+          registrantPhone: currentUser ? currentUser.phone : ''
         };
       });
 
-      const handleChange = (e) => setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
+      const handleChange = (e) => {
+        setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
+        if(e.target.name === 'address') setAddressError('');
+      };
       
+      const handleAddressBlur = () => {
+        const formatted = autoFormatAddress(formData.address);
+        setFormData(prev => ({ ...prev, address: formatted }));
+      };
+
       const handleImageUpload = (e) => {
         const files = Array.from(e.target.files);
         const newImages = files.map(file => URL.createObjectURL(file));
@@ -988,14 +1354,72 @@
         return { ...prev, images: newImages };
       });
 
+      const handleFloorChange = (id, field, value) => {
+        setFormData(prev => ({
+          ...prev,
+          floorDetails: prev.floorDetails.map(item => item.id === id ? { ...item, [field]: value } : item)
+        }));
+      };
+
+      const sortFloorDetails = () => {
+        const parseFloorLevel = (str) => {
+          if(!str) return 0;
+          const numStr = str.replace(/[^0-9]/g, '');
+          const num = numStr ? parseInt(numStr, 10) : 0;
+          if (str.includes('지하') || str.toUpperCase().includes('B')) return -num;
+          return num;
+        };
+
+        setFormData(prev => {
+          const sorted = [...prev.floorDetails].sort((a, b) => parseFloorLevel(a.floor) - parseFloorLevel(b.floor));
+          return { ...prev, floorDetails: sorted };
+        });
+      };
+
+      const addFloor = () => {
+        setFormData(prev => {
+          const groundFloors = prev.floorDetails
+            .map(f => f.floor)
+            .filter(f => f && !f.includes('지하') && !f.toUpperCase().includes('B'))
+            .map(f => parseInt(f.replace(/[^0-9]/g, ''), 10))
+            .filter(n => !isNaN(n));
+          
+          const maxGround = groundFloors.length > 0 ? Math.max(...groundFloors) : 0;
+          const nextFloor = `${maxGround + 1}층`;
+
+          return {
+            ...prev,
+            floorDetails: [...prev.floorDetails, { id: Date.now(), floor: nextFloor, companyName: '', deposit: '', rent: '', maintenance: '', isNew: true }]
+          };
+        });
+      };
+
       const totals = useMemo(() => formData.floorDetails.reduce((acc, curr) => ({
         deposit: acc.deposit + (Number(curr.deposit) || 0),
         rent: acc.rent + (Number(curr.rent) || 0),
         maintenance: acc.maintenance + (Number(curr.maintenance) || 0),
       }), { deposit: 0, rent: 0, maintenance: 0 }), [formData.floorDetails]);
 
+      // 상태 변경 시 공유 자동 해제
+      useEffect(() => {
+        if (formData.status === '보류' || formData.status === '매매') {
+          setFormData(prev => ({ ...prev, isShared: false }));
+        }
+      }, [formData.status]);
+
       const handleSubmit = (e) => {
         e.preventDefault();
+
+        const formattedAddress = autoFormatAddress(formData.address);
+        const isDuplicate = globalProperties.some(p => p.address === formattedAddress && p.id !== formData.id);
+        
+        if (isDuplicate) {
+          setAddressError('이미 등록된 주소지가 존재합니다.');
+          return;
+        }
+
+        sortFloorDetails(); 
+        
         let finalWorkLogs = [...(formData.workLogs || [])];
         if (newLog.trim()) {
           finalWorkLogs.unshift({
@@ -1008,6 +1432,7 @@
 
         onSave({
           ...formData,
+          address: formattedAddress,
           landArea: Number(formData.landArea || 0),
           totalFloorArea: Number(formData.totalFloorArea || 0),
           buildingArea: Number(formData.buildingArea || 0),
@@ -1022,27 +1447,47 @@
         });
       };
 
+      const isShareDisabled = formData.status === '보류' || formData.status === '매매';
+
       return (
         <div className="max-w-4xl mx-auto pb-10 relative">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-6 w-full sm:w-auto">
-              <h2 className="text-xl sm:text-2xl font-bold text-slate-800">{initialData ? '등록된 물건 수정' : '신규 물건 등록'}</h2>
-              <div className="flex items-center p-1 bg-slate-200/70 rounded-xl border border-slate-200">
-                <button type="button" onClick={() => setFormData(prev => ({...prev, status: '보류'}))} className={`flex items-center gap-1 sm:gap-2 px-3 sm:px-4 py-1.5 rounded-lg text-xs sm:text-sm font-bold transition-all duration-300 ${formData.status === '보류' || !formData.status ? 'bg-white text-slate-700 shadow-[0_2px_8px_rgba(0,0,0,0.08)]' : 'text-slate-400 hover:text-slate-600'}`}>보류</button>
-                <button type="button" onClick={() => setFormData(prev => ({...prev, status: '완료'}))} className={`flex items-center gap-1 sm:gap-2 px-3 sm:px-4 py-1.5 rounded-lg text-xs sm:text-sm font-bold transition-all duration-300 ${formData.status === '완료' ? 'bg-red-500 text-white shadow-[0_4px_12px_rgba(239,68,68,0.4)]' : 'text-slate-400 hover:text-red-400'}`}>완료</button>
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-6 w-full md:w-auto">
+              <h2 className="text-xl sm:text-2xl font-bold text-slate-800 shrink-0">{initialData ? '등록된 물건 수정' : '신규 물건 등록'}</h2>
+              <div className="flex items-center p-1 bg-slate-200/70 rounded-xl border border-slate-200 w-full sm:w-auto overflow-x-auto">
+                {STATUS_OPTIONS.map(s => (
+                  <button 
+                    key={s} type="button" onClick={() => setFormData(prev => ({...prev, status: s}))} 
+                    className={`flex-1 sm:flex-none items-center justify-center gap-1 sm:gap-2 px-3 sm:px-4 py-1.5 rounded-lg text-xs sm:text-sm font-bold transition-all duration-300 ${formData.status === s || (!formData.status && s==='보류') ? STATUS_COLORS[s] : 'text-slate-400 hover:text-slate-600'}`}
+                  >
+                    {s}
+                  </button>
+                ))}
               </div>
             </div>
-            <button type="button" onClick={onBack} className="w-full sm:w-auto text-slate-500 hover:text-slate-800 text-sm font-bold bg-slate-200 px-4 py-2.5 sm:py-2 rounded-lg text-center">취소 및 돌아가기</button>
+            
+            <div className="flex items-center gap-2 w-full md:w-auto">
+              <button 
+                type="button" 
+                onClick={() => { if(!isShareDisabled) setFormData(prev => ({...prev, isShared: !prev.isShared})); }} 
+                disabled={isShareDisabled}
+                className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2.5 sm:py-2 rounded-lg text-sm font-bold transition-all duration-300 ${isShareDisabled ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : formData.isShared ? 'bg-indigo-600 text-white shadow-md' : 'bg-indigo-50 text-indigo-600 border border-indigo-200 hover:bg-indigo-100'}`}
+              >
+                <Share2 className="w-4 h-4" /> {isShareDisabled ? '공유 불가' : formData.isShared ? '공유 중' : '공유 켜기'}
+              </button>
+              <button type="button" onClick={onBack} className="flex-1 md:flex-none text-slate-500 hover:text-slate-800 text-sm font-bold bg-slate-200 px-4 py-2.5 sm:py-2 rounded-lg text-center transition-colors">취소 및 돌아가기</button>
+            </div>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
+          <form onSubmit={handleSubmit} onKeyDown={(e) => { if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') e.preventDefault(); }} className="space-y-4 sm:space-y-6">
             <div className="bg-white p-5 sm:p-8 rounded-2xl shadow-sm border border-slate-200">
               <h3 className="text-lg sm:text-xl font-bold text-slate-800 mb-4 sm:mb-6 pb-3 sm:pb-4 border-b border-slate-100 flex items-center gap-2"><Building2 className="w-5 h-5 sm:w-6 sm:h-6 text-blue-500" /> 기본 정보</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                 <FormGroup label="물건명 (필수)"><input required type="text" name="name" value={formData.name || ''} onChange={handleChange} className="form-input w-full p-2.5 sm:p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-bold text-sm sm:text-base" placeholder="예: 엠파이어 빌딩" /></FormGroup>
                 
                 <FormGroup label="소재지 (주소)">
-                   <input required type="text" name="address" value={formData.address || ''} onChange={handleChange} className="form-input w-full p-2.5 sm:p-3 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 bg-white text-sm sm:text-base" placeholder="주소를 직접 입력하세요" />
+                   <input required type="text" name="address" value={formData.address || ''} onChange={handleChange} onBlur={handleAddressBlur} className={`form-input w-full p-2.5 sm:p-3 border rounded-lg outline-none focus:ring-2 bg-white text-sm sm:text-base ${addressError ? 'border-red-400 focus:ring-red-200' : 'border-slate-300 focus:ring-blue-500'}`} placeholder="예: 서울시 강남구 논현동 41-3" />
+                   {addressError && <p className="text-red-500 text-xs font-bold mt-1 px-1">{addressError}</p>}
                 </FormGroup>
 
                 <FormGroup label="물건 종류"><select name="type" value={formData.type || ''} onChange={handleChange} className="form-select w-full p-2.5 sm:p-3 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 bg-white font-bold text-slate-700 text-sm sm:text-base"><option>빌딩</option><option>상가</option><option>오피스텔</option><option>아파트</option><option>빌라</option><option>원룸</option><option>투룸</option><option>쓰리룸+</option></select></FormGroup>
@@ -1069,20 +1514,20 @@
                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-4 sm:gap-y-6">
                    <FormGroup label="용도지역"><input type="text" name="zoning" value={formData.zoning || ''} onChange={handleChange} className="form-input w-full p-2.5 sm:p-3 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base" placeholder="예: 일반상업지역" /></FormGroup>
                    <FormGroup label="대지면적 (㎡)">
-                      <div className="relative"><input type="number" name="landArea" value={formData.landArea || ''} onChange={handleChange} className="form-input w-full p-2.5 sm:p-3 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base" placeholder="예: 330" />{formData.landArea && (<span className="absolute -bottom-5 sm:-bottom-6 left-1 text-[10px] sm:text-xs text-blue-600 font-bold">약 {Math.round(Number(formData.landArea) * 0.3025)}평</span>)}</div>
+                      <div className="relative"><input type="number" name="landArea" value={formData.landArea || ''} onChange={handleChange} className="form-input w-full p-2.5 sm:p-3 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base" placeholder="예: 330" />{formData.landArea && (<span className="absolute -bottom-5 sm:-bottom-6 left-1 text-[10px] sm:text-xs text-blue-600 font-bold">{((formData.landArea || 0) * 0.3025).toFixed(2)}평</span>)}</div>
                    </FormGroup>
                    <FormGroup label="연면적 (㎡)">
-                      <div className="relative"><input type="number" name="totalFloorArea" value={formData.totalFloorArea || ''} onChange={handleChange} className="form-input w-full p-2.5 sm:p-3 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base" placeholder="예: 1500" />{formData.totalFloorArea && (<span className="absolute -bottom-5 sm:-bottom-6 left-1 text-[10px] sm:text-xs text-blue-600 font-bold">약 {Math.round(Number(formData.totalFloorArea) * 0.3025)}평</span>)}</div>
+                      <div className="relative"><input type="number" name="totalFloorArea" value={formData.totalFloorArea || ''} onChange={handleChange} className="form-input w-full p-2.5 sm:p-3 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base" placeholder="예: 1500" />{formData.totalFloorArea && (<span className="absolute -bottom-5 sm:-bottom-6 left-1 text-[10px] sm:text-xs text-blue-600 font-bold">{((formData.totalFloorArea || 0) * 0.3025).toFixed(2)}평</span>)}</div>
                    </FormGroup>
                    <FormGroup label="건축면적 (㎡)">
-                      <div className="relative"><input type="number" name="buildingArea" value={formData.buildingArea || ''} onChange={handleChange} className="form-input w-full p-2.5 sm:p-3 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base" placeholder="예: 198" />{formData.buildingArea && (<span className="absolute -bottom-5 sm:-bottom-6 left-1 text-[10px] sm:text-xs text-blue-600 font-bold">약 {Math.round(Number(formData.buildingArea) * 0.3025)}평</span>)}</div>
+                      <div className="relative"><input type="number" name="buildingArea" value={formData.buildingArea || ''} onChange={handleChange} className="form-input w-full p-2.5 sm:p-3 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base" placeholder="예: 198" />{formData.buildingArea && (<span className="absolute -bottom-5 sm:-bottom-6 left-1 text-[10px] sm:text-xs text-blue-600 font-bold">{((formData.buildingArea || 0) * 0.3025).toFixed(2)}평</span>)}</div>
                    </FormGroup>
                    <div className="grid grid-cols-2 gap-4">
                      <FormGroup label="건폐율 (%)">
-                         <div className="relative"><input type="number" name="buildingCoverage" value={formData.buildingCoverage || ''} onChange={handleChange} className="form-input w-full p-2.5 sm:p-3 pr-6 sm:pr-8 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base" placeholder="60" /><span className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 text-slate-500 font-bold text-xs sm:text-base">%</span></div>
+                         <div className="relative"><input type="number" name="buildingCoverage" value={formData.buildingCoverage || ''} onChange={handleChange} className="form-input w-full p-2.5 sm:p-3 pr-6 sm:pr-8 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base" placeholder="예: 60" /><span className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 text-slate-500 font-bold text-xs sm:text-base">%</span></div>
                      </FormGroup>
                      <FormGroup label="용적률 (%)">
-                         <div className="relative"><input type="number" name="floorAreaRatio" value={formData.floorAreaRatio || ''} onChange={handleChange} className="form-input w-full p-2.5 sm:p-3 pr-6 sm:pr-8 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base" placeholder="450" /><span className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 text-slate-500 font-bold text-xs sm:text-base">%</span></div>
+                         <div className="relative"><input type="number" name="floorAreaRatio" value={formData.floorAreaRatio || ''} onChange={handleChange} className="form-input w-full p-2.5 sm:p-3 pr-6 sm:pr-8 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base" placeholder="예: 250" /><span className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 text-slate-500 font-bold text-xs sm:text-base">%</span></div>
                      </FormGroup>
                    </div>
                    <div className="grid grid-cols-2 gap-4">
@@ -1114,21 +1559,22 @@
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-8">
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 sm:mb-6 border-b border-slate-100 pb-3 sm:pb-4 gap-3 sm:gap-0">
                 <h3 className="text-lg sm:text-xl font-bold text-slate-800">층별 현황 (보증금/월세/관리비)</h3>
-                <button type="button" onClick={() => setFormData({...formData, floorDetails: [...formData.floorDetails, { id: Date.now(), floor: `${formData.floorDetails.length + 1}층`, deposit: '', rent: '', maintenance: '', note: '' }]})} className="w-full sm:w-auto px-5 py-2.5 bg-blue-600 text-white rounded-xl font-bold text-sm hover:bg-blue-700 transition-colors shadow-sm">+ 층 추가</button>
+                <button type="button" onClick={addFloor} className="w-full sm:w-auto px-5 py-2.5 bg-blue-600 text-white rounded-xl font-bold text-sm hover:bg-blue-700 transition-colors shadow-sm">+ 층 추가</button>
               </div>
               <div className="space-y-4">
                 {formData.floorDetails.map((f, i) => (
                   <div key={f.id} className="flex flex-col md:flex-row items-start gap-3 sm:gap-4 p-3 sm:p-4 bg-slate-50 rounded-xl border border-slate-200">
                     <div className="flex w-full md:w-auto gap-3">
-                      <FloorTextInput value={f.floor} onChange={(e) => { const n = [...formData.floorDetails]; n[i].floor = e.target.value; setFormData({...formData, floorDetails: n}); }} />
-                      <div className="md:hidden shrink-0 ml-auto"><button type="button" onClick={() => setFormData({...formData, floorDetails: formData.floorDetails.filter(item => item.id !== f.id)})} className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors border border-red-100 bg-white" title="삭제"><Trash2 className="w-5 h-5" /></button></div>
+                      <FloorTextInput value={f.floor} autoFocus={f.isNew} onChange={(e) => handleFloorChange(f.id, 'floor', e.target.value)} onBlur={sortFloorDetails} />
+                      <CompanyTextInput value={f.companyName} onChange={(e) => handleFloorChange(f.id, 'companyName', e.target.value)} />
+                      <div className="md:hidden shrink-0 ml-auto"><button type="button" onClick={() => setFormData({...formData, floorDetails: formData.floorDetails.filter(item => item.id !== f.id)})} className="p-2.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors border border-red-100 bg-white shadow-sm" title="삭제"><Trash2 className="w-5 h-5" /></button></div>
                     </div>
                     <div className="flex flex-col sm:flex-row w-full gap-3 sm:gap-4">
-                      <FloorMoneyInput label="보증금" value={f.deposit} onChange={(e) => { const n = [...formData.floorDetails]; n[i].deposit = e.target.value; setFormData({...formData, floorDetails: n}); }} />
-                      <FloorMoneyInput label="월세" value={f.rent} onChange={(e) => { const n = [...formData.floorDetails]; n[i].rent = e.target.value; setFormData({...formData, floorDetails: n}); }} />
-                      <FloorMoneyInput label="관리비" value={f.maintenance} onChange={(e) => { const n = [...formData.floorDetails]; n[i].maintenance = e.target.value; setFormData({...formData, floorDetails: n}); }} />
+                      <FloorMoneyInput label="보증금" value={f.deposit} onChange={(e) => handleFloorChange(f.id, 'deposit', e.target.value)} />
+                      <FloorMoneyInput label="월세" value={f.rent} onChange={(e) => handleFloorChange(f.id, 'rent', e.target.value)} />
+                      <FloorMoneyInput label="관리비" value={f.maintenance} onChange={(e) => handleFloorChange(f.id, 'maintenance', e.target.value)} />
                     </div>
-                    <div className="hidden md:block pt-1 shrink-0"><button type="button" onClick={() => setFormData({...formData, floorDetails: formData.floorDetails.filter(item => item.id !== f.id)})} className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors mt-1" title="삭제"><Trash2 className="w-6 h-6" /></button></div>
+                    <div className="hidden md:block pt-1 shrink-0"><button type="button" onClick={() => setFormData({...formData, floorDetails: formData.floorDetails.filter(item => item.id !== f.id)})} className="p-2.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors border border-red-100 bg-white shadow-sm mt-0.5" title="삭제"><Trash2 className="w-5 h-5" /></button></div>
                   </div>
                 ))}
                 <div className="flex flex-col md:flex-row items-start gap-3 sm:gap-4 p-3 sm:p-4 bg-blue-50 rounded-xl border border-blue-200 mt-2">
@@ -1138,7 +1584,7 @@
                     <FloorMoneyInputReadOnly label="총 월세" value={totals.rent} />
                     <FloorMoneyInputReadOnly label="총 관리비" value={totals.maintenance} />
                   </div>
-                  <div className="hidden md:block w-10 shrink-0"></div>
+                  <div className="hidden md:block w-[46px] shrink-0"></div>
                 </div>
               </div>
             </div>
@@ -1152,10 +1598,10 @@
                 {formData.images && formData.images.length > 0 ? (
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
                     {formData.images.map((imgUrl, idx) => (
-                      <div key={idx} className="relative aspect-square bg-slate-100 rounded-lg border border-slate-200 group overflow-hidden"><img src={imgUrl} alt="첨부" className="w-full h-full object-cover" /><button type="button" onClick={() => removeImage(idx)} className="absolute top-1 right-1 p-1 bg-white/80 rounded-full text-red-500 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-50"><XCircle className="w-5 h-5" /></button></div>
+                      <div key={idx} className="relative aspect-[3/4] bg-slate-100 rounded-lg border border-slate-200 group overflow-hidden"><img src={imgUrl} alt="첨부" className="w-full h-full object-cover" /><button type="button" onClick={() => removeImage(idx)} className="absolute top-1 right-1 p-1 bg-white/80 rounded-full text-red-500 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-50"><XCircle className="w-5 h-5" /></button></div>
                     ))}
                   </div>
-                ) : <div className="flex flex-col items-center justify-center p-6 sm:p-10 border-2 border-dashed border-slate-300 rounded-xl text-slate-400 bg-slate-50"><ImageIcon className="w-8 h-8 sm:w-12 sm:h-12 mb-2 sm:mb-3 opacity-50" /><p className="text-xs sm:text-sm font-medium">사진을 첨부해주세요</p></div>}
+                ) : <div className="flex flex-col items-center justify-center p-6 sm:p-10 border-2 border-dashed border-slate-300 rounded-xl text-slate-400 bg-slate-50 aspect-video"><ImageIcon className="w-8 h-8 sm:w-12 sm:h-12 mb-2 sm:mb-3 opacity-50" /><p className="text-xs sm:text-sm font-medium">사진을 첨부해주세요</p></div>}
               </div>
 
               <div className="bg-white p-5 sm:p-8 rounded-2xl shadow-sm border border-slate-200">
