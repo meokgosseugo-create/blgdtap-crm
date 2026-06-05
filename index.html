@@ -11,11 +11,11 @@
   <!-- FontAwesome Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
-  <!-- React & ReactDOM -->
-  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <!-- React & ReactDOM (안정적인 최신 버전) -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
   
-  <!-- Babel Standalone -->
+  <!-- Babel Standalone (브라우저에서 직접 JSX 컴파일) -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
   <style>
@@ -25,7 +25,7 @@
     ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
     input, textarea, button, select, a { -webkit-tap-highlight-color: transparent; }
     
-    /* 숫자 입력칸 위아래 화살표(스피너) 완벽 제거 */
+    /* 숫자 입력칸 위아래 화살표 완벽 제거 */
     input[type="number"]::-webkit-outer-spin-button,
     input[type="number"]::-webkit-inner-spin-button {
       -webkit-appearance: none; margin: 0;
@@ -36,28 +36,18 @@
 <body>
   <div id="root"></div>
 
-  <!-- 1. Firebase 엔진 로드 (React와 완벽하게 분리하여 하얀 화면 방지) -->
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-    import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-    import { getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-    window.FB = {
-      initializeApp, getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged,
-      getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc
-    };
-    
-    // 엔진 로드 완료 신호 발송
-    window.dispatchEvent(new Event('firebase-ready'));
-  </script>
-
-  <!-- 2. 화면 UI 애플리케이션 -->
+  <!-- 파이어베이스 스크립트는 삭제하고 로컬 DB 모드로 우선 완벽 구동되도록 세팅 -->
   <script type="text/babel">
     const { useState, useMemo, useEffect, useRef } = React;
 
     // =====================================================================
-    // [1] 기초 초기 데이터 (DB가 비어있을 때 채워넣을 샘플)
+    // [1] 데이터베이스 뼈대 (Local Storage 기반)
     // =====================================================================
+    const initData = (key, defaultData) => {
+      const stored = localStorage.getItem(key);
+      return stored ? JSON.parse(stored) : defaultData;
+    };
+
     const initialEmployees = [
       { id: 'user-001', loginId: 'admin', password: '123', name: '손태호', phone: '010-1234-5678', department: '중개법인 대표', date: '2026-05-27' },
       { id: 'user-002', loginId: 'kim123', password: '123', name: '김과장', phone: '010-1111-2222', department: '영업1팀', date: '2026-05-27' }
@@ -73,27 +63,10 @@
         floorDetails: [{ id: 1, floor: '1층', companyName: '스타벅스', deposit: 10000, rent: 500, maintenance: 20 }],
         direction: '남향', description: '본 물건은 메인 상권 빌딩입니다.', date: '2026-05-27',
         registrant: '손태호', registrantPhone: '010-1234-5678', status: '완료', isShared: true, workLogs: [], images: []
-      },
-      {
-        id: 'P-002', user_id: 'kim123', name: '강남 에비뉴 타워', ownerName: '이건물', ownerPhone: '010-9876-5432',
-        type: '빌딩', transactionType: '매매', address: '서울시 강남구 역삼동 888-1', zoning: '일반상업지역',
-        landArea: 660, totalFloorArea: 3500, buildingArea: 350, buildingCoverage: 53.0, floorAreaRatio: 530.3,
-        floorUnderground: 2, floorGround: 10, elevators: 2, parking: 30, completionYear: '2020-03',
-        price: { sale: 120000, deposit: 100000, rent: 4500, maintenance: 150 },
-        floorDetails: [], direction: '남향', description: '강남역 초역세권 A급 빌딩입니다.', date: '2026-05-28',
-        registrant: '김과장', registrantPhone: '010-1111-2222', status: '매매', isShared: false, workLogs: [], images: []
       }
     ];
 
-    const initialChatRooms = [
-      {
-        id: 'room-001', participants: ['손태호', '김과장'],
-        messages: [
-          { id: 1, sender: '김과장', text: '대표님, 청담 물건 문의드립니다.', time: '오전 10:30', type: 'text' },
-          { id: 2, sender: '손태호', text: '네, 말씀하세요.', time: '오전 10:35', type: 'text' }
-        ]
-      }
-    ];
+    const initialChatRooms = [];
 
     // =====================================================================
     // [2] UI 아이콘 및 유틸리티 함수
@@ -189,7 +162,6 @@
       '매매': 'bg-blue-500 text-white shadow-[0_4px_12px_rgba(59,130,246,0.4)]'
     };
     
-    // 매매 뱃지는 빌딩 뱃지와 동일한 회색 톤으로 적용
     const STATUS_BADGE_COLORS = {
       '보류': 'bg-slate-200 text-slate-600',
       '완료': 'bg-red-500 text-white shadow-sm',
@@ -285,21 +257,17 @@
     // [4] 메인 APP 컴포넌트
     // =====================================================================
     function App() {
-      const [firebaseReady, setFirebaseReady] = useState(!!window.FB);
-      const [fbAuth, setFbAuth] = useState(null);
-      const [fbDb, setFbDb] = useState(null);
-      const [appId, setAppId] = useState('default-app-id');
-      const [fbUser, setFbUser] = useState(null);
+      // 데이터 로컬 스토리지 연동
+      const [properties, setProperties] = useState(() => initData('crm_props', initialProperties));
+      const [employees, setEmployees] = useState(() => initData('crm_users', initialEmployees));
+      const [customers, setCustomers] = useState(() => initData('crm_custs', []));
+      const [chatRooms, setChatRooms] = useState(() => initData('crm_chats', initialChatRooms));
 
       const [isAuthenticated, setIsAuthenticated] = useState(false);
       const [currentUser, setCurrentUser] = useState(null);
 
       const [myProperties, setMyProperties] = useState([]);
       const [sharedProperties, setSharedProperties] = useState([]);
-      const [chatRooms, setChatRooms] = useState([]);
-      const [properties, setProperties] = useState([]);
-      const [employees, setEmployees] = useState([]);
-      const [customers, setCustomers] = useState([]);
 
       const [currentView, setCurrentView] = useState('list'); 
       const [selectedProperty, setSelectedProperty] = useState(null);
@@ -312,50 +280,13 @@
       const [searchTerm, setSearchTerm] = useState('');
       const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-      // 1. Firebase 엔진 로딩 대기
-      useEffect(() => {
-        if (window.FB) { setFirebaseReady(true); return; }
-        const cb = () => setFirebaseReady(true);
-        window.addEventListener('firebase-ready', cb);
-        return () => window.removeEventListener('firebase-ready', cb);
-      }, []);
+      // 데이터 변경 시 로컬스토리지 자동 저장
+      useEffect(() => { localStorage.setItem('crm_props', JSON.stringify(properties)); }, [properties]);
+      useEffect(() => { localStorage.setItem('crm_users', JSON.stringify(employees)); }, [employees]);
+      useEffect(() => { localStorage.setItem('crm_custs', JSON.stringify(customers)); }, [customers]);
+      useEffect(() => { localStorage.setItem('crm_chats', JSON.stringify(chatRooms)); }, [chatRooms]);
 
-      // 2. Firebase 연결 및 인증
-      useEffect(() => {
-        if (!firebaseReady) return;
-        
-        const { initializeApp, getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged, getFirestore } = window.FB;
-        
-        let config = { projectId: "demo-project" };
-        if (typeof window.__firebase_config !== 'undefined') {
-            try { config = JSON.parse(window.__firebase_config); } catch(e){}
-        }
-        
-        const app = initializeApp(config);
-        const authInstance = getAuth(app);
-        const dbInstance = getFirestore(app);
-        const id = typeof window.__app_id !== 'undefined' ? window.__app_id : 'default-app-id';
-
-        setFbAuth(authInstance);
-        setFbDb(dbInstance);
-        setAppId(id);
-
-        const initAuth = async () => {
-          try {
-            if (typeof window.__initial_auth_token !== 'undefined' && window.__initial_auth_token) {
-              await signInWithCustomToken(authInstance, window.__initial_auth_token);
-            } else {
-              await signInAnonymously(authInstance);
-            }
-          } catch(e) { console.error("Auth Fail:", e); }
-        };
-        initAuth();
-
-        const unsub = onAuthStateChanged(authInstance, user => setFbUser(user));
-        return () => unsub();
-      }, [firebaseReady]);
-
-      // 3. 로컬스토리지에서 기존 로그인 유저 확인
+      // 로그인 유저 자동 복구
       useEffect(() => {
         const storedUser = localStorage.getItem('crm_loggedInUser');
         if (storedUser) {
@@ -364,50 +295,14 @@
         }
       }, []);
 
-      // 4. 권한 확보 후 실시간 데이터 통신
-      useEffect(() => {
-        if (!fbUser || !fbDb) return;
-
-        const { collection, onSnapshot, doc, setDoc } = window.FB;
-
-        const unsubUsers = onSnapshot(collection(fbDb, 'artifacts', appId, 'public', 'data', 'crm_users'), (snapshot) => {
-           if (snapshot.empty) {
-              initialEmployees.forEach(emp => setDoc(doc(fbDb, 'artifacts', appId, 'public', 'data', 'crm_users', emp.id), emp));
-           } else {
-              setEmployees(snapshot.docs.map(d => d.data()));
-           }
-        }, console.error);
-
-        const unsubProps = onSnapshot(collection(fbDb, 'artifacts', appId, 'public', 'data', 'crm_properties'), (snapshot) => {
-           if (snapshot.empty) {
-              initialProperties.forEach(prop => setDoc(doc(fbDb, 'artifacts', appId, 'public', 'data', 'crm_properties', prop.id), prop));
-           } else {
-              setProperties(snapshot.docs.map(d => d.data()));
-           }
-        }, console.error);
-
-        const unsubCusts = onSnapshot(collection(fbDb, 'artifacts', appId, 'public', 'data', 'crm_customers'), (snapshot) => {
-           if (!snapshot.empty) setCustomers(snapshot.docs.map(d => d.data()));
-        }, console.error);
-
-        const unsubChats = onSnapshot(collection(fbDb, 'artifacts', appId, 'public', 'data', 'crm_chatrooms'), (snapshot) => {
-           if (snapshot.empty) {
-              initialChatRooms.forEach(room => setDoc(doc(fbDb, 'artifacts', appId, 'public', 'data', 'crm_chatrooms', room.id), room));
-           } else {
-              setChatRooms(snapshot.docs.map(d => d.data()));
-           }
-        }, console.error);
-
-        return () => { unsubUsers(); unsubProps(); unsubCusts(); unsubChats(); };
-      }, [fbUser, fbDb, appId]);
-
-      // 5. 내 물건, 공유 물건 정리
+      // 내 물건, 공유 물건 정리
       useEffect(() => {
         if (!currentUser) return;
         setMyProperties(properties.filter(p => p.user_id === currentUser.loginId));
         setSharedProperties(properties.filter(p => p.isShared === true));
       }, [properties, currentUser]);
 
+      // 모바일 메뉴 외부 클릭 닫기
       useEffect(() => {
         const handleClickOutside = (e) => {
           if (isMobileMenuOpen && e.target.closest('#sidebar-overlay')) setIsMobileMenuOpen(false);
@@ -416,7 +311,6 @@
         return () => document.removeEventListener('click', handleClickOutside);
       }, [isMobileMenuOpen]);
 
-      // 로그인/회원가입 처리
       const handleAuth = async (type, data) => {
         if (type === 'login') {
           const user = employees.find(emp => emp.loginId === data.loginId && emp.password === data.password);
@@ -442,9 +336,7 @@
             date: new Date().toISOString().split('T')[0]
           };
           
-          const { doc, setDoc } = window.FB;
-          await setDoc(doc(fbDb, 'artifacts', appId, 'public', 'data', 'crm_users', newUser.id), newUser);
-          
+          setEmployees(prev => [newUser, ...prev]);
           localStorage.setItem('crm_loggedInUser', JSON.stringify(newUser));
           setCurrentUser(newUser);
           setIsAuthenticated(true);
@@ -459,8 +351,7 @@
         setIsMobileMenuOpen(false);
       };
 
-      // 물건 등록 (저장) - 저장 시 화면 최상단 이동
-      const handleSaveProperty = async (prop) => {
+      const handleSaveProperty = (prop) => {
         const finalProp = { 
           ...prop, 
           id: prop.id || `P-${Date.now()}`,
@@ -470,27 +361,37 @@
           date: prop.date || new Date().toISOString().split('T')[0]
         };
         
-        const { doc, setDoc } = window.FB;
-        await setDoc(doc(fbDb, 'artifacts', appId, 'public', 'data', 'crm_properties', finalProp.id), finalProp);
+        setProperties(prev => {
+          const existingIdx = prev.findIndex(p => p.id === finalProp.id);
+          if (existingIdx >= 0) {
+            const next = [...prev];
+            next[existingIdx] = finalProp;
+            return next;
+          }
+          return [finalProp, ...prev];
+        });
 
         setSelectedProperty(finalProp);
         setCurrentView('detail');
-        // 화면 최상단 즉시 이동
         const scrollArea = document.getElementById('main-scroll-area');
         if (scrollArea) scrollArea.scrollTo({ top: 0, behavior: 'auto' });
       };
 
-      // 작업 일지 등 저장 전용 (스크롤 화면 위치 고정)
-      const handleUpdateProperty = async (prop) => {
-        const { doc, setDoc } = window.FB;
-        await setDoc(doc(fbDb, 'artifacts', appId, 'public', 'data', 'crm_properties', prop.id), prop);
+      const handleUpdateProperty = (prop) => {
+        setProperties(prev => {
+          const existingIdx = prev.findIndex(p => p.id === prop.id);
+          if (existingIdx >= 0) {
+            const next = [...prev];
+            next[existingIdx] = prop;
+            return next;
+          }
+          return prev;
+        });
         setSelectedProperty(prop);
       };
 
-      // 물건 삭제
-      const handleDeleteProperty = async (propertyId) => {
-        const { doc, deleteDoc } = window.FB;
-        await deleteDoc(doc(fbDb, 'artifacts', appId, 'public', 'data', 'crm_properties', propertyId));
+      const handleDeleteProperty = (propertyId) => {
+        setProperties(prev => prev.filter(p => p.id !== propertyId));
         setCurrentView('list');
         setSelectedProperty(null);
       };
@@ -501,8 +402,7 @@
         setIsMobileMenuOpen(false); 
       };
 
-      // 채팅 시작
-      const handleStartChat = async (targetUserName) => {
+      const handleStartChat = (targetUserName) => {
         if (!targetUserName || targetUserName === currentUser.name) return;
         
         let room = chatRooms.find(r => r.participants.includes(currentUser.name) && r.participants.includes(targetUserName));
@@ -513,29 +413,29 @@
             participants: [currentUser.name, targetUserName],
             messages: []
           };
-          const { doc, setDoc } = window.FB;
-          await setDoc(doc(fbDb, 'artifacts', appId, 'public', 'data', 'crm_chatrooms', room.id), room);
+          setChatRooms(prev => [room, ...prev]);
         }
         
         setCurrentChatRoomId(room.id);
         setActiveTab('chatRoom');
       };
 
-      // 채팅 전송
-      const handleSendMessage = async (roomId, text, type = 'text') => {
-        const room = chatRooms.find(r => r.id === roomId);
-        if (room) {
-          const newMessage = {
-            id: Date.now(),
-            sender: currentUser.name,
-            text,
-            time: new Date().toLocaleTimeString('ko-KR', {hour: '2-digit', minute:'2-digit'}),
-            type
-          };
-          const updatedRoom = { ...room, messages: [...room.messages, newMessage] };
-          const { doc, setDoc } = window.FB;
-          await setDoc(doc(fbDb, 'artifacts', appId, 'public', 'data', 'crm_chatrooms', roomId), updatedRoom);
-        }
+      const handleSendMessage = (roomId, text, type = 'text') => {
+        setChatRooms(prev => prev.map(room => {
+          if(room.id === roomId) {
+            return {
+              ...room,
+              messages: [...room.messages, {
+                id: Date.now(),
+                sender: currentUser.name,
+                text,
+                time: new Date().toLocaleTimeString('ko-KR', {hour: '2-digit', minute:'2-digit'}),
+                type
+              }]
+            }
+          }
+          return room;
+        }));
       };
 
       const filteredMyProperties = myProperties.filter(p => 
@@ -560,13 +460,8 @@
         c.region.toLowerCase().includes(searchTerm.toLowerCase())
       );
 
-      // 데이터 로딩 대기 화면
-      if (!firebaseReady || !fbUser || !fbDb) {
-        return <div className="flex flex-col h-screen items-center justify-center bg-slate-50 text-slate-500 font-bold text-lg"><Building2 className="w-10 h-10 mb-4 text-blue-500 animate-pulse" /> 클라우드 데이터베이스 연결 중...</div>;
-      }
-
       if (!isAuthenticated) {
-        return <AuthView onAuth={handleAuth} isDbEmpty={employees.length === 0} />;
+        return <AuthView onAuth={handleAuth} />;
       }
 
       return (
@@ -685,10 +580,9 @@
                   {currentEmployeeView === 'form' && (
                     <EmployeeFormView 
                       onBack={() => setCurrentEmployeeView('list')} 
-                      onSave={async (newEmp) => {
+                      onSave={(newEmp) => {
                         const emp = { ...newEmp, id: `E-${Date.now()}`, date: new Date().toISOString().split('T')[0] };
-                        const { doc, setDoc } = window.FB;
-                        await setDoc(doc(fbDb, 'artifacts', appId, 'public', 'data', 'crm_users', emp.id), emp);
+                        setEmployees(prev => [emp, ...prev]);
                         setCurrentEmployeeView('list');
                       }} 
                     />
@@ -701,10 +595,9 @@
                   {currentCustomerView === 'form' && (
                     <CustomerFormView 
                       onBack={() => setCurrentCustomerView('list')} 
-                      onSave={async (newCust) => {
+                      onSave={(newCust) => {
                         const cust = { ...newCust, id: `C-${Date.now()}`, date: new Date().toISOString().split('T')[0] };
-                        const { doc, setDoc } = window.FB;
-                        await setDoc(doc(fbDb, 'artifacts', appId, 'public', 'data', 'crm_customers', cust.id), cust);
+                        setCustomers(prev => [cust, ...prev]);
                         setCurrentCustomerView('list');
                       }} 
                     />
@@ -722,7 +615,7 @@
     // [5] 상세/하위 뷰 컴포넌트들
     // =====================================================================
 
-    function AuthView({ onAuth, isDbEmpty }) {
+    function AuthView({ onAuth }) {
       const [isLoginMode, setIsLoginMode] = useState(true);
       const [errorMsg, setErrorMsg] = useState('');
       const [formData, setFormData] = useState({ loginId: '', password: '', name: '', phone: '', department: '' });
@@ -745,7 +638,6 @@
               </div>
               <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">빌딩탭</h1>
               <p className="text-sm text-slate-500 mt-2 text-center">부동산 매물 관리의 시작</p>
-              {isDbEmpty && <p className="text-xs text-blue-600 bg-blue-50 px-3 py-1 rounded font-bold mt-3">최초 접속입니다. '회원가입'을 진행해주세요.</p>}
             </div>
 
             <div className="flex p-1 bg-slate-100 rounded-lg mb-6">
@@ -814,6 +706,17 @@
         return result.join(' ');
       };
 
+      const getAreaRange = (sqm) => {
+        const pyeong = Math.round((sqm || 0) * 0.3025);
+        if (pyeong === 0) return '미등록';
+        let rounded = Math.round(pyeong / 100) * 100;
+        if (rounded === 0 && pyeong > 0) {
+           rounded = Math.round(pyeong / 10) * 10; 
+           if (rounded === 0) rounded = pyeong;
+        }
+        return `약 ${rounded}평`;
+      };
+
       return (
         <div className="w-full">
           <div className="flex items-center gap-3 mb-6 bg-indigo-50 p-4 rounded-xl border border-indigo-100 shadow-sm">
@@ -831,45 +734,48 @@
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 sm:gap-6 auto-rows-fr">
               {sharedList.map(prop => (
-                <div key={prop.id} className="bg-[#fef9c3] p-5 rounded-2xl shadow-md border border-[#fde047] transform transition-transform duration-300 hover:-translate-y-1 relative group flex flex-col justify-between min-h-[220px]">
+                <div key={prop.id} className="bg-[#fef9c3] p-5 rounded-2xl shadow-md border border-[#fde047] transform transition-transform duration-300 hover:-translate-y-1 relative group flex flex-col justify-between min-h-[240px]">
                   
                   <div>
                     <div className="flex justify-between items-start border-b border-[#fde047] pb-3 mb-3">
-                      <h3 className="font-extrabold text-slate-800 text-[15px] sm:text-[17px] leading-tight line-clamp-2 w-full">{getShortAddress(prop.address)}</h3>
+                      <h3 className="font-extrabold text-slate-800 text-[15px] sm:text-[17px] leading-tight line-clamp-2 w-[75%]">{getShortAddress(prop.address)}</h3>
+                      <div className="flex flex-col gap-1 items-end shrink-0">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold text-white shadow-sm ${STATUS_BADGE_COLORS[prop.status || '보류']}`}>{prop.status || '보류'}</span>
+                      </div>
                     </div>
                     
-                    <div className="space-y-2 text-slate-700 font-medium text-sm">
-                      <div className="flex items-center bg-[#fef08a]/40 px-2 py-1.5 rounded gap-3">
+                    <div className="space-y-1.5 text-slate-700 font-medium text-xs">
+                      <div className="flex items-center bg-[#fef08a]/40 px-2 py-1.5 rounded gap-2">
                         <span className="text-slate-600 text-[11px] font-bold w-12 shrink-0">대지</span> 
-                        <span className="font-extrabold flex-1 text-right truncate text-[14px]">{getExactPyeong(prop.landArea)}평</span>
+                        <span className="font-extrabold flex-1 text-right truncate text-[13px]">{getAreaRange(prop.landArea)}</span>
                       </div>
-                      <div className="flex items-center bg-[#fef08a]/40 px-2 py-1.5 rounded gap-3">
+                      <div className="flex items-center bg-[#fef08a]/40 px-2 py-1.5 rounded gap-2">
                         <span className="text-slate-600 text-[11px] font-bold w-12 shrink-0">연면적</span> 
-                        <span className="font-extrabold flex-1 text-right truncate text-[14px]">{getExactPyeong(prop.totalFloorArea)}평</span>
+                        <span className="font-extrabold flex-1 text-right truncate text-[13px]">{getAreaRange(prop.totalFloorArea)}</span>
                       </div>
                       
                       <div className="pt-3 mt-3 border-t border-[#fde047] flex flex-col gap-1">
                         <div className="flex justify-between items-baseline mb-1">
-                          <span className="text-xs font-bold text-indigo-600">{prop.transactionType}가</span>
-                          <span className="text-xl sm:text-2xl font-black text-red-600 tracking-tight leading-none truncate">
+                          <span className="text-[11px] font-bold text-indigo-600">{prop.transactionType}가</span>
+                          <span className="text-lg sm:text-xl font-black text-red-600 tracking-tight leading-none truncate">
                             {prop.transactionType === '매매' ? formatShortCurrency(prop.price?.sale) : 
                              prop.transactionType === '전세' ? formatShortCurrency(prop.price?.deposit) : 
                              `${formatShortCurrency(prop.price?.deposit)}`}
                           </span>
                         </div>
-                        <div className="flex flex-col gap-1.5 mt-1">
+                        <div className="flex flex-col gap-1">
                           <div className="flex justify-between items-center bg-[#fef08a]/60 px-2 py-1.5 rounded">
                             <span className="text-[11px] font-bold text-slate-600">보증금</span>
-                            <span className="text-sm font-extrabold text-slate-800">{formatShortCurrency(prop.price?.deposit)}</span>
+                            <span className="text-[11px] font-extrabold text-slate-800">{formatShortCurrency(prop.price?.deposit)}</span>
                           </div>
                           <div className="flex justify-between items-center bg-[#fef08a]/60 px-2 py-1.5 rounded">
                             <span className="text-[11px] font-bold text-slate-600">월세</span>
-                            <span className="text-sm font-extrabold text-slate-800">{formatShortCurrency(prop.price?.rent)}</span>
+                            <span className="text-[11px] font-extrabold text-slate-800">{formatShortCurrency(prop.price?.rent)}</span>
                           </div>
                           {prop.transactionType === '매매' && (
                             <div className="flex justify-between items-center bg-emerald-100/60 px-2 py-1.5 rounded mt-1 border border-emerald-200">
-                              <span className="text-xs font-bold text-emerald-700">수익률</span>
-                              <span className="text-sm font-extrabold text-emerald-700">{getYield(prop.price?.sale, prop.price?.deposit, prop.price?.rent)}%</span>
+                              <span className="text-[11px] font-bold text-emerald-700">수익률</span>
+                              <span className="text-[12px] font-extrabold text-emerald-700">{getYield(prop.price?.sale, prop.price?.deposit, prop.price?.rent)}%</span>
                             </div>
                           )}
                         </div>
@@ -877,18 +783,18 @@
                     </div>
                   </div>
 
-                  <div className="mt-5 pt-3 border-t border-[#fde047] flex flex-col gap-2">
+                  <div className="mt-4 pt-3 border-t border-[#fde047] flex flex-col gap-1.5">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-slate-500">담당자</span>
+                      <span className="text-[11px] font-bold text-slate-500">담당자</span>
                       {prop.registrant !== currentUser?.name ? (
-                        <button onClick={() => onStartChat(prop.registrant)} className="bg-yellow-400 hover:bg-yellow-500 text-yellow-900 px-2.5 py-1.5 rounded shadow-sm text-[11px] font-bold transition-colors flex items-center gap-1.5">
-                          <MessageCircle className="w-4 h-4" /> 채팅
+                        <button onClick={() => onStartChat(prop.registrant)} className="bg-yellow-400 hover:bg-yellow-500 text-yellow-900 px-3 py-1.5 rounded shadow-sm text-[11px] font-bold transition-colors flex items-center gap-1.5">
+                          <MessageCircle className="w-4 h-4" /> 채팅하기
                         </button>
                       ) : (
                         <span className="text-[10px] text-slate-400 font-bold bg-white/50 px-2 py-1 rounded">내 물건</span>
                       )}
                     </div>
-                    <div className="text-sm font-bold text-slate-800 flex items-center truncate">
+                    <div className="text-xs sm:text-sm font-bold text-slate-800 flex items-center truncate">
                       <i className="fas fa-user-circle mr-1.5 opacity-70 text-slate-500"></i>{prop.registrant || '미상'}
                     </div>
                   </div>
@@ -999,7 +905,7 @@
                     {!isMe && <span className="text-xs text-slate-700 mb-1 ml-1">{msg.sender}</span>}
                     <div className="flex items-end gap-1.5">
                       {isMe && <span className="text-[10px] text-slate-500 mb-1">{msg.time}</span>}
-                      <div className={`px-2.5 py-1.5 text-[13px] shadow-sm leading-snug break-words ${isMe ? 'bg-[#fef01b] text-slate-900 rounded-2xl rounded-tr-sm' : 'bg-white text-slate-800 rounded-2xl rounded-tl-sm'}`}>
+                      <div className={`p-2.5 text-[13px] shadow-sm leading-snug break-words ${isMe ? 'bg-[#fef01b] text-slate-900 rounded-2xl rounded-tr-sm' : 'bg-white text-slate-800 rounded-2xl rounded-tl-sm'}`}>
                         {msg.type === 'file' ? (
                           (() => {
                             let fileData = { name: msg.text, url: '#' };
@@ -1632,7 +1538,7 @@
                     <FloorMoneyInputReadOnly label="총 월세" value={totals.rent} />
                     <FloorMoneyInputReadOnly label="총 관리비" value={totals.maintenance} />
                   </div>
-                  <div className="hidden md:block w-10 shrink-0"></div>
+                  <div className="hidden md:block w-[46px] shrink-0"></div>
                 </div>
               </div>
             </div>
@@ -1690,7 +1596,7 @@
       return (
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden w-full">
           <div className="p-4 md:p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50/50">
-            <h3 className="font-semibold text-slate-800 flex items-center gap-2 text-sm md:text-base"><UserCircle className="w-5 h-5 text-blue-600" /> 등록된 사원 <span className="text-blue-600 bg-blue-100 px-2 py-0.5 rounded-full text-xs">{employees.length}</span></h3>
+            <h3 className="font-semibold text-slate-800 flex items-center gap-2 text-sm md:text-base"><UserCircle className="w-5 h-5 text-blue-600" /> 본인 접속 계정 정보</h3>
           </div>
           <div className="overflow-x-auto w-full">
             <table className="w-full text-left border-collapse whitespace-nowrap min-w-[600px]">
