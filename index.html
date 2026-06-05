@@ -39,28 +39,31 @@
 <body>
   <div id="root"></div>
 
-  <!-- data-type="module"을 사용하여 Firebase 모듈 import 허용 -->
-  <script type="text/babel" data-type="module">
+  <!-- 1. Firebase 모듈 로드부 (Babel과 분리하여 충돌 방지) -->
+  <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
     import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
     import { getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
+    window.FirebaseCore = {
+      initializeApp, getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged,
+      getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc
+    };
+    window.dispatchEvent(new Event('firebaseLoaded'));
+  </script>
+
+  <!-- 2. React UI 구성부 -->
+  <script type="text/babel">
     const { useState, useMemo, useEffect, useRef } = React;
 
-    // =====================================================================
-    // [1] FIREBASE 클라우드 데이터베이스 초기화
-    // =====================================================================
-    let firebaseConfig = { projectId: "demo-project" };
-    try {
-        if (typeof __firebase_config !== 'undefined') firebaseConfig = JSON.parse(__firebase_config);
-    } catch (e) { console.error("Firebase config error", e); }
-    
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const db = getFirestore(app);
-    const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+    // 파이어베이스 글로벌 변수 할당
+    let app, auth, db, appId;
+    let signInWithCustomToken, signInAnonymously, onAuthStateChanged;
+    let collection, onSnapshot, doc, setDoc, deleteDoc;
 
-    // DB가 비어있을 경우 채워넣을 기초(샘플) 데이터
+    // =====================================================================
+    // [1] 기초 초기 데이터 (DB 비어있을 시 사용)
+    // =====================================================================
     const initialEmployees = [
       { id: 'user-001', loginId: 'admin', password: '123', name: '손태호', phone: '010-1234-5678', department: '중개법인 대표', date: '2026-05-27' },
       { id: 'user-002', loginId: 'kim123', password: '123', name: '김과장', phone: '010-1111-2222', department: '영업1팀', date: '2026-05-27' }
@@ -187,17 +190,14 @@
       return `${num.toLocaleString()}만`;
     };
 
-    // 상태 옵션: 보류, 완료, 매매 순서
     const STATUS_OPTIONS = ['보류', '완료', '매매'];
     
-    // 버튼용 색상 (매매는 파란색)
     const STATUS_FORM_COLORS = {
       '보류': 'bg-white text-slate-700 shadow-[0_2px_8px_rgba(0,0,0,0.08)]',
       '완료': 'bg-red-500 text-white shadow-[0_4px_12px_rgba(239,68,68,0.4)]',
       '매매': 'bg-blue-500 text-white shadow-[0_4px_12px_rgba(59,130,246,0.4)]'
     };
     
-    // 목록 뱃지용 색상 (완료만 빨간색, 매매는 회색)
     const STATUS_BADGE_COLORS = {
       '보류': 'bg-slate-200 text-slate-600',
       '완료': 'bg-red-500 text-white shadow-sm',
@@ -213,7 +213,6 @@
       return s.replace(/\s+/g, ' ').trim();
     };
 
-    // 평수 소수점 2자리 정확한 표기
     const getExactPyeong = (sqm) => {
       return ((Number(sqm) || 0) * 0.3025).toFixed(2);
     };
@@ -244,7 +243,7 @@
 
     function FloorMoneyInput({ label, value, onChange }) {
       return (
-        <div className="flex-1 min-w-[120px]">
+        <div className="flex-1 w-full min-w-[120px]">
           <div className="flex items-center border border-slate-300 rounded-lg bg-white focus-within:border-blue-500 focus-within:ring-1 overflow-hidden shadow-sm transition-all">
             <span className="bg-slate-100 text-xs font-bold text-slate-600 px-2 py-3 sm:py-2 border-r border-slate-200 whitespace-nowrap">{label}</span>
             <input type="number" value={value || ''} onChange={onChange} className="w-full py-3 sm:py-2 px-2 text-right text-sm font-bold outline-none bg-transparent" placeholder="0" />
@@ -281,7 +280,7 @@
 
     function FloorMoneyInputReadOnly({ label, value }) {
       return (
-        <div className="flex-1 min-w-[120px]">
+        <div className="flex-1 w-full min-w-[120px]">
           <div className="flex items-center border border-blue-200 rounded-lg bg-white overflow-hidden shadow-sm transition-all">
             <span className="bg-blue-100 text-xs font-bold text-blue-800 px-2 py-3 sm:py-2 border-r border-blue-200 whitespace-nowrap">{label}</span>
             <div className="w-full py-3 sm:py-2 px-2 text-right text-sm font-extrabold text-slate-900 bg-transparent truncate">{value.toLocaleString()}</div>
@@ -387,14 +386,13 @@
         return () => { unsubUsers(); unsubProps(); unsubCusts(); unsubChats(); };
       }, [fbUser]);
 
-      // 3. 내 물건, 공유 물건 정리
+      // 4. 내 물건, 공유 물건 정리
       useEffect(() => {
         if (!currentUser) return;
         setMyProperties(properties.filter(p => p.user_id === currentUser.loginId));
         setSharedProperties(properties.filter(p => p.isShared === true));
       }, [properties, currentUser]);
 
-      // 모바일 닫기
       useEffect(() => {
         const handleClickOutside = (e) => {
           if (isMobileMenuOpen && e.target.closest('#sidebar-overlay')) setIsMobileMenuOpen(false);
@@ -650,7 +648,6 @@
                   {currentView === 'form' && (
                     <PropertyFormView 
                       initialData={selectedProperty} 
-                      properties={properties}
                       onBack={() => { currentView === 'form' && selectedProperty ? setCurrentView('detail') : setCurrentView('list'); }} 
                       onSave={handleSaveProperty} 
                       currentUser={currentUser} 
@@ -1084,7 +1081,7 @@
               <div className="flex flex-col gap-1.5 w-full sm:w-auto">
                 <span className="text-[11px] font-bold text-slate-500 flex items-center gap-1.5 ml-1"><i className="fas fa-layer-group text-blue-500"></i> 상태</span>
                 <div className="flex bg-slate-200/80 p-1 rounded-lg w-full sm:w-auto shadow-inner">
-                  {['전체', ...STATUS_OPTIONS].map(status => (
+                  {['전체', '보류', '완료'].map(status => (
                     <button key={status} onClick={() => setStatusFilter(status)} className={`flex-1 sm:flex-none px-4 py-1.5 rounded-md text-xs font-bold transition-all ${statusFilter === status ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>{status}</button>
                   ))}
                 </div>
@@ -1128,6 +1125,7 @@
                     <td className="p-3">
                       <div className="flex gap-1.5 items-center flex-wrap">
                         <span className={`px-2 py-0.5 rounded text-[11px] font-bold ${STATUS_BADGE_COLORS[prop.status || '보류']}`}>{prop.status || '보류'}</span>
+                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${prop.transactionType === '매매' ? 'bg-slate-100 text-slate-600 border border-slate-200' : prop.transactionType === '전세' ? 'bg-blue-100 text-blue-700 border border-blue-200' : 'bg-green-100 text-green-700 border border-green-200'}`}>{prop.transactionType}</span>
                       </div>
                     </td>
                     <td className="p-3 max-w-[150px] sm:max-w-[200px]">
@@ -1335,7 +1333,7 @@
               </div>
               <div className="space-y-3 max-h-[400px] overflow-y-auto pr-1 sm:pr-2">
                 {(property.workLogs || []).length > 0 ? property.workLogs.map(log => (
-                  <div key={log.id} className="p-3 sm:p-4 bg-slate-50 rounded-xl border border-slate-100 flex flex-col gap-1.5">
+                  <div key={log.id} className="p-3 sm:p-4 bg-slate-50 rounded-xl border border-slate-100 text-xs sm:text-sm flex flex-col gap-1.5">
                     <div className="flex flex-wrap items-center justify-between gap-1 sm:gap-2 border-b border-slate-200 pb-2 mb-1"><span className="font-bold text-slate-700 text-xs sm:text-sm flex items-center gap-1.5"><UserCircle className="w-3 h-3 sm:w-4 sm:h-4 text-blue-500" /> {log.author}</span><span className="text-[10px] sm:text-xs text-slate-400 font-medium">{log.date}</span></div>
                     <p className="text-slate-800 text-xs sm:text-sm whitespace-pre-line leading-relaxed">{log.content}</p>
                   </div>
@@ -1443,13 +1441,6 @@
         e.preventDefault();
 
         const formattedAddress = autoFormatAddress(formData.address);
-        
-        // 중복 주소 체크 (기본 방어 로직)
-        const isDuplicate = globalProperties.some(p => p.address === formattedAddress && p.id !== formData.id);
-        if (isDuplicate) {
-          setAddressError('이미 등록된 주소지가 존재합니다.');
-          return;
-        }
 
         sortFloorDetails(); 
         
@@ -1596,17 +1587,18 @@
               </div>
               <div className="space-y-4">
                 {formData.floorDetails.map((f, i) => (
-                  <div key={f.id} className="flex flex-col p-4 bg-slate-50 rounded-xl border border-slate-200 gap-3">
-                    <div className="flex items-center gap-3 w-full">
+                  <div key={f.id} className="flex flex-col md:flex-row items-start gap-3 sm:gap-4 p-3 sm:p-4 bg-slate-50 rounded-xl border border-slate-200">
+                    <div className="flex w-full md:w-auto gap-3">
                       <FloorTextInput value={f.floor} autoFocus={f.isNew} onChange={(e) => handleFloorChange(f.id, 'floor', e.target.value)} onBlur={sortFloorDetails} />
                       <CompanyTextInput value={f.companyName} onChange={(e) => handleFloorChange(f.id, 'companyName', e.target.value)} />
-                      <button type="button" onClick={() => setFormData({...formData, floorDetails: formData.floorDetails.filter(item => item.id !== f.id)})} className="p-2.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors border border-red-100 bg-white ml-auto shrink-0 shadow-sm" title="삭제"><Trash2 className="w-5 h-5" /></button>
+                      <div className="md:hidden shrink-0 ml-auto"><button type="button" onClick={() => setFormData({...formData, floorDetails: formData.floorDetails.filter(item => item.id !== f.id)})} className="p-2.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors border border-red-100 bg-white shadow-sm" title="삭제"><Trash2 className="w-5 h-5" /></button></div>
                     </div>
-                    <div className="flex flex-col sm:flex-row w-full gap-3">
+                    <div className="flex flex-col sm:flex-row w-full gap-3 sm:gap-4">
                       <FloorMoneyInput label="보증금" value={f.deposit} onChange={(e) => handleFloorChange(f.id, 'deposit', e.target.value)} />
                       <FloorMoneyInput label="월세" value={f.rent} onChange={(e) => handleFloorChange(f.id, 'rent', e.target.value)} />
                       <FloorMoneyInput label="관리비" value={f.maintenance} onChange={(e) => handleFloorChange(f.id, 'maintenance', e.target.value)} />
                     </div>
+                    <div className="hidden md:block pt-1 shrink-0"><button type="button" onClick={() => setFormData({...formData, floorDetails: formData.floorDetails.filter(item => item.id !== f.id)})} className="p-2.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors border border-red-100 bg-white shadow-sm mt-0.5" title="삭제"><Trash2 className="w-5 h-5" /></button></div>
                   </div>
                 ))}
                 <div className="flex flex-col md:flex-row items-start gap-3 sm:gap-4 p-3 sm:p-4 bg-blue-50 rounded-xl border border-blue-200 mt-2">
@@ -1835,8 +1827,32 @@
       );
     }
 
-    const root = ReactDOM.createRoot(document.getElementById('root'));
-    root.render(<App />);
+    // =====================================================================
+    // [9] 부트스트랩 (렌더링)
+    // =====================================================================
+    function startApp() {
+      ({ signInWithCustomToken, signInAnonymously, onAuthStateChanged,
+         collection, onSnapshot, doc, setDoc, deleteDoc } = window.FirebaseCore);
+      
+      let firebaseConfig = { projectId: "demo-project" };
+      try {
+          if (typeof __firebase_config !== 'undefined') firebaseConfig = JSON.parse(__firebase_config);
+      } catch (e) { console.error("Firebase config error", e); }
+      
+      appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+      app = window.FirebaseCore.initializeApp(firebaseConfig);
+      auth = window.FirebaseCore.getAuth(app);
+      db = window.FirebaseCore.getFirestore(app);
+
+      const root = ReactDOM.createRoot(document.getElementById('root'));
+      root.render(<App />);
+    }
+
+    if (window.FirebaseCore) {
+      startApp();
+    } else {
+      window.addEventListener('firebaseLoaded', startApp);
+    }
   </script>
 </body>
 </html>
