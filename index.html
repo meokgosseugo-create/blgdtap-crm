@@ -11,9 +11,9 @@
   <!-- FontAwesome Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
-  <!-- React & ReactDOM (안정적인 최신 버전) -->
-  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
-  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <!-- React & ReactDOM (안정적인 프로덕션 버전) -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   
   <!-- Babel Standalone (브라우저에서 직접 JSX 컴파일) -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -36,7 +36,7 @@
 <body>
   <div id="root"></div>
 
-  <!-- 파이어베이스 스크립트는 삭제하고 로컬 DB 모드로 우선 완벽 구동되도록 세팅 -->
+  <!-- 파이어베이스 스크립트를 제외하고 안정적인 로컬 DB 모드로 완벽 구동되도록 세팅 -->
   <script type="text/babel">
     const { useState, useMemo, useEffect, useRef } = React;
 
@@ -156,12 +156,14 @@
 
     const STATUS_OPTIONS = ['보류', '완료', '매매'];
     
+    // 등록 시 버튼 색상 (매매는 파란색)
     const STATUS_FORM_COLORS = {
       '보류': 'bg-white text-slate-700 shadow-[0_2px_8px_rgba(0,0,0,0.08)]',
       '완료': 'bg-red-500 text-white shadow-[0_4px_12px_rgba(239,68,68,0.4)]',
       '매매': 'bg-blue-500 text-white shadow-[0_4px_12px_rgba(59,130,246,0.4)]'
     };
     
+    // 리스트 및 상세의 뱃지 색상 (매매는 회색)
     const STATUS_BADGE_COLORS = {
       '보류': 'bg-slate-200 text-slate-600',
       '완료': 'bg-red-500 text-white shadow-sm',
@@ -706,17 +708,6 @@
         return result.join(' ');
       };
 
-      const getAreaRange = (sqm) => {
-        const pyeong = Math.round((sqm || 0) * 0.3025);
-        if (pyeong === 0) return '미등록';
-        let rounded = Math.round(pyeong / 100) * 100;
-        if (rounded === 0 && pyeong > 0) {
-           rounded = Math.round(pyeong / 10) * 10; 
-           if (rounded === 0) rounded = pyeong;
-        }
-        return `약 ${rounded}평`;
-      };
-
       return (
         <div className="w-full">
           <div className="flex items-center gap-3 mb-6 bg-indigo-50 p-4 rounded-xl border border-indigo-100 shadow-sm">
@@ -734,48 +725,45 @@
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 sm:gap-6 auto-rows-fr">
               {sharedList.map(prop => (
-                <div key={prop.id} className="bg-[#fef9c3] p-5 rounded-2xl shadow-md border border-[#fde047] transform transition-transform duration-300 hover:-translate-y-1 relative group flex flex-col justify-between min-h-[240px]">
+                <div key={prop.id} className="bg-[#fef9c3] p-5 rounded-2xl shadow-md border border-[#fde047] transform transition-transform duration-300 hover:-translate-y-1 relative group flex flex-col justify-between min-h-[220px]">
                   
                   <div>
                     <div className="flex justify-between items-start border-b border-[#fde047] pb-3 mb-3">
-                      <h3 className="font-extrabold text-slate-800 text-[15px] sm:text-[17px] leading-tight line-clamp-2 w-[75%]">{getShortAddress(prop.address)}</h3>
-                      <div className="flex flex-col gap-1 items-end shrink-0">
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold text-white shadow-sm ${STATUS_BADGE_COLORS[prop.status || '보류']}`}>{prop.status || '보류'}</span>
-                      </div>
+                      <h3 className="font-extrabold text-slate-800 text-[15px] sm:text-[17px] leading-tight line-clamp-2 w-full">{getShortAddress(prop.address)}</h3>
                     </div>
                     
-                    <div className="space-y-1.5 text-slate-700 font-medium text-xs">
-                      <div className="flex items-center bg-[#fef08a]/40 px-2 py-1.5 rounded gap-2">
+                    <div className="space-y-2 text-slate-700 font-medium text-sm">
+                      <div className="flex items-center bg-[#fef08a]/40 px-2 py-1.5 rounded gap-3">
                         <span className="text-slate-600 text-[11px] font-bold w-12 shrink-0">대지</span> 
-                        <span className="font-extrabold flex-1 text-right truncate text-[13px]">{getAreaRange(prop.landArea)}</span>
+                        <span className="font-extrabold flex-1 text-right truncate text-[14px]">{getExactPyeong(prop.landArea)}평</span>
                       </div>
-                      <div className="flex items-center bg-[#fef08a]/40 px-2 py-1.5 rounded gap-2">
+                      <div className="flex items-center bg-[#fef08a]/40 px-2 py-1.5 rounded gap-3">
                         <span className="text-slate-600 text-[11px] font-bold w-12 shrink-0">연면적</span> 
-                        <span className="font-extrabold flex-1 text-right truncate text-[13px]">{getAreaRange(prop.totalFloorArea)}</span>
+                        <span className="font-extrabold flex-1 text-right truncate text-[14px]">{getExactPyeong(prop.totalFloorArea)}평</span>
                       </div>
                       
                       <div className="pt-3 mt-3 border-t border-[#fde047] flex flex-col gap-1">
                         <div className="flex justify-between items-baseline mb-1">
-                          <span className="text-[11px] font-bold text-indigo-600">{prop.transactionType}가</span>
-                          <span className="text-lg sm:text-xl font-black text-red-600 tracking-tight leading-none truncate">
+                          <span className="text-xs font-bold text-indigo-600">{prop.transactionType}가</span>
+                          <span className="text-xl sm:text-2xl font-black text-red-600 tracking-tight leading-none truncate">
                             {prop.transactionType === '매매' ? formatShortCurrency(prop.price?.sale) : 
                              prop.transactionType === '전세' ? formatShortCurrency(prop.price?.deposit) : 
                              `${formatShortCurrency(prop.price?.deposit)}`}
                           </span>
                         </div>
-                        <div className="flex flex-col gap-1">
+                        <div className="flex flex-col gap-1.5 mt-1">
                           <div className="flex justify-between items-center bg-[#fef08a]/60 px-2 py-1.5 rounded">
                             <span className="text-[11px] font-bold text-slate-600">보증금</span>
-                            <span className="text-[11px] font-extrabold text-slate-800">{formatShortCurrency(prop.price?.deposit)}</span>
+                            <span className="text-sm font-extrabold text-slate-800">{formatShortCurrency(prop.price?.deposit)}</span>
                           </div>
                           <div className="flex justify-between items-center bg-[#fef08a]/60 px-2 py-1.5 rounded">
                             <span className="text-[11px] font-bold text-slate-600">월세</span>
-                            <span className="text-[11px] font-extrabold text-slate-800">{formatShortCurrency(prop.price?.rent)}</span>
+                            <span className="text-sm font-extrabold text-slate-800">{formatShortCurrency(prop.price?.rent)}</span>
                           </div>
                           {prop.transactionType === '매매' && (
                             <div className="flex justify-between items-center bg-emerald-100/60 px-2 py-1.5 rounded mt-1 border border-emerald-200">
-                              <span className="text-[11px] font-bold text-emerald-700">수익률</span>
-                              <span className="text-[12px] font-extrabold text-emerald-700">{getYield(prop.price?.sale, prop.price?.deposit, prop.price?.rent)}%</span>
+                              <span className="text-xs font-bold text-emerald-700">수익률</span>
+                              <span className="text-sm font-extrabold text-emerald-700">{getYield(prop.price?.sale, prop.price?.deposit, prop.price?.rent)}%</span>
                             </div>
                           )}
                         </div>
@@ -783,18 +771,18 @@
                     </div>
                   </div>
 
-                  <div className="mt-4 pt-3 border-t border-[#fde047] flex flex-col gap-1.5">
+                  <div className="mt-5 pt-3 border-t border-[#fde047] flex flex-col gap-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-[11px] font-bold text-slate-500">담당자</span>
+                      <span className="text-xs font-bold text-slate-500">담당자</span>
                       {prop.registrant !== currentUser?.name ? (
-                        <button onClick={() => onStartChat(prop.registrant)} className="bg-yellow-400 hover:bg-yellow-500 text-yellow-900 px-3 py-1.5 rounded shadow-sm text-[11px] font-bold transition-colors flex items-center gap-1.5">
-                          <MessageCircle className="w-4 h-4" /> 채팅하기
+                        <button onClick={() => onStartChat(prop.registrant)} className="bg-yellow-400 hover:bg-yellow-500 text-yellow-900 px-2.5 py-1.5 rounded shadow-sm text-[11px] font-bold transition-colors flex items-center gap-1.5">
+                          <MessageCircle className="w-4 h-4" /> 채팅
                         </button>
                       ) : (
                         <span className="text-[10px] text-slate-400 font-bold bg-white/50 px-2 py-1 rounded">내 물건</span>
                       )}
                     </div>
-                    <div className="text-xs sm:text-sm font-bold text-slate-800 flex items-center truncate">
+                    <div className="text-sm font-bold text-slate-800 flex items-center truncate">
                       <i className="fas fa-user-circle mr-1.5 opacity-70 text-slate-500"></i>{prop.registrant || '미상'}
                     </div>
                   </div>
@@ -905,7 +893,7 @@
                     {!isMe && <span className="text-xs text-slate-700 mb-1 ml-1">{msg.sender}</span>}
                     <div className="flex items-end gap-1.5">
                       {isMe && <span className="text-[10px] text-slate-500 mb-1">{msg.time}</span>}
-                      <div className={`p-2.5 text-[13px] shadow-sm leading-snug break-words ${isMe ? 'bg-[#fef01b] text-slate-900 rounded-2xl rounded-tr-sm' : 'bg-white text-slate-800 rounded-2xl rounded-tl-sm'}`}>
+                      <div className={`px-2.5 py-1.5 text-[13px] shadow-sm leading-snug break-words ${isMe ? 'bg-[#fef01b] text-slate-900 rounded-2xl rounded-tr-sm' : 'bg-white text-slate-800 rounded-2xl rounded-tl-sm'}`}>
                         {msg.type === 'file' ? (
                           (() => {
                             let fileData = { name: msg.text, url: '#' };
@@ -1075,7 +1063,7 @@
                     <td className="p-3 text-center font-bold text-emerald-600">{prop.transactionType === '매매' ? `${getYield(prop.price?.sale, prop.price?.deposit, prop.price?.rent)}%` : '-'}</td>
                     <td className="p-3 text-center text-slate-500">{prop.date}</td>
                   </tr>
-                )) : <tr><td colSpan="9" className="p-8 text-center text-slate-500 font-medium bg-slate-50">등록된 내 물건이 없습니다.</td></tr>}
+                )) : <tr><td colSpan="9" className="p-8 text-center text-slate-500 font-medium bg-slate-50">조건에 맞는 물건이 없습니다.</td></tr>}
               </tbody>
             </table>
           </div>
@@ -1468,13 +1456,13 @@
                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-4 sm:gap-y-6">
                    <FormGroup label="용도지역"><input type="text" name="zoning" value={formData.zoning || ''} onChange={handleChange} className="form-input w-full p-2.5 sm:p-3 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base" placeholder="예: 일반상업지역" /></FormGroup>
                    <FormGroup label="대지면적 (㎡)">
-                      <div className="relative"><input type="number" name="landArea" value={formData.landArea || ''} onChange={handleChange} className="form-input w-full p-2.5 sm:p-3 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base" placeholder="예: 330" />{formData.landArea && (<span className="absolute -bottom-5 sm:-bottom-6 left-1 text-[10px] sm:text-xs text-blue-600 font-bold">{((formData.landArea || 0) * 0.3025).toFixed(2)}평</span>)}</div>
+                      <div className="relative"><input type="number" name="landArea" value={formData.landArea || ''} onChange={handleChange} className="form-input w-full p-2.5 sm:p-3 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base" placeholder="예: 330" />{formData.landArea && (<span className="absolute -bottom-5 sm:-bottom-6 left-1 text-[10px] sm:text-xs text-blue-600 font-bold">{getExactPyeong(formData.landArea)}평</span>)}</div>
                    </FormGroup>
                    <FormGroup label="연면적 (㎡)">
-                      <div className="relative"><input type="number" name="totalFloorArea" value={formData.totalFloorArea || ''} onChange={handleChange} className="form-input w-full p-2.5 sm:p-3 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base" placeholder="예: 1500" />{formData.totalFloorArea && (<span className="absolute -bottom-5 sm:-bottom-6 left-1 text-[10px] sm:text-xs text-blue-600 font-bold">{((formData.totalFloorArea || 0) * 0.3025).toFixed(2)}평</span>)}</div>
+                      <div className="relative"><input type="number" name="totalFloorArea" value={formData.totalFloorArea || ''} onChange={handleChange} className="form-input w-full p-2.5 sm:p-3 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base" placeholder="예: 1500" />{formData.totalFloorArea && (<span className="absolute -bottom-5 sm:-bottom-6 left-1 text-[10px] sm:text-xs text-blue-600 font-bold">{getExactPyeong(formData.totalFloorArea)}평</span>)}</div>
                    </FormGroup>
                    <FormGroup label="건축면적 (㎡)">
-                      <div className="relative"><input type="number" name="buildingArea" value={formData.buildingArea || ''} onChange={handleChange} className="form-input w-full p-2.5 sm:p-3 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base" placeholder="예: 198" />{formData.buildingArea && (<span className="absolute -bottom-5 sm:-bottom-6 left-1 text-[10px] sm:text-xs text-blue-600 font-bold">{((formData.buildingArea || 0) * 0.3025).toFixed(2)}평</span>)}</div>
+                      <div className="relative"><input type="number" name="buildingArea" value={formData.buildingArea || ''} onChange={handleChange} className="form-input w-full p-2.5 sm:p-3 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base" placeholder="예: 198" />{formData.buildingArea && (<span className="absolute -bottom-5 sm:-bottom-6 left-1 text-[10px] sm:text-xs text-blue-600 font-bold">{getExactPyeong(formData.buildingArea)}평</span>)}</div>
                    </FormGroup>
                    <div className="grid grid-cols-2 gap-4">
                      <FormGroup label="건폐율 (%)">
@@ -1538,7 +1526,7 @@
                     <FloorMoneyInputReadOnly label="총 월세" value={totals.rent} />
                     <FloorMoneyInputReadOnly label="총 관리비" value={totals.maintenance} />
                   </div>
-                  <div className="hidden md:block w-[46px] shrink-0"></div>
+                  <div className="hidden md:block w-10 shrink-0"></div>
                 </div>
               </div>
             </div>
@@ -1757,6 +1745,7 @@
       );
     }
 
+    // ★★★ 가장 중요: 화면 렌더링 명령어 ★★★
     const root = ReactDOM.createRoot(document.getElementById('root'));
     root.render(<App />);
   </script>
