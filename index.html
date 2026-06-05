@@ -187,16 +187,21 @@
       return `${num.toLocaleString()}만`;
     };
 
+    // 상태 옵션: 보류, 완료, 매매 순서
     const STATUS_OPTIONS = ['보류', '완료', '매매'];
-    const STATUS_COLORS = {
+    
+    // 버튼용 색상 (매매는 파란색)
+    const STATUS_FORM_COLORS = {
       '보류': 'bg-white text-slate-700 shadow-[0_2px_8px_rgba(0,0,0,0.08)]',
       '완료': 'bg-red-500 text-white shadow-[0_4px_12px_rgba(239,68,68,0.4)]',
       '매매': 'bg-blue-500 text-white shadow-[0_4px_12px_rgba(59,130,246,0.4)]'
     };
+    
+    // 목록 뱃지용 색상 (완료만 빨간색, 매매는 회색)
     const STATUS_BADGE_COLORS = {
       '보류': 'bg-slate-200 text-slate-600',
       '완료': 'bg-red-500 text-white shadow-sm',
-      '매매': 'bg-slate-200 text-slate-600'
+      '매매': 'bg-slate-100 text-slate-600 border border-slate-200'
     };
 
     const autoFormatAddress = (addr) => {
@@ -206,6 +211,11 @@
       s = s.replace(/([가-힣]+[구군시])([가-힣]+[동읍면로길])/g, '$1 $2');
       s = s.replace(/([가-힣]+[동읍면로길])(\d)/g, '$1 $2');
       return s.replace(/\s+/g, ' ').trim();
+    };
+
+    // 평수 소수점 2자리 정확한 표기
+    const getExactPyeong = (sqm) => {
+      return ((Number(sqm) || 0) * 0.3025).toFixed(2);
     };
 
     // =====================================================================
@@ -234,7 +244,7 @@
 
     function FloorMoneyInput({ label, value, onChange }) {
       return (
-        <div className="flex-1 w-full min-w-[120px]">
+        <div className="flex-1 min-w-[120px]">
           <div className="flex items-center border border-slate-300 rounded-lg bg-white focus-within:border-blue-500 focus-within:ring-1 overflow-hidden shadow-sm transition-all">
             <span className="bg-slate-100 text-xs font-bold text-slate-600 px-2 py-3 sm:py-2 border-r border-slate-200 whitespace-nowrap">{label}</span>
             <input type="number" value={value || ''} onChange={onChange} className="w-full py-3 sm:py-2 px-2 text-right text-sm font-bold outline-none bg-transparent" placeholder="0" />
@@ -271,7 +281,7 @@
 
     function FloorMoneyInputReadOnly({ label, value }) {
       return (
-        <div className="flex-1 w-full min-w-[120px]">
+        <div className="flex-1 min-w-[120px]">
           <div className="flex items-center border border-blue-200 rounded-lg bg-white overflow-hidden shadow-sm transition-all">
             <span className="bg-blue-100 text-xs font-bold text-blue-800 px-2 py-3 sm:py-2 border-r border-blue-200 whitespace-nowrap">{label}</span>
             <div className="w-full py-3 sm:py-2 px-2 text-right text-sm font-extrabold text-slate-900 bg-transparent truncate">{value.toLocaleString()}</div>
@@ -289,8 +299,8 @@
       // Firebase 연동 상태
       const [fbUser, setFbUser] = useState(null);
       const [isDbReady, setIsDbReady] = useState(false);
-      const [isUsersLoaded, setIsUsersLoaded] = useState(false); // 유저 정보 완벽 로딩 확인용
 
+      // 로컬스토리지 로그인 유지 로직
       const [isAuthenticated, setIsAuthenticated] = useState(false);
       const [currentUser, setCurrentUser] = useState(null);
 
@@ -298,7 +308,6 @@
       const [sharedProperties, setSharedProperties] = useState([]);
       const [chatRooms, setChatRooms] = useState([]);
 
-      // 전체 상태 리스트
       const [properties, setProperties] = useState([]);
       const [employees, setEmployees] = useState([]);
       const [customers, setCustomers] = useState([]);
@@ -334,17 +343,25 @@
         return () => unsubscribe();
       }, []);
 
-      // 2. Firebase 데이터 구독 (실시간)
+      // 2. 앱 실행 시 로컬스토리지에서 유저 확인
+      useEffect(() => {
+        const storedUser = localStorage.getItem('crm_loggedInUser');
+        if (storedUser) {
+          setCurrentUser(JSON.parse(storedUser));
+          setIsAuthenticated(true);
+        }
+      }, []);
+
+      // 3. Firebase 데이터 구독
       useEffect(() => {
         if (!fbUser) return;
-        
+
         const unsubUsers = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'crm_users'), (snapshot) => {
            if (snapshot.empty) {
               initialEmployees.forEach(emp => setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'crm_users', emp.id), emp));
            } else {
               setEmployees(snapshot.docs.map(d => d.data()));
            }
-           setIsUsersLoaded(true); // 로그인 방지 에러 해결을 위해 유저 로딩 완료 체크
         }, console.error);
 
         const unsubProps = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'crm_properties'), (snapshot) => {
@@ -356,9 +373,7 @@
         }, console.error);
 
         const unsubCusts = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'crm_customers'), (snapshot) => {
-           if (!snapshot.empty) {
-              setCustomers(snapshot.docs.map(d => d.data()));
-           }
+           if (!snapshot.empty) setCustomers(snapshot.docs.map(d => d.data()));
         }, console.error);
 
         const unsubChats = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'crm_chatrooms'), (snapshot) => {
@@ -379,6 +394,7 @@
         setSharedProperties(properties.filter(p => p.isShared === true));
       }, [properties, currentUser]);
 
+      // 모바일 닫기
       useEffect(() => {
         const handleClickOutside = (e) => {
           if (isMobileMenuOpen && e.target.closest('#sidebar-overlay')) setIsMobileMenuOpen(false);
@@ -392,6 +408,7 @@
         if (type === 'login') {
           const user = employees.find(emp => emp.loginId === data.loginId && emp.password === data.password);
           if (user) {
+            localStorage.setItem('crm_loggedInUser', JSON.stringify(user));
             setCurrentUser(user);
             setIsAuthenticated(true);
             return { success: true };
@@ -414,6 +431,7 @@
           
           await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'crm_users', newUser.id), newUser);
           
+          localStorage.setItem('crm_loggedInUser', JSON.stringify(newUser));
           setCurrentUser(newUser);
           setIsAuthenticated(true);
           return { success: true };
@@ -421,6 +439,7 @@
       };
 
       const handleLogout = () => {
+        localStorage.removeItem('crm_loggedInUser');
         setIsAuthenticated(false);
         setCurrentUser(null);
         setIsMobileMenuOpen(false);
@@ -441,11 +460,12 @@
 
         setSelectedProperty(finalProp);
         setCurrentView('detail');
+        // 저장 시 맨 위로 바로 이동
         const scrollArea = document.getElementById('main-scroll-area');
         if (scrollArea) scrollArea.scrollTo({ top: 0, behavior: 'auto' });
       };
 
-      // 화면 업데이트 전용 (일지 등록용)
+      // 화면 업데이트 전용 (일지 등록 시 스크롤 유지용)
       const handleUpdateProperty = async (prop) => {
         await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'crm_properties', prop.id), prop);
         setSelectedProperty(prop);
@@ -522,8 +542,8 @@
       );
 
       // 데이터 로딩 처리
-      if (!isDbReady || !isUsersLoaded) {
-        return <div className="flex h-screen items-center justify-center bg-slate-50 text-slate-500 font-bold text-lg"><Building2 className="w-8 h-8 mr-3 text-blue-500 animate-pulse" /> 클라우드 데이터베이스 동기화 중...</div>;
+      if (!isDbReady) {
+        return <div className="flex h-screen items-center justify-center bg-slate-50 text-slate-500 font-bold text-lg"><Building2 className="w-8 h-8 mr-3 text-blue-500 animate-pulse" /> 클라우드 데이터베이스 연결 중...</div>;
       }
 
       if (!isAuthenticated) {
@@ -773,17 +793,6 @@
         return result.join(' ');
       };
 
-      const getAreaRange = (sqm) => {
-        const pyeong = Math.round((sqm || 0) * 0.3025);
-        if (pyeong === 0) return '미등록';
-        let rounded = Math.round(pyeong / 100) * 100;
-        if (rounded === 0 && pyeong > 0) {
-           rounded = Math.round(pyeong / 10) * 10; 
-           if (rounded === 0) rounded = pyeong;
-        }
-        return `약 ${rounded}평`;
-      };
-
       return (
         <div className="w-full">
           <div className="flex items-center gap-3 mb-6 bg-indigo-50 p-4 rounded-xl border border-indigo-100 shadow-sm">
@@ -811,11 +820,11 @@
                     <div className="space-y-2 text-slate-700 font-medium text-sm">
                       <div className="flex items-center bg-[#fef08a]/40 px-2 py-1.5 rounded gap-3">
                         <span className="text-slate-600 text-[11px] font-bold w-12 shrink-0">대지</span> 
-                        <span className="font-extrabold flex-1 text-right truncate text-[14px]">{getAreaRange(prop.landArea)}</span>
+                        <span className="font-extrabold flex-1 text-right truncate text-[14px]">{getExactPyeong(prop.landArea)}평</span>
                       </div>
                       <div className="flex items-center bg-[#fef08a]/40 px-2 py-1.5 rounded gap-3">
                         <span className="text-slate-600 text-[11px] font-bold w-12 shrink-0">연면적</span> 
-                        <span className="font-extrabold flex-1 text-right truncate text-[14px]">{getAreaRange(prop.totalFloorArea)}</span>
+                        <span className="font-extrabold flex-1 text-right truncate text-[14px]">{getExactPyeong(prop.totalFloorArea)}평</span>
                       </div>
                       
                       <div className="pt-3 mt-3 border-t border-[#fde047] flex flex-col gap-1">
@@ -1119,7 +1128,6 @@
                     <td className="p-3">
                       <div className="flex gap-1.5 items-center flex-wrap">
                         <span className={`px-2 py-0.5 rounded text-[11px] font-bold ${STATUS_BADGE_COLORS[prop.status || '보류']}`}>{prop.status || '보류'}</span>
-                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${prop.transactionType === '매매' ? 'bg-slate-100 text-slate-600 border border-slate-200' : prop.transactionType === '전세' ? 'bg-blue-100 text-blue-700 border border-blue-200' : 'bg-green-100 text-green-700 border border-green-200'}`}>{prop.transactionType}</span>
                       </div>
                     </td>
                     <td className="p-3 max-w-[150px] sm:max-w-[200px]">
@@ -1131,8 +1139,8 @@
                         <span className="text-[11px] text-slate-400 truncate flex items-center gap-0.5" title={prop.address}><MapPin className="w-3 h-3 opacity-70 shrink-0" /> {prop.address}</span>
                       </div>
                     </td>
-                    <td className="p-3 text-center text-slate-600">{((prop.landArea || 0) * 0.3025).toFixed(2)}</td>
-                    <td className="p-3 text-center text-slate-600">{((prop.totalFloorArea || 0) * 0.3025).toFixed(2)}</td>
+                    <td className="p-3 text-center text-slate-600">{getExactPyeong(prop.landArea)}</td>
+                    <td className="p-3 text-center text-slate-600">{getExactPyeong(prop.totalFloorArea)}</td>
                     <td className="p-3 text-right font-bold text-red-600">{formatKoreanCurrency(prop.price?.sale || 0)}</td>
                     <td className="p-3 text-right text-slate-700">{formatKoreanCurrency(prop.price?.deposit || 0)}</td>
                     <td className="p-3 text-right text-slate-700">{formatKoreanCurrency(prop.price?.rent || 0)}</td>
@@ -1259,9 +1267,9 @@
               <div className="p-3 sm:p-4 bg-slate-50 border-b border-slate-200"><h3 className="font-bold text-slate-800 flex items-center gap-2 text-sm sm:text-base"><Building2 className="w-4 h-4 sm:w-5 sm:h-5 text-blue-500" /> 건물 정보</h3></div>
               <div className="p-0">
                 <SpecRow icon={<MapIcon />} label="용도지역" value={property.zoning || '-'} />
-                <SpecRow icon={<Maximize />} label="대지면적" value={<span>{((property.landArea || 0) * 0.3025).toFixed(2)}평 <span className="text-slate-400 font-normal ml-1">({property.landArea || 0}㎡)</span></span>} />
-                <SpecRow icon={<Maximize />} label="연면적" value={<span>{((property.totalFloorArea || 0) * 0.3025).toFixed(2)}평 <span className="text-slate-400 font-normal ml-1">({property.totalFloorArea || 0}㎡)</span></span>} />
-                <SpecRow icon={<Maximize />} label="건축면적" value={<span>{((property.buildingArea || 0) * 0.3025).toFixed(2)}평 <span className="text-slate-400 font-normal ml-1">({property.buildingArea || 0}㎡)</span></span>} />
+                <SpecRow icon={<Maximize />} label="대지면적" value={<span>{getExactPyeong(property.landArea)}평 <span className="text-slate-400 font-normal ml-1">({property.landArea || 0}㎡)</span></span>} />
+                <SpecRow icon={<Maximize />} label="연면적" value={<span>{getExactPyeong(property.totalFloorArea)}평 <span className="text-slate-400 font-normal ml-1">({property.totalFloorArea || 0}㎡)</span></span>} />
+                <SpecRow icon={<Maximize />} label="건축면적" value={<span>{getExactPyeong(property.buildingArea)}평 <span className="text-slate-400 font-normal ml-1">({property.buildingArea || 0}㎡)</span></span>} />
                 <SpecRow icon={<Percent />} label="건폐율 / 용적률" value={`${property.buildingCoverage || 0}% / ${property.floorAreaRatio || 0}%`} />
                 <SpecRow icon={<Building2 />} label="건물 층수" value={`지하 ${property.floorUnderground || 0}층 / 지상 ${property.floorGround || 0}층`} />
                 <SpecRow icon={<Car />} label="주차대수" value={`${property.parking || 0}대`} />
@@ -1339,7 +1347,7 @@
       );
     }
 
-    function PropertyFormView({ initialData, properties, onBack, onSave, currentUser }) {
+    function PropertyFormView({ initialData, onBack, onSave, currentUser }) {
       const [newLog, setNewLog] = useState('');
       const [addressError, setAddressError] = useState('');
       const [formData, setFormData] = useState(() => {
@@ -1436,8 +1444,8 @@
 
         const formattedAddress = autoFormatAddress(formData.address);
         
-        // 중복 주소 체크 
-        const isDuplicate = properties.some(p => p.address === formattedAddress && p.id !== formData.id);
+        // 중복 주소 체크 (기본 방어 로직)
+        const isDuplicate = globalProperties.some(p => p.address === formattedAddress && p.id !== formData.id);
         if (isDuplicate) {
           setAddressError('이미 등록된 주소지가 존재합니다.');
           return;
@@ -1483,7 +1491,7 @@
                 {STATUS_OPTIONS.map(s => (
                   <button 
                     key={s} type="button" onClick={() => setFormData(prev => ({...prev, status: s}))} 
-                    className={`flex-1 sm:flex-none items-center justify-center gap-1 sm:gap-2 px-3 sm:px-4 py-1.5 rounded-lg text-xs sm:text-sm font-bold transition-all duration-300 ${formData.status === s || (!formData.status && s==='보류') ? STATUS_COLORS[s] : 'text-slate-400 hover:text-slate-600'}`}
+                    className={`flex-1 sm:flex-none items-center justify-center gap-1 sm:gap-2 px-3 sm:px-4 py-1.5 rounded-lg text-xs sm:text-sm font-bold transition-all duration-300 ${formData.status === s || (!formData.status && s==='보류') ? STATUS_FORM_COLORS[s] : 'text-slate-400 hover:text-slate-600'}`}
                   >
                     {s}
                   </button>
@@ -1588,18 +1596,17 @@
               </div>
               <div className="space-y-4">
                 {formData.floorDetails.map((f, i) => (
-                  <div key={f.id} className="flex flex-col md:flex-row items-start gap-3 sm:gap-4 p-3 sm:p-4 bg-slate-50 rounded-xl border border-slate-200">
-                    <div className="flex w-full md:w-auto gap-3">
+                  <div key={f.id} className="flex flex-col p-4 bg-slate-50 rounded-xl border border-slate-200 gap-3">
+                    <div className="flex items-center gap-3 w-full">
                       <FloorTextInput value={f.floor} autoFocus={f.isNew} onChange={(e) => handleFloorChange(f.id, 'floor', e.target.value)} onBlur={sortFloorDetails} />
                       <CompanyTextInput value={f.companyName} onChange={(e) => handleFloorChange(f.id, 'companyName', e.target.value)} />
-                      <div className="md:hidden shrink-0 ml-auto"><button type="button" onClick={() => setFormData({...formData, floorDetails: formData.floorDetails.filter(item => item.id !== f.id)})} className="p-2.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors border border-red-100 bg-white shadow-sm" title="삭제"><Trash2 className="w-5 h-5" /></button></div>
+                      <button type="button" onClick={() => setFormData({...formData, floorDetails: formData.floorDetails.filter(item => item.id !== f.id)})} className="p-2.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors border border-red-100 bg-white ml-auto shrink-0 shadow-sm" title="삭제"><Trash2 className="w-5 h-5" /></button>
                     </div>
-                    <div className="flex flex-col sm:flex-row w-full gap-3 sm:gap-4">
+                    <div className="flex flex-col sm:flex-row w-full gap-3">
                       <FloorMoneyInput label="보증금" value={f.deposit} onChange={(e) => handleFloorChange(f.id, 'deposit', e.target.value)} />
                       <FloorMoneyInput label="월세" value={f.rent} onChange={(e) => handleFloorChange(f.id, 'rent', e.target.value)} />
                       <FloorMoneyInput label="관리비" value={f.maintenance} onChange={(e) => handleFloorChange(f.id, 'maintenance', e.target.value)} />
                     </div>
-                    <div className="hidden md:block pt-1 shrink-0"><button type="button" onClick={() => setFormData({...formData, floorDetails: formData.floorDetails.filter(item => item.id !== f.id)})} className="p-2.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors border border-red-100 bg-white shadow-sm mt-0.5" title="삭제"><Trash2 className="w-5 h-5" /></button></div>
                   </div>
                 ))}
                 <div className="flex flex-col md:flex-row items-start gap-3 sm:gap-4 p-3 sm:p-4 bg-blue-50 rounded-xl border border-blue-200 mt-2">
@@ -1609,7 +1616,7 @@
                     <FloorMoneyInputReadOnly label="총 월세" value={totals.rent} />
                     <FloorMoneyInputReadOnly label="총 관리비" value={totals.maintenance} />
                   </div>
-                  <div className="hidden md:block w-[46px] shrink-0"></div>
+                  <div className="hidden md:block w-10 shrink-0"></div>
                 </div>
               </div>
             </div>
