@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="ko">
-<head>ㅁ
+<head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>빌딩탭</title>
@@ -187,7 +187,6 @@
       return `${num.toLocaleString()}만`;
     };
 
-    // 상태 버튼 옵션 및 색상
     const STATUS_OPTIONS = ['보류', '완료', '매매'];
     const STATUS_COLORS = {
       '보류': 'bg-white text-slate-700 shadow-[0_2px_8px_rgba(0,0,0,0.08)]',
@@ -197,7 +196,7 @@
     const STATUS_BADGE_COLORS = {
       '보류': 'bg-slate-200 text-slate-600',
       '완료': 'bg-red-500 text-white shadow-sm',
-      '매매': 'bg-blue-500 text-white shadow-sm'
+      '매매': 'bg-slate-200 text-slate-600'
     };
 
     const autoFormatAddress = (addr) => {
@@ -290,6 +289,7 @@
       // Firebase 연동 상태
       const [fbUser, setFbUser] = useState(null);
       const [isDbReady, setIsDbReady] = useState(false);
+      const [isUsersLoaded, setIsUsersLoaded] = useState(false); // 유저 정보 완벽 로딩 확인용
 
       const [isAuthenticated, setIsAuthenticated] = useState(false);
       const [currentUser, setCurrentUser] = useState(null);
@@ -344,6 +344,7 @@
            } else {
               setEmployees(snapshot.docs.map(d => d.data()));
            }
+           setIsUsersLoaded(true); // 로그인 방지 에러 해결을 위해 유저 로딩 완료 체크
         }, console.error);
 
         const unsubProps = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'crm_properties'), (snapshot) => {
@@ -355,9 +356,7 @@
         }, console.error);
 
         const unsubCusts = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'crm_customers'), (snapshot) => {
-           if (snapshot.empty) {
-              // 최초 등록자 없으면 그냥 비워둠
-           } else {
+           if (!snapshot.empty) {
               setCustomers(snapshot.docs.map(d => d.data()));
            }
         }, console.error);
@@ -523,8 +522,8 @@
       );
 
       // 데이터 로딩 처리
-      if (!isDbReady) {
-        return <div className="flex h-screen items-center justify-center bg-slate-50 text-slate-500 font-bold text-lg"><Building2 className="w-8 h-8 mr-3 text-blue-500 animate-pulse" /> 클라우드 데이터베이스 연결 중...</div>;
+      if (!isDbReady || !isUsersLoaded) {
+        return <div className="flex h-screen items-center justify-center bg-slate-50 text-slate-500 font-bold text-lg"><Building2 className="w-8 h-8 mr-3 text-blue-500 animate-pulse" /> 클라우드 데이터베이스 동기화 중...</div>;
       }
 
       if (!isAuthenticated) {
@@ -631,6 +630,7 @@
                   {currentView === 'form' && (
                     <PropertyFormView 
                       initialData={selectedProperty} 
+                      properties={properties}
                       onBack={() => { currentView === 'form' && selectedProperty ? setCurrentView('detail') : setCurrentView('list'); }} 
                       onSave={handleSaveProperty} 
                       currentUser={currentUser} 
@@ -1075,7 +1075,7 @@
               <div className="flex flex-col gap-1.5 w-full sm:w-auto">
                 <span className="text-[11px] font-bold text-slate-500 flex items-center gap-1.5 ml-1"><i className="fas fa-layer-group text-blue-500"></i> 상태</span>
                 <div className="flex bg-slate-200/80 p-1 rounded-lg w-full sm:w-auto shadow-inner">
-                  {['전체', '보류', '완료'].map(status => (
+                  {['전체', ...STATUS_OPTIONS].map(status => (
                     <button key={status} onClick={() => setStatusFilter(status)} className={`flex-1 sm:flex-none px-4 py-1.5 rounded-md text-xs font-bold transition-all ${statusFilter === status ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>{status}</button>
                   ))}
                 </div>
@@ -1339,7 +1339,7 @@
       );
     }
 
-    function PropertyFormView({ initialData, onBack, onSave, currentUser }) {
+    function PropertyFormView({ initialData, properties, onBack, onSave, currentUser }) {
       const [newLog, setNewLog] = useState('');
       const [addressError, setAddressError] = useState('');
       const [formData, setFormData] = useState(() => {
@@ -1436,8 +1436,12 @@
 
         const formattedAddress = autoFormatAddress(formData.address);
         
-        // 중복 주소 체크 생략 (서버 연동 시 복잡도 줄이기 위해 우선 제외하거나 서버데이터로 비교)
-        // 위에서 구현된 FB 연동에서는 전체 DB를 가져오므로 가능은 함
+        // 중복 주소 체크 
+        const isDuplicate = properties.some(p => p.address === formattedAddress && p.id !== formData.id);
+        if (isDuplicate) {
+          setAddressError('이미 등록된 주소지가 존재합니다.');
+          return;
+        }
 
         sortFloorDetails(); 
         
