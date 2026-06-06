@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>빌딩탭 개인 CRM</title>
+  <title>빌딩탭 CRM (로컬버전)</title>
   
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -17,11 +17,6 @@
   
   <!-- Babel -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-
-  <!-- Firebase 8.x CDN -->
-  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
 
   <style>
     body { font-family: 'Pretendard', -apple-system, sans-serif; background-color: #f8fafc; }
@@ -40,28 +35,12 @@
     const { useState, useMemo, useEffect, useRef } = React;
 
     // =====================================================================
-    // [1] FIREBASE 클라우드 데이터베이스 초기화
+    // [1] 데이터베이스 뼈대 (Local Storage 기반 - 무한로딩 절대 없음)
     // =====================================================================
-    // 💡 깃허브에서 정상적으로 크로스 디바이스(PC-모바일) 연동을 하시려면 
-    // 아래 firebaseConfig 변수에 선생님 본인의 Firebase 프로젝트 설정값을 넣으셔야 합니다.
-    let firebaseConfig = { projectId: "demo-project" };
-    try {
-      if (typeof window.__firebase_config !== 'undefined' && window.__firebase_config) {
-        firebaseConfig = JSON.parse(window.__firebase_config);
-      }
-    } catch (e) { 
-      console.error("Firebase config error", e); 
-    }
-
-    if (!firebase.apps.length) {
-      firebase.initializeApp(firebaseConfig);
-    }
-    
-    const auth = firebase.auth();
-    const db = firebase.firestore();
-    const appId = typeof window.__app_id !== 'undefined' ? window.__app_id : 'default-app-id';
-
-    const getCollection = (colName) => db.collection('artifacts').doc(appId).collection('public').doc('data').collection(colName);
+    const initData = (key, defaultData) => {
+      const stored = localStorage.getItem(key);
+      return stored ? JSON.parse(stored) : defaultData;
+    };
 
     // =====================================================================
     // [2] 유틸리티 함수 & 아이콘 맵핑
@@ -88,6 +67,16 @@
       if (eok > 0) result += `${eok}억 `;
       if (man > 0) result += `${man.toLocaleString()}만`;
       return result.trim() + '원';
+    };
+
+    const formatShortCurrency = (val) => {
+      const num = Number(val);
+      if (!num || isNaN(num) || num === 0) return '0원';
+      if (num >= 10000) {
+        const eok = num / 10000;
+        return `${Number.isInteger(eok) ? eok : eok.toFixed(1).replace(/\.0$/, '')}억`;
+      }
+      return `${num.toLocaleString()}만`;
     };
 
     const STATUS_OPTIONS = ['보류', '완료', '매매'];
@@ -160,6 +149,7 @@
     const CalendarDays = (p) => <Icon name="fa-calendar-day" {...p} />;
     const Percent = (p) => <Icon name="fa-percentage" {...p} />;
     const Bars = (p) => <Icon name="fa-bars" {...p} />;
+    const Times = (p) => <Icon name="fa-times" {...p} />;
 
     // =====================================================================
     // [3] 공통 UI 컴포넌트
@@ -246,23 +236,22 @@
     // [4] 메인 APP 컴포넌트
     // =====================================================================
     function App() {
-      const [fbUser, setFbUser] = useState(null); 
-      const [dbError, setDbError] = useState(false); // 깃허브 등 외부 환경 차단 에러 감지
+      // 로컬 스토리지 연동 (빈 배열 기본값으로 시작)
+      const [properties, setProperties] = useState(() => initData('crm_props_local', []));
+      const [employees, setEmployees] = useState(() => initData('crm_users_local', []));
+      const [customers, setCustomers] = useState(() => initData('crm_custs_local', []));
 
       const [isAuthenticated, setIsAuthenticated] = useState(false);
       const [currentUser, setCurrentUser] = useState(() => {
-        const storedUser = localStorage.getItem('crm_loggedInUser');
+        const storedUser = localStorage.getItem('crm_loggedInUser_local');
         return storedUser ? JSON.parse(storedUser) : null;
       });
 
-      const [properties, setProperties] = useState([]);
-      const [employees, setEmployees] = useState([]);
-      const [customers, setCustomers] = useState([]);
       const [myProperties, setMyProperties] = useState([]);
 
       const [currentView, setCurrentView] = useState('list'); 
       const [selectedProperty, setSelectedProperty] = useState(null);
-      const [activeTab, setActiveTab] = useState('properties'); // 공유, 채팅방 제거
+      const [activeTab, setActiveTab] = useState('properties');
       
       const [currentEmployeeView, setCurrentEmployeeView] = useState('list');
       const [currentCustomerView, setCurrentCustomerView] = useState('list');
@@ -270,61 +259,18 @@
       const [searchTerm, setSearchTerm] = useState('');
       const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-      // 1. Firebase 로그인 초기화 (무한로딩 방지를 위해 await 블로킹 제거)
-      useEffect(() => {
-        const initAuth = async () => {
-          try {
-            if (typeof window.__initial_auth_token !== 'undefined' && window.__initial_auth_token) {
-              await auth.signInWithCustomToken(window.__initial_auth_token);
-            } else {
-              await auth.signInAnonymously();
-            }
-          } catch(e) { 
-            console.warn("Auth warning:", e); 
-          }
-        };
-        
-        initAuth();
-        
-        const unsubscribe = auth.onAuthStateChanged(user => {
-          setFbUser(user);
-        });
-        return () => unsubscribe();
-      }, []);
+      // 데이터 변경 시 로컬스토리지 자동 저장
+      useEffect(() => { localStorage.setItem('crm_props_local', JSON.stringify(properties)); }, [properties]);
+      useEffect(() => { localStorage.setItem('crm_users_local', JSON.stringify(employees)); }, [employees]);
+      useEffect(() => { localStorage.setItem('crm_custs_local', JSON.stringify(customers)); }, [customers]);
 
-      // 2. 로그인 유지 확인
       useEffect(() => {
-        if (currentUser) setIsAuthenticated(true);
+        if (currentUser) {
+          setIsAuthenticated(true);
+        }
       }, [currentUser]);
 
-      // 3. 서버 데이터 실시간 구독 (권한 에러 감지 추가)
-      useEffect(() => {
-        if (!fbUser) return; 
-
-        const errHandler = (err) => {
-          console.error("Firestore 연결 차단됨:", err);
-          setDbError(true);
-        };
-
-        const unsubUsers = getCollection('crm_users').onSnapshot(
-          snapshot => setEmployees(snapshot.docs.map(d => d.data())), 
-          errHandler
-        );
-
-        const unsubProps = getCollection('crm_properties').onSnapshot(
-          snapshot => setProperties(snapshot.docs.map(d => d.data())), 
-          errHandler
-        );
-
-        const unsubCusts = getCollection('crm_customers').onSnapshot(
-          snapshot => setCustomers(snapshot.docs.map(d => d.data())), 
-          errHandler
-        );
-
-        return () => { unsubUsers(); unsubProps(); unsubCusts(); };
-      }, [fbUser]);
-
-      // 4. 내 물건 전용 정리
+      // 내 물건 필터링
       useEffect(() => {
         if (!currentUser) return;
         setMyProperties(properties.filter(p => p.user_id === currentUser.loginId));
@@ -339,14 +285,10 @@
       }, [isMobileMenuOpen]);
 
       const handleAuth = async (type, data) => {
-        if (dbError) {
-           return { success: false, message: '현재 깃허브 등 외부 환경 접근이 차단되어 로그인이 불가능합니다. 자체 데이터베이스를 설정해주세요.' };
-        }
-
         if (type === 'login') {
           const user = employees.find(emp => emp.loginId === data.loginId && emp.password === data.password);
           if (user) {
-            localStorage.setItem('crm_loggedInUser', JSON.stringify(user));
+            localStorage.setItem('crm_loggedInUser_local', JSON.stringify(user));
             setCurrentUser(user);
             setIsAuthenticated(true);
             return { success: true };
@@ -367,27 +309,22 @@
             date: new Date().toISOString().split('T')[0]
           };
           
-          try {
-            await getCollection('crm_users').doc(newUser.id).set(newUser);
-            localStorage.setItem('crm_loggedInUser', JSON.stringify(newUser));
-            setCurrentUser(newUser);
-            setIsAuthenticated(true);
-            return { success: true };
-          } catch(err) {
-            return { success: false, message: '서버 등록 중 오류가 발생했습니다. 나중에 다시 시도해주세요.' };
-          }
+          setEmployees(prev => [newUser, ...prev]);
+          localStorage.setItem('crm_loggedInUser_local', JSON.stringify(newUser));
+          setCurrentUser(newUser);
+          setIsAuthenticated(true);
+          return { success: true };
         }
       };
 
       const handleLogout = () => {
-        localStorage.removeItem('crm_loggedInUser');
+        localStorage.removeItem('crm_loggedInUser_local');
         setIsAuthenticated(false);
         setCurrentUser(null);
         setIsMobileMenuOpen(false);
       };
 
-      const handleSaveProperty = async (prop) => {
-        if (dbError) { alert("서버 연동이 불가능하여 저장이 취소되었습니다."); return; }
+      const handleSaveProperty = (prop) => {
         const finalProp = { 
           ...prop, 
           id: prop.id || `P-${Date.now()}`,
@@ -397,7 +334,11 @@
           date: prop.date || new Date().toISOString().split('T')[0]
         };
         
-        await getCollection('crm_properties').doc(finalProp.id).set(finalProp);
+        setProperties(prev => {
+          const idx = prev.findIndex(p => p.id === finalProp.id);
+          if(idx >= 0) { const n=[...prev]; n[idx]=finalProp; return n; }
+          return [finalProp, ...prev];
+        });
 
         setSelectedProperty(finalProp);
         setCurrentView('detail');
@@ -406,15 +347,17 @@
         if (scrollArea) scrollArea.scrollTo({ top: 0, behavior: 'auto' });
       };
 
-      const handleUpdateProperty = async (prop) => {
-        if (dbError) return;
-        await getCollection('crm_properties').doc(prop.id).set(prop);
+      const handleUpdateProperty = (prop) => {
+        setProperties(prev => {
+          const idx = prev.findIndex(p => p.id === prop.id);
+          if(idx >= 0) { const n=[...prev]; n[idx]=prop; return n; }
+          return prev;
+        });
         setSelectedProperty(prop);
       };
 
-      const handleDeleteProperty = async (propertyId) => {
-        if (dbError) return;
-        await getCollection('crm_properties').doc(propertyId).delete();
+      const handleDeleteProperty = (propertyId) => {
+        setProperties(prev => prev.filter(p => p.id !== propertyId));
         setCurrentView('list');
         setSelectedProperty(null);
       };
@@ -442,9 +385,9 @@
         c.region.toLowerCase().includes(searchTerm.toLowerCase())
       );
 
-      // 비로그인 화면 (에러 메세지 포함)
+      // 비로그인 화면
       if (!isAuthenticated) {
-        return <AuthView onAuth={handleAuth} dbError={dbError} isDbEmpty={employees.length === 0} />;
+        return <AuthView onAuth={handleAuth} isDbEmpty={employees.length === 0} />;
       }
 
       return (
@@ -455,7 +398,7 @@
               <h1 className="text-lg font-bold tracking-tight">빌딩탭</h1>
             </div>
             <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 -mr-2 text-slate-300 hover:text-white transition-colors">
-              <Bars className="w-6 h-6" />
+              {isMobileMenuOpen ? <Times className="w-6 h-6" /> : <Bars className="w-6 h-6" />}
             </button>
           </div>
 
@@ -467,7 +410,7 @@
                 <Building2 className="w-8 h-8 text-blue-400" />
                 <h1 className="text-xl font-bold tracking-tight">빌딩탭</h1>
               </div>
-              <p className="text-[11px] text-slate-400 mt-2">부동산 종합 관리 시스템 (개인용)</p>
+              <p className="text-[11px] text-slate-400 mt-2">부동산 종합 관리 시스템 (로컬 모드)</p>
             </div>
             
             <nav className="flex-1 p-4 space-y-2 overflow-y-auto mt-4 md:mt-0">
@@ -554,9 +497,9 @@
                   {currentEmployeeView === 'form' && (
                     <EmployeeFormView 
                       onBack={() => setCurrentEmployeeView('list')} 
-                      onSave={async (newEmp) => {
+                      onSave={(newEmp) => {
                         const emp = { ...newEmp, id: `E-${Date.now()}`, date: new Date().toISOString().split('T')[0] };
-                        await getCollection('crm_users').doc(emp.id).set(emp);
+                        setEmployees(prev => [emp, ...prev]);
                         setCurrentEmployeeView('list');
                       }} 
                     />
@@ -569,9 +512,9 @@
                   {currentCustomerView === 'form' && (
                     <CustomerFormView 
                       onBack={() => setCurrentCustomerView('list')} 
-                      onSave={async (newCust) => {
+                      onSave={(newCust) => {
                         const cust = { ...newCust, id: `C-${Date.now()}`, date: new Date().toISOString().split('T')[0] };
-                        await getCollection('crm_customers').doc(cust.id).set(cust);
+                        setCustomers(prev => [cust, ...prev]);
                         setCurrentCustomerView('list');
                       }} 
                     />
@@ -589,7 +532,7 @@
     // [5] 상세/하위 뷰 컴포넌트들
     // =====================================================================
 
-    function AuthView({ onAuth, dbError, isDbEmpty }) {
+    function AuthView({ onAuth, isDbEmpty }) {
       const [isLoginMode, setIsLoginMode] = useState(true);
       const [errorMsg, setErrorMsg] = useState('');
       const [formData, setFormData] = useState({ loginId: '', password: '', name: '', phone: '', department: '' });
@@ -614,14 +557,7 @@
               <p className="text-sm text-slate-500 mt-2 text-center">부동산 매물 관리의 시작</p>
             </div>
 
-            {dbError && (
-              <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-700 text-xs sm:text-sm rounded-xl font-bold leading-relaxed shadow-sm">
-                🚨 보안 규칙에 의해 데이터베이스 연동이 차단되었습니다.<br/>
-                이 코드를 깃허브 페이지 등 외부에서 실행하시려면 HTML 소스코드 상단의 <span className="bg-red-100 px-1 rounded">firebaseConfig</span> 부분을 본인의 클라우드 설정으로 교체하셔야 합니다.
-              </div>
-            )}
-
-            {!dbError && isDbEmpty && <p className="text-xs text-blue-600 bg-blue-50 px-3 py-2 rounded-lg font-bold mb-4 text-center">최초 접속입니다. '회원가입'을 진행해주세요.</p>}
+            {isDbEmpty && <p className="text-xs text-blue-600 bg-blue-50 px-3 py-2 rounded-lg font-bold mb-4 text-center">최초 접속입니다. '회원가입'을 진행해주세요.</p>}
 
             <div className="flex p-1 bg-slate-100 rounded-lg mb-6">
               <button onClick={() => {setIsLoginMode(true); setErrorMsg('');}} className={`flex-1 py-2.5 text-sm font-bold rounded-md transition-all ${isLoginMode ? 'bg-white text-blue-600 shadow' : 'text-slate-500'}`}>로그인</button>
@@ -668,7 +604,7 @@
 
               {errorMsg && <div className="p-3 bg-red-50 text-red-600 text-sm font-bold rounded-lg text-center border border-red-100">{errorMsg}</div>}
 
-              <button type="submit" disabled={dbError} className={`w-full py-4 font-bold rounded-xl transition-all shadow-md mt-6 flex items-center justify-center gap-2 text-lg ${dbError ? 'bg-slate-300 text-white cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700 shadow-blue-200'}`}>
+              <button type="submit" className="w-full py-4 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-all shadow-md mt-6 flex items-center justify-center gap-2 text-lg">
                 {isLoginMode ? <><ShieldCheck className="w-5 h-5" /> 로그인</> : '계정 생성 및 접속'}
               </button>
             </form>
