@@ -18,7 +18,7 @@
   <!-- Babel -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-  <!-- Firebase 8.x (가장 안정적인 CDN 로드 방식) -->
+  <!-- Firebase 8.x CDN -->
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
@@ -35,8 +35,9 @@
 </head>
 <body>
   <div id="root">
+    <!-- 초기 렌더링용 로딩 바 (React가 뜨면 즉시 사라짐) -->
     <div style="display:flex; height:100vh; align-items:center; justify-content:center; color:#64748b; font-weight:bold;">
-      <i class="fas fa-spinner fa-spin" style="margin-right:10px;"></i> 서버 연결 중입니다...
+      <i class="fas fa-spinner fa-spin" style="margin-right:10px;"></i> 시스템 부팅 중...
     </div>
   </div>
 
@@ -44,7 +45,7 @@
     const { useState, useMemo, useEffect, useRef } = React;
 
     // =====================================================================
-    // [1] FIREBASE 클라우드 데이터베이스 초기화 (서버 로그인 용도)
+    // [1] FIREBASE 클라우드 데이터베이스 초기화
     // =====================================================================
     let firebaseConfig = { projectId: "demo-project" };
     try {
@@ -57,21 +58,7 @@
     const db = firebase.firestore();
     const appId = typeof window.__app_id !== 'undefined' ? window.__app_id : 'default-app-id';
 
-    const collection = (dbInst, ...paths) => {
-      let ref = dbInst;
-      paths.forEach((path, i) => {
-        if (i % 2 === 0) ref = ref.collection(path);
-        else ref = ref.doc(path);
-      });
-      return ref;
-    };
-    const doc = (dbInst, ...paths) => collection(dbInst, ...paths);
-    const setDoc = (ref, data) => ref.set(data);
-    const deleteDoc = (ref) => ref.delete();
-    const onSnapshot = (ref, cb, errCb) => ref.onSnapshot(cb, errCb);
-    const signInAnonymously = (authInst) => authInst.signInAnonymously();
-    const signInWithCustomToken = (authInst, token) => authInst.signInWithCustomToken(token);
-    const onAuthStateChanged = (authInst, cb) => authInst.onAuthStateChanged(cb);
+    const getCollection = (colName) => db.collection('artifacts').doc(appId).collection('public').doc('data').collection(colName);
 
     // =====================================================================
     // [2] 유틸리티 함수 & 아이콘 맵핑
@@ -227,8 +214,8 @@
     // [4] 메인 APP 컴포넌트
     // =====================================================================
     function App() {
-      const [fbUser, setFbUser] = useState(null);
-      const [isDbReady, setIsDbReady] = useState(false);
+      const [fbUser, setFbUser] = useState(null); // Firebase 접속 유저 저장
+      const [isDbReady, setIsDbReady] = useState(true); 
 
       const [isAuthenticated, setIsAuthenticated] = useState(false);
       const [currentUser, setCurrentUser] = useState(() => {
@@ -244,8 +231,6 @@
 
       const [currentView, setCurrentView] = useState('list'); 
       const [selectedProperty, setSelectedProperty] = useState(null);
-      
-      // 시작 탭을 '내 물건 관리(properties)'로 고정
       const [activeTab, setActiveTab] = useState('properties');
       
       const [currentEmployeeView, setCurrentEmployeeView] = useState('list');
@@ -259,51 +244,50 @@
         const initAuth = async () => {
           try {
             if (typeof window.__initial_auth_token !== 'undefined' && window.__initial_auth_token) {
-              await signInWithCustomToken(auth, window.__initial_auth_token);
+              await auth.signInWithCustomToken(window.__initial_auth_token);
             } else {
-              await signInAnonymously(auth);
+              await auth.signInAnonymously();
             }
-          } catch(e) { console.error("Firebase Auth Error", e); }
+          } catch(e) { console.error("Firebase Auth 무시", e); }
         };
         initAuth();
-        
-        const unsubscribe = onAuthStateChanged(auth, user => {
+
+        const unsubscribe = auth.onAuthStateChanged(user => {
           setFbUser(user);
-          if(user) setIsDbReady(true);
         });
         return () => unsubscribe();
       }, []);
 
+      // 2. 로그인 유저 확인
       useEffect(() => {
         if (currentUser) setIsAuthenticated(true);
       }, [currentUser]);
 
-      // 2. 실시간 서버 데이터 구독 (모든 기기 동기화)
+      // 3. 서버(클라우드) 데이터 실시간 연동 (PC/모바일 연동)
       useEffect(() => {
-        if (!fbUser) return;
+        if (!fbUser) return; // 핵심: 인증 완료 전에 데이터베이스 호출을 차단하여 권한 에러 해결
 
-        const unsubUsers = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'crm_users'), (snapshot) => {
+        const unsubUsers = getCollection('crm_users').onSnapshot((snapshot) => {
           setEmployees(snapshot.docs.map(d => d.data()));
         }, console.error);
 
-        const unsubProps = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'crm_properties'), (snapshot) => {
+        const unsubProps = getCollection('crm_properties').onSnapshot((snapshot) => {
           setProperties(snapshot.docs.map(d => d.data()));
         }, console.error);
 
-        const unsubCusts = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'crm_customers'), (snapshot) => {
+        const unsubCusts = getCollection('crm_customers').onSnapshot((snapshot) => {
           setCustomers(snapshot.docs.map(d => d.data()));
         }, console.error);
 
         return () => { unsubUsers(); unsubProps(); unsubCusts(); };
       }, [fbUser]);
 
-      // 3. 내 물건 필터링
+      // 4. 내 물건 필터링
       useEffect(() => {
         if (!currentUser) return;
         setMyProperties(properties.filter(p => p.user_id === currentUser.loginId));
       }, [properties, currentUser]);
 
-      // 모바일 메뉴 바탕 클릭 시 닫기
       useEffect(() => {
         const handleClickOutside = (e) => {
           if (isMobileMenuOpen && e.target.closest('#sidebar-overlay')) setIsMobileMenuOpen(false);
@@ -312,7 +296,6 @@
         return () => document.removeEventListener('click', handleClickOutside);
       }, [isMobileMenuOpen]);
 
-      // 로그인 및 회원가입 처리 로직
       const handleAuth = async (type, data) => {
         if (type === 'login') {
           const user = employees.find(emp => emp.loginId === data.loginId && emp.password === data.password);
@@ -322,7 +305,7 @@
             setIsAuthenticated(true);
             return { success: true };
           }
-          return { success: false, message: '아이디 또는 비밀번호가 일치하지 않습니다.' };
+          return { success: false, message: '아이디 또는 비밀번호가 일치하지 않거나, 아직 서버에 동기화되지 않았습니다. (새로고침 후 다시 시도)' };
         } 
         if (type === 'signup') {
           const exists = employees.some(emp => emp.loginId === data.loginId);
@@ -338,7 +321,7 @@
             date: new Date().toISOString().split('T')[0]
           };
           
-          await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'crm_users', newUser.id), newUser);
+          await getCollection('crm_users').doc(newUser.id).set(newUser);
           
           localStorage.setItem('crm_loggedInUser', JSON.stringify(newUser));
           setCurrentUser(newUser);
@@ -354,7 +337,6 @@
         setIsMobileMenuOpen(false);
       };
 
-      // 물건 등록 (서버 저장)
       const handleSaveProperty = async (prop) => {
         const finalProp = { 
           ...prop, 
@@ -365,7 +347,7 @@
           date: prop.date || new Date().toISOString().split('T')[0]
         };
         
-        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'crm_properties', finalProp.id), finalProp);
+        await getCollection('crm_properties').doc(finalProp.id).set(finalProp);
 
         setSelectedProperty(finalProp);
         setCurrentView('detail');
@@ -375,12 +357,12 @@
       };
 
       const handleUpdateProperty = async (prop) => {
-        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'crm_properties', prop.id), prop);
+        await getCollection('crm_properties').doc(prop.id).set(prop);
         setSelectedProperty(prop);
       };
 
       const handleDeleteProperty = async (propertyId) => {
-        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'crm_properties', propertyId));
+        await getCollection('crm_properties').doc(propertyId).delete();
         setCurrentView('list');
         setSelectedProperty(null);
       };
@@ -408,14 +390,8 @@
         c.region.toLowerCase().includes(searchTerm.toLowerCase())
       );
 
-      // 로딩 화면
-      if (!isDbReady) {
-        return <div className="flex flex-col h-screen items-center justify-center bg-slate-50 text-slate-500 font-bold text-lg"><Building2 className="w-10 h-10 mb-4 text-blue-500 animate-pulse" /> 서버 연결 중입니다...</div>;
-      }
-
-      // 비로그인 뷰
       if (!isAuthenticated) {
-        return <AuthView onAuth={handleAuth} isDbEmpty={employees.length === 0} />;
+        return <AuthView onAuth={handleAuth} />;
       }
 
       return (
@@ -438,14 +414,14 @@
                 <Building2 className="w-8 h-8 text-blue-400" />
                 <h1 className="text-xl font-bold tracking-tight">빌딩탭</h1>
               </div>
-              <p className="text-[11px] text-slate-400 mt-2">사내 부동산 종합 관리 시스템</p>
+              <p className="text-[11px] text-slate-400 mt-2">부동산 종합 관리 시스템 (개인용)</p>
             </div>
             
             <nav className="flex-1 p-4 space-y-2 overflow-y-auto mt-4 md:mt-0">
               <SidebarItem icon={<CalendarIcon />} label="개인 캘린더" active={activeTab === 'calendar'} onClick={() => changeTab('calendar')} />
               <SidebarItem icon={<List />} label="내 물건 관리" active={activeTab === 'properties'} onClick={() => { changeTab('properties'); setCurrentView('list'); }} />
-              <SidebarItem icon={<Users />} label="고객 관리 (매수자)" active={activeTab === 'customers'} onClick={() => { changeTab('customers'); setCurrentCustomerView('list'); }} />
-              <SidebarItem icon={<UserCircle />} label="사원 계정 관리" active={activeTab === 'employees'} onClick={() => { changeTab('employees'); setCurrentEmployeeView('list'); }} />
+              <SidebarItem icon={<Users />} label="고객 관리(매수자)" active={activeTab === 'customers'} onClick={() => { changeTab('customers'); setCurrentCustomerView('list'); }} />
+              <SidebarItem icon={<UserCircle />} label="사원 관리" active={activeTab === 'employees'} onClick={() => { changeTab('employees'); setCurrentEmployeeView('list'); }} />
               <div className="pt-4 mt-4 border-t border-slate-800">
                 <SidebarItem icon={<Lock />} label="로그아웃" active={false} onClick={handleLogout} />
               </div>
@@ -468,8 +444,8 @@
             <header className="bg-white border-b border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 md:px-8 shadow-sm z-10 gap-4 shrink-0">
               <h2 className="text-lg md:text-xl font-semibold text-slate-800">
                 {activeTab === 'properties' ? '내 물건 관리' : 
-                 activeTab === 'employees' ? '사원 계정 관리' :
-                 activeTab === 'customers' ? '고객 관리 (매수자)' :
+                 activeTab === 'employees' ? '사원 관리' :
+                 activeTab === 'customers' ? '고객 관리(매수자)' :
                  activeTab === 'calendar' ? '개인 캘린더' : '관리 메뉴'}
               </h2>
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
@@ -528,7 +504,7 @@
                       onBack={() => setCurrentEmployeeView('list')} 
                       onSave={async (newEmp) => {
                         const emp = { ...newEmp, id: `E-${Date.now()}`, date: new Date().toISOString().split('T')[0] };
-                        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'crm_users', emp.id), emp);
+                        await getCollection('crm_users').doc(emp.id).set(emp);
                         setCurrentEmployeeView('list');
                       }} 
                     />
@@ -543,7 +519,7 @@
                       onBack={() => setCurrentCustomerView('list')} 
                       onSave={async (newCust) => {
                         const cust = { ...newCust, id: `C-${Date.now()}`, date: new Date().toISOString().split('T')[0] };
-                        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'crm_customers', cust.id), cust);
+                        await getCollection('crm_customers').doc(cust.id).set(cust);
                         setCurrentCustomerView('list');
                       }} 
                     />
@@ -560,7 +536,7 @@
     // =====================================================================
     // [5] 상세/하위 뷰 컴포넌트들
     // =====================================================================
-    function AuthView({ onAuth, isDbEmpty }) {
+    function AuthView({ onAuth }) {
       const [isLoginMode, setIsLoginMode] = useState(true);
       const [errorMsg, setErrorMsg] = useState('');
       const [formData, setFormData] = useState({ loginId: '', password: '', name: '', phone: '', department: '' });
@@ -582,8 +558,7 @@
                 <Building2 className="w-8 h-8 text-blue-600" />
               </div>
               <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">빌딩탭</h1>
-              <p className="text-sm text-slate-500 mt-2 text-center">사내 부동산 매물 관리 시스템</p>
-              {isDbEmpty && <p className="text-xs text-blue-600 bg-blue-50 px-3 py-1 rounded font-bold mt-3">최초 접속입니다. '회원가입'을 진행해주세요.</p>}
+              <p className="text-sm text-slate-500 mt-2 text-center">부동산 매물 관리의 시작</p>
             </div>
 
             <div className="flex p-1 bg-slate-100 rounded-lg mb-6">
@@ -966,7 +941,7 @@
           landArea: '', totalFloorArea: '', buildingArea: '', buildingCoverage: '', floorAreaRatio: '', floorUnderground: '', floorGround: '', elevators: '', parking: '', completionYear: '',
           sale: '', deposit: '', rent: '', maintenance: '',
           floorDetails: [{ id: Date.now(), floor: '1층', companyName: '', deposit: '', rent: '', maintenance: '' }],
-          direction: '남향', workLogs: [], status: '보류', isShared: false, images: []
+          direction: '남향', workLogs: [], status: '보류'
         };
       });
 
@@ -1038,13 +1013,6 @@
         maintenance: acc.maintenance + (Number(curr.maintenance) || 0),
       }), { deposit: 0, rent: 0, maintenance: 0 }), [formData.floorDetails]);
 
-      // 상태 변경 시 공유 자동 해제
-      useEffect(() => {
-        if (formData.status === '보류' || formData.status === '매매') {
-          setFormData(prev => ({ ...prev, isShared: false }));
-        }
-      }, [formData.status]);
-
       const handleSubmit = (e) => {
         e.preventDefault();
 
@@ -1079,8 +1047,6 @@
         });
       };
 
-      const isShareDisabled = formData.status === '보류' || formData.status === '매매';
-
       return (
         <div className="max-w-4xl mx-auto pb-10 relative">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
@@ -1099,7 +1065,6 @@
             </div>
             
             <div className="flex items-center gap-2 w-full md:w-auto">
-              {/* 공유 스위치는 그대로 둠 (공유 게시판 활성화용) */}
               <button type="button" onClick={onBack} className="flex-1 md:flex-none text-slate-500 hover:text-slate-800 text-sm font-bold bg-slate-200 px-4 py-2.5 sm:py-2 rounded-lg text-center transition-colors">취소 및 돌아가기</button>
             </div>
           </div>
