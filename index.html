@@ -49,14 +49,20 @@
     // =====================================================================
     let firebaseConfig = { projectId: "demo-project" };
     try {
-      if (typeof window.__firebase_config !== 'undefined') firebaseConfig = JSON.parse(window.__firebase_config);
-    } catch (e) { console.error("Firebase config error", e); }
+      if (typeof __firebase_config !== 'undefined' && __firebase_config) {
+        firebaseConfig = JSON.parse(__firebase_config);
+      }
+    } catch (e) { 
+      console.error("Firebase config error", e); 
+    }
 
-    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+    if (!firebase.apps.length) {
+      firebase.initializeApp(firebaseConfig);
+    }
     
     const auth = firebase.auth();
     const db = firebase.firestore();
-    const appId = typeof window.__app_id !== 'undefined' ? window.__app_id : 'default-app-id';
+    const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
     const getCollection = (colName) => db.collection('artifacts').doc(appId).collection('public').doc('data').collection(colName);
 
@@ -64,7 +70,9 @@
     // [2] 유틸리티 함수 & 아이콘 맵핑
     // =====================================================================
     const getYield = (sale, deposit, rent) => {
-      const s = Number(sale) || 0; const d = Number(deposit) || 0; const r = Number(rent) || 0;
+      const s = Number(sale) || 0; 
+      const d = Number(deposit) || 0; 
+      const r = Number(rent) || 0;
       if (s === 0 || s <= d || r === 0) return '0.0';
       return (((r * 12) / (s - d)) * 100).toFixed(1);
     };
@@ -77,27 +85,34 @@
     const formatKoreanCurrency = (val) => {
       let num = Math.round(Number(val) || 0);
       if (num === 0) return '0원';
-      const eok = Math.floor(num / 10000); const man = num % 10000;
+      const eok = Math.floor(num / 10000); 
+      const man = num % 10000;
       let result = '';
       if (eok > 0) result += `${eok}억 `;
       if (man > 0) result += `${man.toLocaleString()}만`;
       return result.trim() + '원';
     };
 
-    const formatShortCurrency = (val) => {
-      const num = Number(val);
-      if (!num || isNaN(num) || num === 0) return '0원';
-      if (num >= 10000) { const eok = num / 10000; return `${Number.isInteger(eok) ? eok : eok.toFixed(1).replace(/\.0$/, '')}억`; }
-      return `${num.toLocaleString()}만`;
+    const STATUS_OPTIONS = ['보류', '완료', '매매'];
+    
+    const STATUS_FORM_COLORS = { 
+      '보류': 'bg-white text-slate-700 shadow-[0_2px_8px_rgba(0,0,0,0.08)]', 
+      '완료': 'bg-red-500 text-white shadow-[0_4px_12px_rgba(239,68,68,0.4)]', 
+      '매매': 'bg-blue-500 text-white shadow-[0_4px_12px_rgba(59,130,246,0.4)]' 
+    };
+    
+    const STATUS_BADGE_COLORS = { 
+      '보류': 'bg-slate-200 text-slate-600', 
+      '완료': 'bg-red-500 text-white shadow-sm', 
+      '매매': 'bg-slate-100 text-slate-600 border border-slate-200' 
     };
 
-    const STATUS_OPTIONS = ['보류', '완료', '매매'];
-    const STATUS_FORM_COLORS = { '보류': 'bg-white text-slate-700 shadow-[0_2px_8px_rgba(0,0,0,0.08)]', '완료': 'bg-red-500 text-white shadow-[0_4px_12px_rgba(239,68,68,0.4)]', '매매': 'bg-blue-500 text-white shadow-[0_4px_12px_rgba(59,130,246,0.4)]' };
-    const STATUS_BADGE_COLORS = { '보류': 'bg-slate-200 text-slate-600', '완료': 'bg-red-500 text-white shadow-sm', '매매': 'bg-slate-100 text-slate-600 border border-slate-200' };
-
     const autoFormatAddress = (addr) => {
-      if (!addr) return ''; let s = addr.replace(/\s+/g, '');
-      s = s.replace(/([가-힣]+[시도])([가-힣]+[구군시])/g, '$1 $2'); s = s.replace(/([가-힣]+[구군시])([가-힣]+[동읍면로길])/g, '$1 $2'); s = s.replace(/([가-힣]+[동읍면로길])(\d)/g, '$1 $2');
+      if (!addr) return ''; 
+      let s = addr.replace(/\s+/g, '');
+      s = s.replace(/([가-힣]+[시도])([가-힣]+[구군시])/g, '$1 $2'); 
+      s = s.replace(/([가-힣]+[구군시])([가-힣]+[동읍면로길])/g, '$1 $2'); 
+      s = s.replace(/([가-힣]+[동읍면로길])(\d)/g, '$1 $2');
       return s.replace(/\s+/g, ' ').trim();
     };
 
@@ -105,7 +120,13 @@
 
     const Icon = ({ name, className }) => {
       let textClass = 'text-base';
-      if (className?.includes('w-3')) textClass = 'text-xs'; else if (className?.includes('w-4')) textClass = 'text-sm'; else if (className?.includes('w-5')) textClass = 'text-lg'; else if (className?.includes('w-6')) textClass = 'text-xl'; else if (className?.includes('w-8')) textClass = 'text-3xl'; else if (className?.includes('w-12')) textClass = 'text-5xl';
+      if (className?.includes('w-3')) textClass = 'text-xs'; 
+      else if (className?.includes('w-4')) textClass = 'text-sm'; 
+      else if (className?.includes('w-5')) textClass = 'text-lg'; 
+      else if (className?.includes('w-6')) textClass = 'text-xl'; 
+      else if (className?.includes('w-8')) textClass = 'text-3xl'; 
+      else if (className?.includes('w-12')) textClass = 'text-5xl';
+      
       const cleanClassName = (className || '').replace(/\bw-\d+\b/g, '').replace(/\bh-\d+\b/g, '').trim();
       return <i className={`fas ${name} ${textClass} ${cleanClassName} flex items-center justify-center`}></i>;
     };
@@ -142,7 +163,6 @@
     const CalendarDays = (p) => <Icon name="fa-calendar-day" {...p} />;
     const Percent = (p) => <Icon name="fa-percentage" {...p} />;
     const Bars = (p) => <Icon name="fa-bars" {...p} />;
-    const Times = (p) => <Icon name="fa-times" {...p} />;
 
     // =====================================================================
     // [3] 공통 UI 컴포넌트
@@ -154,15 +174,27 @@
         </button>
       );
     }
-    function FormGroup({ label, children }) { return <div className="flex flex-col gap-1.5 w-full"><label className="text-sm font-semibold text-slate-700">{label}</label>{children}</div>; }
+    
+    function FormGroup({ label, children }) { 
+      return (
+        <div className="flex flex-col gap-1.5 w-full">
+          <label className="text-sm font-semibold text-slate-700">{label}</label>
+          {children}
+        </div>
+      ); 
+    }
+    
     function SpecRow({ icon, label, value }) {
       return (
         <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors gap-1 sm:gap-4">
-          <div className="flex items-center gap-3 text-slate-500 text-sm shrink-0">{React.cloneElement(icon, { className: 'w-4 h-4 text-slate-400' })} {label}</div>
+          <div className="flex items-center gap-3 text-slate-500 text-sm shrink-0">
+            {React.cloneElement(icon, { className: 'w-4 h-4 text-slate-400' })} {label}
+          </div>
           <div className="font-semibold text-slate-800 text-sm sm:text-right break-all sm:break-normal">{value}</div>
         </div>
       );
     }
+    
     function FloorMoneyInput({ label, value, onChange }) {
       return (
         <div className="flex-1 w-full min-w-[120px]">
@@ -175,6 +207,7 @@
         </div>
       );
     }
+    
     function FloorTextInput({ value, onChange, onBlur, autoFocus }) {
       return (
         <div className="w-full sm:w-20 shrink-0">
@@ -186,6 +219,7 @@
         </div>
       );
     }
+    
     function CompanyTextInput({ value, onChange }) {
       return (
         <div className="flex-1 min-w-[140px]">
@@ -197,6 +231,7 @@
         </div>
       );
     }
+    
     function FloorMoneyInputReadOnly({ label, value }) {
       return (
         <div className="flex-1 w-full min-w-[120px]">
@@ -214,8 +249,8 @@
     // [4] 메인 APP 컴포넌트
     // =====================================================================
     function App() {
-      const [fbUser, setFbUser] = useState(null); // Firebase 접속 유저 저장
-      const [isDbReady, setIsDbReady] = useState(true); 
+      const [fbUser, setFbUser] = useState(null); 
+      const [isDbReady, setIsDbReady] = useState(false); 
 
       const [isAuthenticated, setIsAuthenticated] = useState(false);
       const [currentUser, setCurrentUser] = useState(() => {
@@ -226,7 +261,6 @@
       const [properties, setProperties] = useState([]);
       const [employees, setEmployees] = useState([]);
       const [customers, setCustomers] = useState([]);
-
       const [myProperties, setMyProperties] = useState([]);
 
       const [currentView, setCurrentView] = useState('list'); 
@@ -239,50 +273,62 @@
       const [searchTerm, setSearchTerm] = useState('');
       const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-      // 1. Firebase 로그인 초기화
+      // 1. Firebase 로그인 초기화 (권한 에러 및 무한 로딩 해결 핵심)
       useEffect(() => {
+        let unsubscribe = () => {};
+
         const initAuth = async () => {
           try {
-            if (typeof window.__initial_auth_token !== 'undefined' && window.__initial_auth_token) {
-              await auth.signInWithCustomToken(window.__initial_auth_token);
+            // 커스텀 토큰 혹은 익명 로그인 진행
+            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+              await auth.signInWithCustomToken(__initial_auth_token);
             } else {
               await auth.signInAnonymously();
             }
-          } catch(e) { console.error("Firebase Auth 무시", e); }
+            
+            // 인증이 '성공'한 뒤에만 사용자 상태 추적 및 DB 통신 개시
+            unsubscribe = auth.onAuthStateChanged(user => {
+              setFbUser(user);
+              setIsDbReady(true);
+            });
+          } catch(e) { 
+            console.error("Firebase Auth 에러 발생:", e); 
+            setIsDbReady(true); // 에러가 나도 무한로딩에 빠지지 않게 화면은 띄움
+          }
         };
+        
         initAuth();
-
-        const unsubscribe = auth.onAuthStateChanged(user => {
-          setFbUser(user);
-        });
         return () => unsubscribe();
       }, []);
 
-      // 2. 로그인 유저 확인
+      // 2. 앱 내 자체 로그인 유지 확인
       useEffect(() => {
         if (currentUser) setIsAuthenticated(true);
       }, [currentUser]);
 
-      // 3. 서버(클라우드) 데이터 실시간 연동 (PC/모바일 연동)
+      // 3. 서버 데이터 실시간 구독 (인증 완료 후에만 접근하여 에러 방지)
       useEffect(() => {
-        if (!fbUser) return; // 핵심: 인증 완료 전에 데이터베이스 호출을 차단하여 권한 에러 해결
+        if (!fbUser) return; 
 
-        const unsubUsers = getCollection('crm_users').onSnapshot((snapshot) => {
-          setEmployees(snapshot.docs.map(d => d.data()));
-        }, console.error);
+        const unsubUsers = getCollection('crm_users').onSnapshot(
+          snapshot => setEmployees(snapshot.docs.map(d => d.data())), 
+          err => console.error("사원 데이터 불러오기 에러:", err)
+        );
 
-        const unsubProps = getCollection('crm_properties').onSnapshot((snapshot) => {
-          setProperties(snapshot.docs.map(d => d.data()));
-        }, console.error);
+        const unsubProps = getCollection('crm_properties').onSnapshot(
+          snapshot => setProperties(snapshot.docs.map(d => d.data())), 
+          err => console.error("물건 데이터 불러오기 에러:", err)
+        );
 
-        const unsubCusts = getCollection('crm_customers').onSnapshot((snapshot) => {
-          setCustomers(snapshot.docs.map(d => d.data()));
-        }, console.error);
+        const unsubCusts = getCollection('crm_customers').onSnapshot(
+          snapshot => setCustomers(snapshot.docs.map(d => d.data())), 
+          err => console.error("고객 데이터 불러오기 에러:", err)
+        );
 
         return () => { unsubUsers(); unsubProps(); unsubCusts(); };
       }, [fbUser]);
 
-      // 4. 내 물건 필터링
+      // 4. 내 물건 전용 정리
       useEffect(() => {
         if (!currentUser) return;
         setMyProperties(properties.filter(p => p.user_id === currentUser.loginId));
@@ -305,7 +351,7 @@
             setIsAuthenticated(true);
             return { success: true };
           }
-          return { success: false, message: '아이디 또는 비밀번호가 일치하지 않거나, 아직 서버에 동기화되지 않았습니다. (새로고침 후 다시 시도)' };
+          return { success: false, message: '아이디 또는 비밀번호가 일치하지 않습니다.' };
         } 
         if (type === 'signup') {
           const exists = employees.some(emp => emp.loginId === data.loginId);
@@ -321,12 +367,15 @@
             date: new Date().toISOString().split('T')[0]
           };
           
-          await getCollection('crm_users').doc(newUser.id).set(newUser);
-          
-          localStorage.setItem('crm_loggedInUser', JSON.stringify(newUser));
-          setCurrentUser(newUser);
-          setIsAuthenticated(true);
-          return { success: true };
+          try {
+            await getCollection('crm_users').doc(newUser.id).set(newUser);
+            localStorage.setItem('crm_loggedInUser', JSON.stringify(newUser));
+            setCurrentUser(newUser);
+            setIsAuthenticated(true);
+            return { success: true };
+          } catch(err) {
+            return { success: false, message: '서버 등록 중 오류가 발생했습니다. 나중에 다시 시도해주세요.' };
+          }
         }
       };
 
@@ -390,8 +439,19 @@
         c.region.toLowerCase().includes(searchTerm.toLowerCase())
       );
 
+      // 로딩 화면 방어 로직 (DB 초기화가 안끝났으면 대기)
+      if (!isDbReady) {
+        return (
+          <div className="flex flex-col h-screen items-center justify-center bg-slate-50 text-slate-500 font-bold text-lg">
+            <Building2 className="w-10 h-10 mb-4 text-blue-500 animate-pulse" /> 
+            서버와 통신 중입니다...
+          </div>
+        );
+      }
+
+      // 비로그인 화면
       if (!isAuthenticated) {
-        return <AuthView onAuth={handleAuth} />;
+        return <AuthView onAuth={handleAuth} isDbEmpty={employees.length === 0} />;
       }
 
       return (
@@ -421,7 +481,7 @@
               <SidebarItem icon={<CalendarIcon />} label="개인 캘린더" active={activeTab === 'calendar'} onClick={() => changeTab('calendar')} />
               <SidebarItem icon={<List />} label="내 물건 관리" active={activeTab === 'properties'} onClick={() => { changeTab('properties'); setCurrentView('list'); }} />
               <SidebarItem icon={<Users />} label="고객 관리(매수자)" active={activeTab === 'customers'} onClick={() => { changeTab('customers'); setCurrentCustomerView('list'); }} />
-              <SidebarItem icon={<UserCircle />} label="사원 관리" active={activeTab === 'employees'} onClick={() => { changeTab('employees'); setCurrentEmployeeView('list'); }} />
+              <SidebarItem icon={<UserCircle />} label="사원 등록" active={activeTab === 'employees'} onClick={() => { changeTab('employees'); setCurrentEmployeeView('list'); }} />
               <div className="pt-4 mt-4 border-t border-slate-800">
                 <SidebarItem icon={<Lock />} label="로그아웃" active={false} onClick={handleLogout} />
               </div>
@@ -472,7 +532,7 @@
               </div>
             </header>
 
-            <div id="main-scroll-area" className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-8 relative">
+            <div id="main-scroll-area" className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-8 relative bg-slate-100 sm:bg-transparent">
               {activeTab === 'properties' && (
                 <>
                   {currentView === 'list' && <PropertyListView properties={filteredMyProperties} onViewDetail={(p) => { setSelectedProperty(p); setCurrentView('detail'); }} />}
@@ -536,7 +596,8 @@
     // =====================================================================
     // [5] 상세/하위 뷰 컴포넌트들
     // =====================================================================
-    function AuthView({ onAuth }) {
+
+    function AuthView({ onAuth, isDbEmpty }) {
       const [isLoginMode, setIsLoginMode] = useState(true);
       const [errorMsg, setErrorMsg] = useState('');
       const [formData, setFormData] = useState({ loginId: '', password: '', name: '', phone: '', department: '' });
@@ -559,6 +620,7 @@
               </div>
               <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">빌딩탭</h1>
               <p className="text-sm text-slate-500 mt-2 text-center">부동산 매물 관리의 시작</p>
+              {isDbEmpty && <p className="text-xs text-blue-600 bg-blue-50 px-3 py-1 rounded font-bold mt-3">최초 접속입니다. '회원가입'을 진행해주세요.</p>}
             </div>
 
             <div className="flex p-1 bg-slate-100 rounded-lg mb-6">
@@ -907,7 +969,7 @@
                     ))}
                   </div>
                 </>
-              ) : <div className="aspect-[3/4] max-h-[400px] bg-slate-50 border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center text-slate-400 p-4"><ImageIcon className="w-8 h-8 sm:w-12 sm:h-12 mb-2 opacity-50" /><p className="text-xs sm:text-sm">등록된 사진이 없습니다</p></div>}
+              ) : <div className="aspect-[3/4] max-h-[400px] bg-slate-50 border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center text-slate-400 p-4"><ImageIcon className="w-8 h-8 sm:w-12 sm:h-12 mb-2 opacity-50" /><p className="text-xs sm:text-sm font-medium">등록된 사진이 없습니다</p></div>}
             </div>
 
             <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col">
@@ -1017,7 +1079,6 @@
         e.preventDefault();
 
         const formattedAddress = autoFormatAddress(formData.address);
-
         sortFloorDetails(); 
         
         let finalWorkLogs = [...(formData.workLogs || [])];
