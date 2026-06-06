@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>빌딩탭 CRM</title>
+  <title>빌딩탭 개인 CRM</title>
   
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -34,12 +34,7 @@
   </style>
 </head>
 <body>
-  <div id="root">
-    <!-- 초기 렌더링용 로딩 바 (React가 뜨면 즉시 사라짐) -->
-    <div style="display:flex; height:100vh; align-items:center; justify-content:center; color:#64748b; font-weight:bold;">
-      <i class="fas fa-spinner fa-spin" style="margin-right:10px;"></i> 시스템 부팅 중...
-    </div>
-  </div>
+  <div id="root"></div>
 
   <script type="text/babel">
     const { useState, useMemo, useEffect, useRef } = React;
@@ -47,10 +42,12 @@
     // =====================================================================
     // [1] FIREBASE 클라우드 데이터베이스 초기화
     // =====================================================================
+    // 💡 깃허브에서 정상적으로 크로스 디바이스(PC-모바일) 연동을 하시려면 
+    // 아래 firebaseConfig 변수에 선생님 본인의 Firebase 프로젝트 설정값을 넣으셔야 합니다.
     let firebaseConfig = { projectId: "demo-project" };
     try {
-      if (typeof __firebase_config !== 'undefined' && __firebase_config) {
-        firebaseConfig = JSON.parse(__firebase_config);
+      if (typeof window.__firebase_config !== 'undefined' && window.__firebase_config) {
+        firebaseConfig = JSON.parse(window.__firebase_config);
       }
     } catch (e) { 
       console.error("Firebase config error", e); 
@@ -62,7 +59,7 @@
     
     const auth = firebase.auth();
     const db = firebase.firestore();
-    const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+    const appId = typeof window.__app_id !== 'undefined' ? window.__app_id : 'default-app-id';
 
     const getCollection = (colName) => db.collection('artifacts').doc(appId).collection('public').doc('data').collection(colName);
 
@@ -250,7 +247,7 @@
     // =====================================================================
     function App() {
       const [fbUser, setFbUser] = useState(null); 
-      const [isDbReady, setIsDbReady] = useState(false); 
+      const [dbError, setDbError] = useState(false); // 깃허브 등 외부 환경 차단 에러 감지
 
       const [isAuthenticated, setIsAuthenticated] = useState(false);
       const [currentUser, setCurrentUser] = useState(() => {
@@ -265,7 +262,7 @@
 
       const [currentView, setCurrentView] = useState('list'); 
       const [selectedProperty, setSelectedProperty] = useState(null);
-      const [activeTab, setActiveTab] = useState('properties');
+      const [activeTab, setActiveTab] = useState('properties'); // 공유, 채팅방 제거
       
       const [currentEmployeeView, setCurrentEmployeeView] = useState('list');
       const [currentCustomerView, setCurrentCustomerView] = useState('list');
@@ -273,56 +270,55 @@
       const [searchTerm, setSearchTerm] = useState('');
       const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-      // 1. Firebase 로그인 초기화 (권한 에러 및 무한 로딩 해결 핵심)
+      // 1. Firebase 로그인 초기화 (무한로딩 방지를 위해 await 블로킹 제거)
       useEffect(() => {
-        let unsubscribe = () => {};
-
         const initAuth = async () => {
           try {
-            // 커스텀 토큰 혹은 익명 로그인 진행
-            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-              await auth.signInWithCustomToken(__initial_auth_token);
+            if (typeof window.__initial_auth_token !== 'undefined' && window.__initial_auth_token) {
+              await auth.signInWithCustomToken(window.__initial_auth_token);
             } else {
               await auth.signInAnonymously();
             }
-            
-            // 인증이 '성공'한 뒤에만 사용자 상태 추적 및 DB 통신 개시
-            unsubscribe = auth.onAuthStateChanged(user => {
-              setFbUser(user);
-              setIsDbReady(true);
-            });
           } catch(e) { 
-            console.error("Firebase Auth 에러 발생:", e); 
-            setIsDbReady(true); // 에러가 나도 무한로딩에 빠지지 않게 화면은 띄움
+            console.warn("Auth warning:", e); 
           }
         };
         
         initAuth();
+        
+        const unsubscribe = auth.onAuthStateChanged(user => {
+          setFbUser(user);
+        });
         return () => unsubscribe();
       }, []);
 
-      // 2. 앱 내 자체 로그인 유지 확인
+      // 2. 로그인 유지 확인
       useEffect(() => {
         if (currentUser) setIsAuthenticated(true);
       }, [currentUser]);
 
-      // 3. 서버 데이터 실시간 구독 (인증 완료 후에만 접근하여 에러 방지)
+      // 3. 서버 데이터 실시간 구독 (권한 에러 감지 추가)
       useEffect(() => {
         if (!fbUser) return; 
 
+        const errHandler = (err) => {
+          console.error("Firestore 연결 차단됨:", err);
+          setDbError(true);
+        };
+
         const unsubUsers = getCollection('crm_users').onSnapshot(
           snapshot => setEmployees(snapshot.docs.map(d => d.data())), 
-          err => console.error("사원 데이터 불러오기 에러:", err)
+          errHandler
         );
 
         const unsubProps = getCollection('crm_properties').onSnapshot(
           snapshot => setProperties(snapshot.docs.map(d => d.data())), 
-          err => console.error("물건 데이터 불러오기 에러:", err)
+          errHandler
         );
 
         const unsubCusts = getCollection('crm_customers').onSnapshot(
           snapshot => setCustomers(snapshot.docs.map(d => d.data())), 
-          err => console.error("고객 데이터 불러오기 에러:", err)
+          errHandler
         );
 
         return () => { unsubUsers(); unsubProps(); unsubCusts(); };
@@ -343,6 +339,10 @@
       }, [isMobileMenuOpen]);
 
       const handleAuth = async (type, data) => {
+        if (dbError) {
+           return { success: false, message: '현재 깃허브 등 외부 환경 접근이 차단되어 로그인이 불가능합니다. 자체 데이터베이스를 설정해주세요.' };
+        }
+
         if (type === 'login') {
           const user = employees.find(emp => emp.loginId === data.loginId && emp.password === data.password);
           if (user) {
@@ -387,6 +387,7 @@
       };
 
       const handleSaveProperty = async (prop) => {
+        if (dbError) { alert("서버 연동이 불가능하여 저장이 취소되었습니다."); return; }
         const finalProp = { 
           ...prop, 
           id: prop.id || `P-${Date.now()}`,
@@ -406,11 +407,13 @@
       };
 
       const handleUpdateProperty = async (prop) => {
+        if (dbError) return;
         await getCollection('crm_properties').doc(prop.id).set(prop);
         setSelectedProperty(prop);
       };
 
       const handleDeleteProperty = async (propertyId) => {
+        if (dbError) return;
         await getCollection('crm_properties').doc(propertyId).delete();
         setCurrentView('list');
         setSelectedProperty(null);
@@ -439,19 +442,9 @@
         c.region.toLowerCase().includes(searchTerm.toLowerCase())
       );
 
-      // 로딩 화면 방어 로직 (DB 초기화가 안끝났으면 대기)
-      if (!isDbReady) {
-        return (
-          <div className="flex flex-col h-screen items-center justify-center bg-slate-50 text-slate-500 font-bold text-lg">
-            <Building2 className="w-10 h-10 mb-4 text-blue-500 animate-pulse" /> 
-            서버와 통신 중입니다...
-          </div>
-        );
-      }
-
-      // 비로그인 화면
+      // 비로그인 화면 (에러 메세지 포함)
       if (!isAuthenticated) {
-        return <AuthView onAuth={handleAuth} isDbEmpty={employees.length === 0} />;
+        return <AuthView onAuth={handleAuth} dbError={dbError} isDbEmpty={employees.length === 0} />;
       }
 
       return (
@@ -551,7 +544,6 @@
                       initialData={selectedProperty} 
                       onBack={() => { currentView === 'form' && selectedProperty ? setCurrentView('detail') : setCurrentView('list'); }} 
                       onSave={handleSaveProperty} 
-                      currentUser={currentUser} 
                     />
                   )}
                 </>
@@ -597,7 +589,7 @@
     // [5] 상세/하위 뷰 컴포넌트들
     // =====================================================================
 
-    function AuthView({ onAuth, isDbEmpty }) {
+    function AuthView({ onAuth, dbError, isDbEmpty }) {
       const [isLoginMode, setIsLoginMode] = useState(true);
       const [errorMsg, setErrorMsg] = useState('');
       const [formData, setFormData] = useState({ loginId: '', password: '', name: '', phone: '', department: '' });
@@ -620,8 +612,16 @@
               </div>
               <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">빌딩탭</h1>
               <p className="text-sm text-slate-500 mt-2 text-center">부동산 매물 관리의 시작</p>
-              {isDbEmpty && <p className="text-xs text-blue-600 bg-blue-50 px-3 py-1 rounded font-bold mt-3">최초 접속입니다. '회원가입'을 진행해주세요.</p>}
             </div>
+
+            {dbError && (
+              <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-700 text-xs sm:text-sm rounded-xl font-bold leading-relaxed shadow-sm">
+                🚨 보안 규칙에 의해 데이터베이스 연동이 차단되었습니다.<br/>
+                이 코드를 깃허브 페이지 등 외부에서 실행하시려면 HTML 소스코드 상단의 <span className="bg-red-100 px-1 rounded">firebaseConfig</span> 부분을 본인의 클라우드 설정으로 교체하셔야 합니다.
+              </div>
+            )}
+
+            {!dbError && isDbEmpty && <p className="text-xs text-blue-600 bg-blue-50 px-3 py-2 rounded-lg font-bold mb-4 text-center">최초 접속입니다. '회원가입'을 진행해주세요.</p>}
 
             <div className="flex p-1 bg-slate-100 rounded-lg mb-6">
               <button onClick={() => {setIsLoginMode(true); setErrorMsg('');}} className={`flex-1 py-2.5 text-sm font-bold rounded-md transition-all ${isLoginMode ? 'bg-white text-blue-600 shadow' : 'text-slate-500'}`}>로그인</button>
@@ -668,7 +668,7 @@
 
               {errorMsg && <div className="p-3 bg-red-50 text-red-600 text-sm font-bold rounded-lg text-center border border-red-100">{errorMsg}</div>}
 
-              <button type="submit" className="w-full py-4 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-all shadow-md shadow-blue-200 mt-6 flex items-center justify-center gap-2 text-lg">
+              <button type="submit" disabled={dbError} className={`w-full py-4 font-bold rounded-xl transition-all shadow-md mt-6 flex items-center justify-center gap-2 text-lg ${dbError ? 'bg-slate-300 text-white cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700 shadow-blue-200'}`}>
                 {isLoginMode ? <><ShieldCheck className="w-5 h-5" /> 로그인</> : '계정 생성 및 접속'}
               </button>
             </form>
@@ -969,7 +969,7 @@
                     ))}
                   </div>
                 </>
-              ) : <div className="aspect-[3/4] max-h-[400px] bg-slate-50 border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center text-slate-400 p-4"><ImageIcon className="w-8 h-8 sm:w-12 sm:h-12 mb-2 opacity-50" /><p className="text-xs sm:text-sm font-medium">등록된 사진이 없습니다</p></div>}
+              ) : <div className="aspect-[3/4] max-h-[400px] bg-slate-50 border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center text-slate-400 p-4"><ImageIcon className="w-8 h-8 sm:w-12 sm:h-12 mb-2 opacity-50" /><p className="text-xs sm:text-sm">등록된 사진이 없습니다</p></div>}
             </div>
 
             <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col">
@@ -992,7 +992,7 @@
       );
     }
 
-    function PropertyFormView({ initialData, onBack, onSave, currentUser }) {
+    function PropertyFormView({ initialData, onBack, onSave }) {
       const [newLog, setNewLog] = useState('');
       const [addressError, setAddressError] = useState('');
       const [formData, setFormData] = useState(() => {
@@ -1086,7 +1086,7 @@
           finalWorkLogs.unshift({
             id: Date.now(),
             date: new Date().toLocaleString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }),
-            author: currentUser ? currentUser.name : '시스템',
+            author: '등록자',
             content: newLog.trim()
           });
         }
