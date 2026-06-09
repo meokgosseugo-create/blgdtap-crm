@@ -25,7 +25,7 @@
 <body>
   <div id="root">
     <div style="display:flex; height:100vh; align-items:center; justify-content:center; color:#64748b; font-weight:bold;">
-      <i class="fas fa-spinner fa-spin" style="margin-right:10px;"></i> 최신 시스템을 불러오는 중입니다...
+      <i class="fas fa-spinner fa-spin" style="margin-right:10px;"></i> 최신 v4.0 시스템을 불러오는 중입니다...
     </div>
   </div>
 
@@ -72,14 +72,15 @@
       return Math.round(sale / (landArea * 0.3025));
     };
 
-    // 💡 완벽하게 수정한 금액 표기 로직 (예: 5444444 -> 544.4억 고정)
+    // 💡 금액 표기 완벽 고정 로직 (무조건 소수점 첫째 자리, 천만 원까지만 강제 표시)
     const formatKoreanCurrency = (val) => {
       const num = Number(val);
       if (!num || isNaN(num) || num === 0) return '0원';
       if (num >= 10000) {
-        // 소수점 둘째 자리에서 내림 처리하여 무조건 첫째 자리만 남김
-        const eok = Math.floor((num / 10000) * 10) / 10; 
-        return `${eok.toLocaleString('ko-KR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}억`;
+        // 입력값을 1000으로 나누고 내림한 뒤 10으로 나눔 -> 무조건 소수점 1자리로 강제 절삭
+        // 예: 544444 -> 544.444 -> 544.4억
+        const eok = Math.floor(num / 1000) / 10; 
+        return `${eok.toFixed(1)}억`;
       }
       return `${num.toLocaleString('ko-KR')}만`;
     };
@@ -190,8 +191,8 @@
       const [currentView, setCurrentView] = useState('list'); 
       const [selectedProperty, setSelectedProperty] = useState(null);
       
-      // 💡 [핵심] 접속하자마자 무조건 '내 물건 관리'가 보이도록 설정
-      const [activeTab, setActiveTab] = useState('properties'); 
+      // 💡 시작 시 무조건 '개인 캘린더'가 1순위로 열리도록 고정
+      const [activeTab, setActiveTab] = useState('calendar'); 
       
       const [currentEmployeeView, setCurrentEmployeeView] = useState('list');
       const [currentCustomerView, setCurrentCustomerView] = useState('list');
@@ -242,7 +243,7 @@
             safeStorage.setItem('crm_loggedInUser_local', JSON.stringify(user));
             setCurrentUser(user);
             setIsAuthenticated(true);
-            setActiveTab('properties'); // 로그인 성공 시에도 무조건 내 물건 관리 탭으로
+            setActiveTab('calendar'); // 로그인 후에도 캘린더가 먼저 보이게 고정
             return { success: true };
           }
           return { success: false, message: '아이디 또는 비밀번호가 일치하지 않습니다.' };
@@ -267,7 +268,7 @@
           safeStorage.setItem('crm_loggedInUser_local', JSON.stringify(newUser));
           setCurrentUser(newUser);
           setIsAuthenticated(true);
-          setActiveTab('properties');
+          setActiveTab('calendar');
           return { success: true };
         }
       };
@@ -284,7 +285,7 @@
           id: prop.id || `P-${Date.now()}`,
           user_id: currentUser.loginId, 
           registrant: currentUser.name,
-          date: prop.date || new Date().toISOString().split('T')[0] // 등록일자
+          date: prop.date || new Date().toISOString().split('T')[0]
         };
         
         if(supabase) await supabase.from('crm_properties').upsert(finalProp);
@@ -327,7 +328,7 @@
           <div className="md:hidden flex items-center justify-between bg-slate-900 text-white p-4 z-30 shadow-md">
             <div className="flex items-center gap-2">
               <Building2 className="w-6 h-6 text-blue-400" />
-              <h1 className="text-lg font-bold tracking-tight">빌딩탭 <span className="text-xs font-normal text-blue-200 ml-1">최신버전</span></h1>
+              <h1 className="text-lg font-bold tracking-tight">빌딩탭 <span className="text-xs font-bold text-green-400 ml-1">v4.0</span></h1>
             </div>
             <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 -mr-2 text-slate-300">
               <Bars className="w-6 h-6" />
@@ -338,14 +339,14 @@
             <div className="p-6 border-b border-slate-800 hidden md:block">
               <div className="flex items-center gap-3">
                 <Building2 className="w-8 h-8 text-blue-400" />
-                <h1 className="text-xl font-bold tracking-tight">빌딩탭 <span className="text-xs font-normal text-blue-300 ml-1">최신버전</span></h1>
+                <h1 className="text-xl font-bold tracking-tight">빌딩탭 <span className="text-xs font-bold text-green-500 ml-1 px-2 py-0.5 bg-green-100 rounded-full">v4.0</span></h1>
               </div>
             </div>
             
             <nav className="flex-1 p-4 space-y-2 overflow-y-auto mt-4 md:mt-0">
-              {/* 💡 1순위: 내 물건 관리, 2순위: 캘린더 로 교체된 메뉴 */}
-              <SidebarItem icon={<List />} label="내 물건 관리" active={activeTab === 'properties'} onClick={() => changeTab('properties')} />
+              {/* 💡 캘린더가 1순위, 내 물건 관리가 2순위로 완벽히 교체 */}
               <SidebarItem icon={<CalendarIcon />} label="개인 캘린더" active={activeTab === 'calendar'} onClick={() => changeTab('calendar')} />
+              <SidebarItem icon={<List />} label="내 물건 관리" active={activeTab === 'properties'} onClick={() => changeTab('properties')} />
               <SidebarItem icon={<Users />} label="고객 관리(매수자)" active={activeTab === 'customers'} onClick={() => changeTab('customers')} />
               <SidebarItem icon={<UserCircle />} label="사원 목록" active={activeTab === 'employees'} onClick={() => changeTab('employees')} />
               <div className="pt-4 mt-4 border-t border-slate-800">
@@ -369,7 +370,7 @@
           <main className="flex-1 flex flex-col h-[calc(100vh-60px)] md:h-screen overflow-hidden">
             <header className="bg-white border-b border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 md:px-8 gap-4 shrink-0">
               <h2 className="text-lg md:text-xl font-semibold text-slate-800">
-                {activeTab === 'properties' ? '내 물건 관리' : activeTab === 'calendar' ? '개인 캘린더' : activeTab === 'customers' ? '고객 관리' : '사원 목록'}
+                {activeTab === 'calendar' ? '개인 캘린더' : activeTab === 'properties' ? '내 물건 관리' : activeTab === 'customers' ? '고객 관리' : '사원 목록'}
               </h2>
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
                 <div className="relative w-full sm:w-auto">
@@ -391,6 +392,7 @@
             </header>
 
             <div className="flex-1 overflow-y-auto p-4 md:p-8 bg-slate-100 sm:bg-transparent">
+              {activeTab === 'calendar' && <CalendarView currentUser={currentUser} properties={myProperties} memos={memos} setMemos={setMemos} />}
               {activeTab === 'properties' && (
                 <>
                   {currentView === 'list' && <PropertyListView properties={filteredMyProperties} onViewDetail={(p) => { setSelectedProperty(p); setCurrentView('detail'); }} />}
@@ -398,7 +400,6 @@
                   {currentView === 'form' && <PropertyFormView initialData={selectedProperty} onBack={() => setCurrentView('list')} onSave={handleSaveProperty} currentUser={currentUser} />}
                 </>
               )}
-              {activeTab === 'calendar' && <CalendarView currentUser={currentUser} properties={myProperties} memos={memos} setMemos={setMemos} />}
               
               {activeTab === 'customers' && (
                 <>
@@ -457,7 +458,7 @@
           <div className="w-full max-w-md bg-white p-8 rounded-2xl shadow-xl">
             <div className="flex flex-col items-center justify-center mb-6">
               <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-4"><Building2 className="w-8 h-8 text-blue-600" /></div>
-              <h1 className="text-2xl font-extrabold text-slate-900">빌딩탭 <span className="text-sm font-normal text-blue-500">최신버전</span></h1>
+              <h1 className="text-2xl font-extrabold text-slate-900">빌딩탭 <span className="text-sm font-bold text-green-600">v4.0</span></h1>
               <p className="text-sm text-slate-500 mt-2">부동산 매물 관리의 시작</p>
             </div>
 
@@ -722,7 +723,6 @@
             <div key={d} onClick={() => { setEditingDate(dayStr); setNewMemo(''); }} className={`relative min-h-[100px] p-2 border rounded-lg cursor-pointer hover:border-blue-400 ${isToday ? 'bg-blue-50 border-blue-300' : 'bg-white'}`}>
               <div className="font-bold text-sm mb-1">{d}</div>
               
-              {/* 💡 일정 추가 및 휴지통(삭제) 아이콘 항시 노출 */}
               {dayMemos.map(m => (
                 <div key={m.id} className="text-[11px] bg-blue-100 text-blue-800 p-1 mb-1 rounded flex justify-between items-center gap-1">
                   <span className="truncate flex-1">{m.text}</span>
@@ -730,7 +730,6 @@
                 </div>
               ))}
 
-              {/* 💡 '완료' 처리된 물건 건수 표시 */}
               {completedCount > 0 && (
                 <div className="text-[11px] bg-red-100 text-red-700 p-1 rounded font-bold border border-red-200 mt-1 text-center">
                   작업완료 : {completedCount}건
