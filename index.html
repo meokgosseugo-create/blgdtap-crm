@@ -25,7 +25,7 @@
 <body>
   <div id="root">
     <div style="display:flex; height:100vh; align-items:center; justify-content:center; color:#64748b; font-weight:bold;">
-      <i class="fas fa-spinner fa-spin" style="margin-right:10px;"></i> 시스템을 불러오는 중입니다...
+      <i class="fas fa-spinner fa-spin" style="margin-right:10px;"></i> 최신 시스템을 불러오는 중입니다...
     </div>
   </div>
 
@@ -72,12 +72,15 @@
       return Math.round(sale / (landArea * 0.3025));
     };
 
+    // 💡 완벽하게 수정한 금액 표기 로직 (무조건 소수점 첫째 자리, 천만원까지만 표시)
     const formatKoreanCurrency = (val) => {
       const num = Number(val);
       if (!num || isNaN(num) || num === 0) return '0원';
       if (num >= 10000) {
-        const eok = (Math.floor(num / 1000) / 10).toFixed(1);
-        return `${eok}억`;
+        // 입력값을 1000으로 나누고 내림한 뒤 10으로 나눔 -> 무조건 소수점 1자리로 잘라냄
+        // 예: 544444 -> 544.444 -> 544.4
+        const eok = Math.floor(num / 1000) / 10; 
+        return `${eok.toLocaleString('ko-KR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}억`;
       }
       return `${num.toLocaleString('ko-KR')}만`;
     };
@@ -188,7 +191,8 @@
       const [currentView, setCurrentView] = useState('list'); 
       const [selectedProperty, setSelectedProperty] = useState(null);
       
-      const [activeTab, setActiveTab] = useState('calendar'); 
+      // 💡 시작 시 무조건 '내 물건 관리'가 보이도록 고정
+      const [activeTab, setActiveTab] = useState('properties'); 
       
       const [currentEmployeeView, setCurrentEmployeeView] = useState('list');
       const [currentCustomerView, setCurrentCustomerView] = useState('list');
@@ -239,7 +243,7 @@
             safeStorage.setItem('crm_loggedInUser_local', JSON.stringify(user));
             setCurrentUser(user);
             setIsAuthenticated(true);
-            setActiveTab('calendar');
+            setActiveTab('properties'); // 로그인 시에도 무조건 내 물건 관리 탭으로
             return { success: true };
           }
           return { success: false, message: '아이디 또는 비밀번호가 일치하지 않습니다.' };
@@ -264,7 +268,7 @@
           safeStorage.setItem('crm_loggedInUser_local', JSON.stringify(newUser));
           setCurrentUser(newUser);
           setIsAuthenticated(true);
-          setActiveTab('calendar');
+          setActiveTab('properties');
           return { success: true };
         }
       };
@@ -324,7 +328,7 @@
           <div className="md:hidden flex items-center justify-between bg-slate-900 text-white p-4 z-30 shadow-md">
             <div className="flex items-center gap-2">
               <Building2 className="w-6 h-6 text-blue-400" />
-              <h1 className="text-lg font-bold tracking-tight">빌딩탭 <span className="text-xs font-bold text-red-400 ml-1">[v3.0 최종수정]</span></h1>
+              <h1 className="text-lg font-bold tracking-tight">빌딩탭 <span className="text-xs font-bold text-red-400 ml-1">[v2.0 완벽적용]</span></h1>
             </div>
             <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 -mr-2 text-slate-300">
               <Bars className="w-6 h-6" />
@@ -335,13 +339,14 @@
             <div className="p-6 border-b border-slate-800 hidden md:block">
               <div className="flex items-center gap-3">
                 <Building2 className="w-8 h-8 text-blue-400" />
-                <h1 className="text-xl font-bold tracking-tight">빌딩탭 <span className="text-xs font-bold text-red-500 ml-1 px-2 py-0.5 bg-red-100 rounded-full">v3.0</span></h1>
+                <h1 className="text-xl font-bold tracking-tight">빌딩탭 <span className="text-xs font-bold text-red-500 ml-1 px-2 py-0.5 bg-red-100 rounded-full">v2.0</span></h1>
               </div>
             </div>
             
             <nav className="flex-1 p-4 space-y-2 overflow-y-auto mt-4 md:mt-0">
-              <SidebarItem icon={<CalendarIcon />} label="개인 캘린더" active={activeTab === 'calendar'} onClick={() => changeTab('calendar')} />
+              {/* 💡 좌측 메뉴 1순위: 내 물건 관리, 2순위: 캘린더 위치 완벽 교체 */}
               <SidebarItem icon={<List />} label="내 물건 관리" active={activeTab === 'properties'} onClick={() => changeTab('properties')} />
+              <SidebarItem icon={<CalendarIcon />} label="개인 캘린더" active={activeTab === 'calendar'} onClick={() => changeTab('calendar')} />
               <SidebarItem icon={<Users />} label="고객 관리(매수자)" active={activeTab === 'customers'} onClick={() => changeTab('customers')} />
               <SidebarItem icon={<UserCircle />} label="사원 목록" active={activeTab === 'employees'} onClick={() => changeTab('employees')} />
               <div className="pt-4 mt-4 border-t border-slate-800">
@@ -365,7 +370,7 @@
           <main className="flex-1 flex flex-col h-[calc(100vh-60px)] md:h-screen overflow-hidden">
             <header className="bg-white border-b border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 md:px-8 gap-4 shrink-0">
               <h2 className="text-lg md:text-xl font-semibold text-slate-800">
-                {activeTab === 'calendar' ? '개인 캘린더' : activeTab === 'properties' ? '내 물건 관리' : activeTab === 'customers' ? '고객 관리' : '사원 목록'}
+                {activeTab === 'properties' ? '내 물건 관리' : activeTab === 'calendar' ? '개인 캘린더' : activeTab === 'customers' ? '고객 관리' : '사원 목록'}
               </h2>
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
                 <div className="relative w-full sm:w-auto">
@@ -387,7 +392,6 @@
             </header>
 
             <div className="flex-1 overflow-y-auto p-4 md:p-8 bg-slate-100 sm:bg-transparent">
-              {activeTab === 'calendar' && <CalendarView currentUser={currentUser} properties={myProperties} memos={memos} setMemos={setMemos} />}
               {activeTab === 'properties' && (
                 <>
                   {currentView === 'list' && <PropertyListView properties={filteredMyProperties} onViewDetail={(p) => { setSelectedProperty(p); setCurrentView('detail'); }} />}
@@ -395,6 +399,7 @@
                   {currentView === 'form' && <PropertyFormView initialData={selectedProperty} onBack={() => setCurrentView('list')} onSave={handleSaveProperty} currentUser={currentUser} />}
                 </>
               )}
+              {activeTab === 'calendar' && <CalendarView currentUser={currentUser} properties={myProperties} memos={memos} setMemos={setMemos} />}
               
               {activeTab === 'customers' && (
                 <>
@@ -453,7 +458,7 @@
           <div className="w-full max-w-md bg-white p-8 rounded-2xl shadow-xl">
             <div className="flex flex-col items-center justify-center mb-6">
               <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-4"><Building2 className="w-8 h-8 text-blue-600" /></div>
-              <h1 className="text-2xl font-extrabold text-slate-900">빌딩탭 <span className="text-sm font-bold text-red-500">v3.0</span></h1>
+              <h1 className="text-2xl font-extrabold text-slate-900">빌딩탭 <span className="text-sm font-bold text-red-500">v2.0</span></h1>
               <p className="text-sm text-slate-500 mt-2">부동산 매물 관리의 시작</p>
             </div>
 
