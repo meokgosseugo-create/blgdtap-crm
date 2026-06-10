@@ -365,6 +365,7 @@
 
           if (error) {
             if (error.message.includes('already registered')) return { success: false, message: '이미 존재하는 아이디입니다.' };
+            if (error.message.includes('rate limit')) return { success: false, message: '가입 횟수 제한에 걸렸습니다. (Supabase Auth 설정에서 Rate Limit 변경 필요)' };
             return { success: false, message: error.message };
           }
 
