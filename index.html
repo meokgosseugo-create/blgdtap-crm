@@ -11,14 +11,14 @@
   <!-- FontAwesome Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
-  <!-- React & ReactDOM (HTML 직접 실행용) -->
+  <!-- React & ReactDOM -->
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   
-  <!-- Babel (브라우저 번역기) -->
+  <!-- Babel -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-  <!-- Supabase CDN (가장 안정적인 방식) -->
+  <!-- Supabase -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <style>
@@ -34,12 +34,11 @@
 <body>
   <div id="root"></div>
 
-  <!-- 여기서부터 무조건 작동하는 단일 코드 구조 -->
   <script type="text/babel">
     const { useState, useMemo, useEffect, useRef } = React;
 
     // =====================================================================
-    // [1] 선생님의 Supabase 직접 연동 (URL / KEY 적용 완료)
+    // [1] Supabase 연동
     // =====================================================================
     const SUPABASE_URL = "https://ehshoqcskipcvybhomlq.supabase.co";
     const SUPABASE_KEY = "sb_publishable_v5aUCKdYsRAtiwKSjn8oSA_GnuPEe4G";
@@ -52,18 +51,6 @@
       getItem: (key) => { try { return localStorage.getItem(key); } catch (e) { return window['temp_' + key] || null; } },
       setItem: (key, val) => { try { localStorage.setItem(key, val); } catch (e) { window['temp_' + key] = val; } },
       removeItem: (key) => { try { localStorage.removeItem(key); } catch (e) { delete window['temp_' + key]; } }
-    };
-
-    // Supabase Auth 유저 데이터를 로컬 currentUser 형태로 변환
-    const mapSupabaseUser = (user) => {
-      if (!user) return null;
-      return {
-        id: user.id, // Supabase Auth UID
-        loginId: user.email ? user.email.replace('@crm.local', '') : '', // 가상 이메일에서 원래 아이디만 추출
-        name: user.user_metadata?.name || '사용자',
-        department: user.user_metadata?.department || '사원',
-        phone: user.user_metadata?.phone || ''
-      };
     };
 
     const getYield = (sale, deposit, rent) => {
@@ -83,11 +70,38 @@
       const num = Number(val);
       if (!num || isNaN(num) || num === 0) return '0원';
       if (num >= 10000) {
-        // 무조건 소수점 첫째 자리(천만 원 단위)까지만 남기고 자르기
         const eok = Math.floor(num / 1000) / 10;
         return `${eok.toFixed(1)}억`;
       }
       return `${num.toLocaleString('ko-KR')}만`;
+    };
+
+    const autoFormatAddress = (addr) => {
+      if (!addr) return ''; 
+      let s = addr.replace(/\s+/g, '');
+      s = s.replace(/([가-힣]+[시도])([가-힣]+[구군시])/g, '$1 $2'); 
+      s = s.replace(/([가-힣]+[구군시])([가-힣]+[동읍면로길])/g, '$1 $2'); 
+      s = s.replace(/([가-힣]+[동읍면로길])(\d)/g, '$1 $2');
+      return s.replace(/\s+/g, ' ').trim();
+    };
+
+    const getExactPyeong = (sqm) => ((Number(sqm) || 0) * 0.3025).toFixed(2);
+
+    // 💡 공유 물건용 축약 주소 변환 (예: 서울시 강남구 신사동 10 -> 서울시 강남구)
+    const formatShortAddress = (addr) => {
+      if (!addr || typeof addr !== 'string') return '';
+      const parts = addr.split(' ').filter(Boolean);
+      if (parts.length >= 2) return `${parts[0]} ${parts[1]}`;
+      return addr;
+    };
+
+    // 💡 공유 물건용 어림수 평수 변환 (약 100평 단위 반올림)
+    const formatRoughPyeong = (sqm) => {
+      let p = Math.round((Number(sqm) || 0) * 0.3025);
+      if (p === 0) return '0평';
+      if (p >= 100) p = Math.round(p / 100) * 100;
+      else if (p >= 10) p = Math.round(p / 10) * 10;
+      return `약 ${p}평`;
     };
 
     const STATUS_OPTIONS = ['보류', '매매', '완료'];
@@ -104,17 +118,6 @@
       '완료': 'bg-blue-500 text-white shadow-sm'
     };
 
-    const autoFormatAddress = (addr) => {
-      if (!addr) return ''; 
-      let s = addr.replace(/\s+/g, '');
-      s = s.replace(/([가-힣]+[시도])([가-힣]+[구군시])/g, '$1 $2'); 
-      s = s.replace(/([가-힣]+[구군시])([가-힣]+[동읍면로길])/g, '$1 $2'); 
-      s = s.replace(/([가-힣]+[동읍면로길])(\d)/g, '$1 $2');
-      return s.replace(/\s+/g, ' ').trim();
-    };
-
-    const getExactPyeong = (sqm) => ((Number(sqm) || 0) * 0.3025).toFixed(2);
-
     const Icon = ({ name, className }) => {
       let textClass = 'text-base';
       if (className?.includes('w-3')) textClass = 'text-xs'; 
@@ -122,7 +125,6 @@
       else if (className?.includes('w-5')) textClass = 'text-lg'; 
       else if (className?.includes('w-6')) textClass = 'text-xl'; 
       else if (className?.includes('w-8')) textClass = 'text-3xl'; 
-      else if (className?.includes('w-12')) textClass = 'text-5xl';
       
       const cleanClassName = (className || '').replace(/\bw-\d+\b/g, '').replace(/\bh-\d+\b/g, '').trim();
       return <i className={`fas ${name} ${textClass} ${cleanClassName} flex items-center justify-center`}></i>;
@@ -160,6 +162,9 @@
     const CalendarDays = (p) => <Icon name="fa-calendar-day" {...p} />;
     const Percent = (p) => <Icon name="fa-percentage" {...p} />;
     const Bars = (p) => <Icon name="fa-bars" {...p} />;
+    const Comments = (p) => <Icon name="fa-comments" {...p} />;
+    const Share = (p) => <Icon name="fa-share-alt" {...p} />;
+    const Send = (p) => <Icon name="fa-paper-plane" {...p} />;
 
     // =====================================================================
     // [3] 공통 UI 컴포넌트
@@ -246,7 +251,6 @@
     // [4] 메인 APP 컴포넌트
     // =====================================================================
     function App() {
-      // 💡 [변경 완료] Supabase 인증 상태 관리 적용
       const [isAuthenticated, setIsAuthenticated] = useState(false);
       const [currentUser, setCurrentUser] = useState(null);
       const [isAuthLoading, setIsAuthLoading] = useState(true);
@@ -261,13 +265,14 @@
       const [selectedProperty, setSelectedProperty] = useState(null);
       
       const [activeTab, setActiveTab] = useState('calendar'); 
+      const [selectedChatEmp, setSelectedChatEmp] = useState(null);
+
       const [currentEmployeeView, setCurrentEmployeeView] = useState('list');
       const [currentCustomerView, setCurrentCustomerView] = useState('list');
 
       const [searchTerm, setSearchTerm] = useState('');
       const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-      // 클라우드 데이터베이스 업데이트
       const fetchCloudData = async () => {
         try {
           const [propsRes, usersRes, custsRes, memosRes] = await Promise.all([
@@ -286,21 +291,30 @@
         }
       };
 
-      // 💡 Supabase Auth 세션 관리
       useEffect(() => {
-        // 최초 로드 시 세션 확인
         supabase.auth.getSession().then(({ data: { session } }) => {
           if (session) {
-            setCurrentUser(mapSupabaseUser(session.user));
+            setCurrentUser({
+              loginId: session.user.email.replace('@crm.local', ''),
+              name: session.user.user_metadata?.name || '사용자',
+              department: session.user.user_metadata?.department || '사원',
+              phone: session.user.user_metadata?.phone || '',
+              id: session.user.id
+            });
             setIsAuthenticated(true);
           }
           setIsAuthLoading(false);
         });
 
-        // 세션 변경(로그인/로그아웃) 감지 리스너
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
           if (session) {
-            setCurrentUser(mapSupabaseUser(session.user));
+            setCurrentUser({
+              loginId: session.user.email.replace('@crm.local', ''),
+              name: session.user.user_metadata?.name || '사용자',
+              department: session.user.user_metadata?.department || '사원',
+              phone: session.user.user_metadata?.phone || '',
+              id: session.user.id
+            });
             setIsAuthenticated(true);
           } else {
             setCurrentUser(null);
@@ -316,7 +330,6 @@
         };
       }, []);
 
-      // 내 물건 필터링
       useEffect(() => {
         if (!currentUser) return;
         setMyProperties(properties.filter(p => p.user_id === currentUser.loginId));
@@ -330,49 +343,37 @@
         return () => document.removeEventListener('click', handleClickOutside);
       }, [isMobileMenuOpen]);
 
-      // 💡 [변경 완료] Supabase 인증 로직 (회원가입/로그인)
       const handleAuth = async (type, data) => {
-        // 이메일 형식을 요구하는 Supabase를 위해 가상 도메인 부착
         const email = data.loginId.includes('@') ? data.loginId : `${data.loginId}@crm.local`;
 
         if (type === 'login') {
-          const { data: authData, error } = await supabase.auth.signInWithPassword({
+          const { error } = await supabase.auth.signInWithPassword({
             email,
             password: data.password,
           });
 
-          if (error) {
-            return { success: false, message: '아이디 또는 비밀번호가 일치하지 않습니다.' };
-          }
+          if (error) return { success: false, message: '아이디 또는 비밀번호가 일치하지 않습니다.' };
           
           setActiveTab('calendar');
           return { success: true };
         } 
         
         if (type === 'signup') {
-          // Supabase Auth 회원가입
           const { data: authData, error } = await supabase.auth.signUp({
             email,
             password: data.password,
-            options: {
-              data: {
-                name: data.name,
-                department: data.department || '신규 사원',
-                phone: data.phone
-              }
-            }
+            options: { data: { name: data.name, department: data.department || '신규 사원', phone: data.phone } }
           });
 
           if (error) {
             if (error.message.includes('already registered')) return { success: false, message: '이미 존재하는 아이디입니다.' };
-            if (error.message.includes('rate limit')) return { success: false, message: '가입 횟수 제한에 걸렸습니다. (Supabase Auth 설정에서 Rate Limit 변경 필요)' };
+            if (error.message.includes('rate limit')) return { success: false, message: '가입 제한에 걸렸습니다. Supabase 설정을 확인해주세요.' };
             return { success: false, message: error.message };
           }
 
-          // 기존 DB 조회용 crm_users 테이블에도 정보 남기기
           if (authData.user) {
              await supabase.from('crm_users').insert([{
-               id: authData.user.id, // Auth UID와 일치
+               id: authData.user.id, 
                loginId: data.loginId,
                name: data.name,
                department: data.department || '신규 사원',
@@ -386,7 +387,6 @@
         }
       };
 
-      // 💡 [변경 완료] Supabase 안전한 로그아웃
       const handleLogout = async () => {
         await supabase.auth.signOut();
         setIsMobileMenuOpen(false);
@@ -442,11 +442,11 @@
 
       const filteredMyProperties = myProperties.filter(p => 
         p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-        p.address.toLowerCase().includes(searchTerm.toLowerCase())
+        (p.address||'').toLowerCase().includes(searchTerm.toLowerCase())
       );
 
       const filteredEmployees = employees.filter(e =>
-        currentUser && e.loginId === currentUser.loginId &&
+        currentUser && e.id !== currentUser.id &&
         (e.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         e.department.toLowerCase().includes(searchTerm.toLowerCase()) ||
         e.loginId.toLowerCase().includes(searchTerm.toLowerCase()))
@@ -459,13 +459,12 @@
 
       if (isAuthLoading) {
         return (
-          <div className="flex h-screen items-center justify-center text-slate-500 font-bold">
-            <i className="fas fa-spinner fa-spin mr-2"></i> 인증 정보를 확인하는 중입니다...
+          <div className="flex h-screen items-center justify-center text-slate-500 font-bold bg-slate-50">
+            <i className="fas fa-spinner fa-spin mr-2"></i> 시스템 인증 정보를 확인 중입니다...
           </div>
         );
       }
 
-      // 비로그인 화면
       if (!isAuthenticated) {
         return <AuthView onAuth={handleAuth} isDbEmpty={employees.length === 0} />;
       }
@@ -490,12 +489,15 @@
                 <Building2 className="w-8 h-8 text-blue-400" />
                 <h1 className="text-xl font-bold tracking-tight">빌딩탭</h1>
               </div>
-              <p className="text-[11px] text-slate-400 mt-2">부동산 종합 관리 시스템 (개인용)</p>
+              <p className="text-[11px] text-slate-400 mt-2">부동산 종합 관리 시스템</p>
             </div>
             
             <nav className="flex-1 p-4 space-y-2 overflow-y-auto mt-4 md:mt-0">
+              {/* 💡 [요청사항] 메뉴 순서 재조정 */}
               <SidebarItem icon={<CalendarIcon />} label="개인 캘린더" active={activeTab === 'calendar'} onClick={() => changeTab('calendar')} />
               <SidebarItem icon={<List />} label="내 물건 관리" active={activeTab === 'properties'} onClick={() => { changeTab('properties'); setCurrentView('list'); }} />
+              <SidebarItem icon={<Share />} label="물건 공유" active={activeTab === 'shared'} onClick={() => changeTab('shared')} />
+              <SidebarItem icon={<Comments />} label="1대1 채팅" active={activeTab === 'chat'} onClick={() => changeTab('chat')} />
               <SidebarItem icon={<Users />} label="고객 관리(매수자)" active={activeTab === 'customers'} onClick={() => { changeTab('customers'); setCurrentCustomerView('list'); }} />
               <SidebarItem icon={<UserCircle />} label="사원 목록" active={activeTab === 'employees'} onClick={() => { changeTab('employees'); setCurrentEmployeeView('list'); }} />
               <div className="pt-4 mt-4 border-t border-slate-800">
@@ -505,12 +507,12 @@
             
             <div className="p-4 border-t border-slate-800 mt-auto bg-slate-900">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center font-bold shadow-inner shrink-0">
+                <div className="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold shadow-inner shrink-0">
                   {currentUser ? currentUser.name.charAt(0) : 'U'}
                 </div>
                 <div className="truncate">
                   <p className="text-sm font-medium truncate">{currentUser ? currentUser.name : '사용자'} 님</p>
-                  <p className="text-xs text-slate-400 truncate">{currentUser ? currentUser.department : '관리자'}</p>
+                  <p className="text-xs text-slate-400 truncate">{currentUser ? currentUser.department : '사원'}</p>
                 </div>
               </div>
             </div>
@@ -520,9 +522,11 @@
             <header className="bg-white border-b border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 md:px-8 shadow-sm z-10 gap-4 shrink-0">
               <h2 className="text-lg md:text-xl font-semibold text-slate-800">
                 {activeTab === 'properties' ? '내 물건 관리' : 
+                 activeTab === 'shared' ? '공유된 물건 게시판' :
                  activeTab === 'employees' ? '사원 목록' :
                  activeTab === 'customers' ? '고객 관리(매수자)' :
-                 activeTab === 'calendar' ? '개인 캘린더' : '관리 메뉴'}
+                 activeTab === 'calendar' ? '개인 캘린더' : 
+                 activeTab === 'chat' ? '1대1 실시간 채팅' : '관리 메뉴'}
               </h2>
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
                 <div className="relative w-full sm:w-auto">
@@ -572,6 +576,22 @@
                   )}
                 </>
               )}
+              {activeTab === 'shared' && (
+                <SharedPropertiesView 
+                  properties={properties}
+                  onStartChat={(targetUserId) => {
+                    const emp = employees.find(e => e.loginId === targetUserId);
+                    if (emp && emp.id !== currentUser.id) {
+                      setSelectedChatEmp(emp);
+                      setActiveTab('chat');
+                    } else if (emp && emp.id === currentUser.id) {
+                      alert('자신이 등록한 물건입니다. 다른 사원의 물건에서 채팅을 시도해주세요.');
+                    } else {
+                      alert('해당 담당자의 사원 정보를 찾을 수 없습니다.');
+                    }
+                  }}
+                />
+              )}
               {activeTab === 'employees' && (
                 <>
                   {currentEmployeeView === 'list' && <EmployeeListView employees={filteredEmployees} />}
@@ -618,6 +638,14 @@
                   setMemos={setMemos}
                 />
               )}
+              {activeTab === 'chat' && (
+                <ChatView 
+                  currentUser={currentUser}
+                  employees={employees}
+                  selectedEmp={selectedChatEmp}
+                  setSelectedEmp={setSelectedChatEmp}
+                />
+              )}
             </div>
           </main>
         </div>
@@ -625,9 +653,197 @@
     }
 
     // =====================================================================
-    // [5] 상세/하위 뷰 컴포넌트들
+    // [5] 물건 공유 뷰 (메모장 스타일 보드)
     // =====================================================================
+    function SharedPropertiesView({ properties, onStartChat }) {
+      const sharedProps = properties.filter(p => p.is_shared === true);
 
+      return (
+        <div className="bg-slate-50/50 h-full p-2 sm:p-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pt-2">
+            {sharedProps.map(p => (
+              <div key={p.id} className="relative bg-amber-100/90 border border-amber-300 rounded-bl-3xl rounded-tr-3xl p-5 shadow-[4px_4px_15px_rgba(0,0,0,0.05)] transform transition-transform hover:-translate-y-1 hover:shadow-lg">
+                {/* 메모장 테이프 장식 */}
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-16 h-6 bg-amber-500/30 backdrop-blur-sm rotate-[-2deg] shadow-sm"></div>
+                
+                <div className="mt-2 mb-4">
+                  <span className="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded mb-2 inline-block shadow-sm">공유됨</span>
+                  {/* 💡 [요청사항] 가명으로 설정된 이름 노출 */}
+                  <h3 className="font-bold text-lg text-slate-800 truncate" title={p.shared_name || p.name}>{p.shared_name || p.name}</h3>
+                </div>
+                
+                <ul className="space-y-2 text-sm text-slate-700 font-medium mb-4">
+                  <li className="flex gap-2">
+                     <span className="text-amber-700/70 shrink-0">📍 위치:</span>
+                     <span className="font-bold truncate" title={p.address}>{formatShortAddress(p.address)} 일대</span>
+                  </li>
+                  <li className="flex gap-2">
+                     <span className="text-amber-700/70 shrink-0">📐 면적:</span>
+                     <span className="truncate">대지 {formatRoughPyeong(p.landArea)} / 건축 {formatRoughPyeong(p.buildingArea || p.totalFloorArea)}</span>
+                  </li>
+                  <li className="flex gap-2">
+                     <span className="text-amber-700/70 shrink-0">💰 금액:</span>
+                     <span className="font-extrabold text-red-600">{formatKoreanCurrency(p.price?.sale || p.price?.deposit || 0)}</span>
+                  </li>
+                </ul>
+
+                {/* 💡 [요청사항] 작성한 특징 노출 */}
+                {p.shared_features && (
+                  <div className="mb-5 p-3 bg-white/50 rounded-lg text-sm text-slate-800 border border-amber-200/50 shadow-inner">
+                     <div className="font-bold mb-1 text-amber-800 flex items-center gap-1"><FileText className="w-3 h-3" /> 특징</div>
+                     <div className="whitespace-pre-line leading-relaxed text-xs">{p.shared_features}</div>
+                  </div>
+                )}
+
+                <div className="pt-4 border-t border-amber-300/50 flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                     <div className="w-6 h-6 rounded-full bg-slate-700 text-white flex items-center justify-center text-[10px] font-bold">{p.registrant ? p.registrant.charAt(0) : 'U'}</div>
+                     <span className="text-xs font-bold text-slate-700">{p.registrant} 담당</span>
+                  </div>
+                  <button onClick={() => onStartChat(p.user_id)} className="relative z-10 flex items-center gap-1 px-3 py-1.5 bg-[#FEE500] text-yellow-900 rounded-lg text-xs font-bold hover:bg-yellow-400 shadow-sm transition-colors cursor-pointer">
+                    <Comments className="w-3 h-3" /> 채팅하기
+                  </button>
+                </div>
+              </div>
+            ))}
+            {sharedProps.length === 0 && (
+              <div className="col-span-full py-20 text-center text-slate-400 font-medium bg-white rounded-2xl border border-slate-200 border-dashed">
+                <Share className="w-10 h-10 mx-auto mb-3 opacity-20" />
+                공유된 물건이 아직 없습니다.<br/>내 물건 관리에서 '완료' 상태의 물건을 공유해보세요.
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // =====================================================================
+    // [6] 카카오톡 스타일 실시간 채팅 뷰 (Supabase Polling)
+    // =====================================================================
+    function ChatView({ currentUser, employees, selectedEmp, setSelectedEmp }) {
+      const [allMessages, setAllMessages] = useState([]);
+      const [newMessage, setNewMessage] = useState('');
+      const messagesEndRef = useRef(null);
+
+      const fetchAllMyMessages = async () => {
+        const { data, error } = await supabase
+          .from('crm_messages')
+          .select('*')
+          .or(`sender_id.eq.${currentUser.id},receiver_id.eq.${currentUser.id}`)
+          .order('id', { ascending: true });
+        if (data && !error) setAllMessages(data);
+      };
+
+      useEffect(() => {
+        if (!currentUser) return;
+        fetchAllMyMessages();
+        const intervalId = setInterval(fetchAllMyMessages, 3000);
+        return () => clearInterval(intervalId);
+      }, [currentUser]);
+
+      useEffect(() => {
+        if (messagesEndRef.current) {
+          messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+        }
+      }, [allMessages, selectedEmp]);
+
+      const currentChatMessages = useMemo(() => {
+        if (!selectedEmp) return [];
+        return allMessages.filter(m => 
+          (m.sender_id === currentUser.id && m.receiver_id === selectedEmp.id) ||
+          (m.sender_id === selectedEmp.id && m.receiver_id === currentUser.id)
+        );
+      }, [allMessages, selectedEmp, currentUser]);
+
+      const getLastMessage = (empId) => {
+         const msgs = allMessages.filter(m => (m.sender_id === currentUser.id && m.receiver_id === empId) || (m.sender_id === empId && m.receiver_id === currentUser.id));
+         if (msgs.length === 0) return null;
+         return msgs[msgs.length - 1].text;
+      };
+
+      const handleSendMessage = async (e) => {
+        e.preventDefault();
+        if (!newMessage.trim() || !selectedEmp) return;
+
+        const msgData = {
+          sender_id: currentUser.id,
+          receiver_id: selectedEmp.id,
+          text: newMessage.trim()
+        };
+        const { error } = await supabase.from('crm_messages').insert([msgData]);
+        if (error) console.error("메시지 전송 실패:", error);
+        
+        fetchAllMyMessages();
+        setNewMessage('');
+      };
+
+      const chatPartners = employees.filter(e => e.id !== currentUser.id);
+
+      if (!selectedEmp) {
+        return (
+           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden h-[calc(100vh-160px)] flex flex-col">
+             <div className="p-4 border-b border-slate-200 font-bold text-slate-800 bg-slate-50 flex items-center gap-2"><Comments className="w-5 h-5 text-blue-500" /> 전체 대화 가능 사원 목록</div>
+             <div className="flex-1 overflow-y-auto p-2 space-y-1 bg-white">
+                {chatPartners.map(emp => {
+                   const lastMsg = getLastMessage(emp.id);
+                   return (
+                      <button key={emp.id} onClick={() => setSelectedEmp(emp)} className="w-full text-left p-3 rounded-xl transition-all flex items-center gap-4 hover:bg-slate-50 border border-transparent hover:border-slate-100">
+                        <div className="w-12 h-12 rounded-full bg-slate-700 text-white flex items-center justify-center text-lg font-bold shrink-0">{emp.name.charAt(0)}</div>
+                        <div className="flex-1 truncate">
+                           <div className="flex justify-between items-baseline mb-1">
+                             <span className="font-bold text-slate-800 text-sm">{emp.name}</span>
+                             <span className="text-[10px] text-slate-400">{emp.department}</span>
+                           </div>
+                           <div className="text-xs text-slate-500 truncate">{lastMsg || '대화 내역이 없습니다. 탭하여 채팅 시작'}</div>
+                        </div>
+                      </button>
+                   )
+                })}
+                {chatPartners.length === 0 && <div className="text-center text-slate-400 text-xs py-10">대화할 사원이 없습니다.</div>}
+             </div>
+           </div>
+        );
+      }
+
+      return (
+        <div className="bg-[#b2c7d9] rounded-2xl shadow-sm border border-slate-200 overflow-hidden h-[calc(100vh-160px)] flex flex-col relative">
+          <div className="px-4 py-3 bg-white/90 backdrop-blur-sm border-b border-slate-200 flex items-center gap-3 z-10 sticky top-0 shadow-sm">
+            <button onClick={() => setSelectedEmp(null)} className="p-2 hover:bg-slate-100 rounded-full transition-colors"><ChevronLeft className="w-5 h-5 text-slate-600" title="채팅방 나가기" /></button>
+            <div className="w-9 h-9 rounded-full bg-slate-700 text-white flex items-center justify-center font-bold text-sm shrink-0">{selectedEmp.name.charAt(0)}</div>
+            <div className="font-bold text-slate-800">{selectedEmp.name} <span className="text-xs font-normal text-slate-500 ml-1">{selectedEmp.department}</span></div>
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            {currentChatMessages.map((msg) => {
+              const isMe = msg.sender_id === currentUser.id;
+              return (
+                <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
+                  {!isMe && (
+                     <div className="w-8 h-8 rounded-full bg-slate-700 text-white flex items-center justify-center font-bold text-xs shrink-0 mr-2 mt-1 shadow-sm">{selectedEmp.name.charAt(0)}</div>
+                  )}
+                  <div className={`max-w-[75%] flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
+                     {!isMe && <span className="text-[11px] text-slate-600 mb-1 ml-1 font-medium">{selectedEmp.name}</span>}
+                     <div className={`rounded-xl px-3.5 py-2 text-sm shadow-sm whitespace-pre-line break-words ${isMe ? 'bg-[#FEE500] text-black rounded-tr-none' : 'bg-white text-black rounded-tl-none'}`}>
+                       {msg.text}
+                     </div>
+                  </div>
+                </div>
+              );
+            })}
+            <div ref={messagesEndRef} />
+          </div>
+
+          <form onSubmit={handleSendMessage} className="p-3 bg-white border-t border-slate-200 flex gap-2 items-center">
+            <input type="text" value={newMessage} onChange={e => setNewMessage(e.target.value)} placeholder="메시지를 입력하세요..." className="flex-1 px-4 py-2.5 border border-slate-300 rounded-full outline-none focus:border-blue-500 focus:ring-1 text-sm bg-slate-50" />
+            <button type="submit" className="w-10 h-10 bg-[#FEE500] text-yellow-900 rounded-full flex items-center justify-center hover:bg-yellow-400 transition-colors shadow-sm"><Send className="w-4 h-4 ml-[-2px] mt-[1px]" /></button>
+          </form>
+        </div>
+      );
+    }
+
+    // =====================================================================
+    // [7] 기존 하위 컴포넌트들 유지
+    // =====================================================================
     function AuthView({ onAuth, isDbEmpty }) {
       const [isLoginMode, setIsLoginMode] = useState(true);
       const [errorMsg, setErrorMsg] = useState('');
@@ -639,14 +855,8 @@
       const handleSubmit = async (e) => {
         e.preventDefault();
         setErrorMsg('');
-        
-        // 아이디 기억하기
-        if (rememberId && isLoginMode) {
-          safeStorage.setItem('crm_saved_id', formData.loginId);
-        } else if (!rememberId && isLoginMode) {
-          safeStorage.removeItem('crm_saved_id');
-        }
-
+        if (rememberId && isLoginMode) safeStorage.setItem('crm_saved_id', formData.loginId);
+        else if (!rememberId && isLoginMode) safeStorage.removeItem('crm_saved_id');
         const result = await onAuth(isLoginMode ? 'login' : 'signup', formData);
         if (result && !result.success) setErrorMsg(result.message);
       };
@@ -661,14 +871,11 @@
               <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">빌딩탭</h1>
               <p className="text-sm text-slate-500 mt-2 text-center">부동산 매물 관리의 시작</p>
             </div>
-
             {isDbEmpty && <p className="text-xs text-blue-600 bg-blue-50 px-3 py-2 rounded-lg font-bold mb-4 text-center">최초 접속입니다. '사원 가입'을 진행해주세요.</p>}
-
             <div className="flex p-1 bg-slate-100 rounded-lg mb-6">
               <button onClick={() => {setIsLoginMode(true); setErrorMsg('');}} className={`flex-1 py-2.5 text-sm font-bold rounded-md transition-all ${isLoginMode ? 'bg-white text-blue-600 shadow' : 'text-slate-500'}`}>로그인</button>
               <button onClick={() => {setIsLoginMode(false); setErrorMsg('');}} className={`flex-1 py-2.5 text-sm font-bold rounded-md transition-all ${!isLoginMode ? 'bg-white text-blue-600 shadow' : 'text-slate-500'}`}>사원 가입</button>
             </div>
-
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-1.5">
                 <label className="text-sm font-bold text-slate-700">아이디</label>
@@ -684,38 +891,24 @@
                   <input required type="password" name="password" value={formData.password} onChange={handleChange} placeholder="비밀번호 입력" className="w-full pl-12 pr-4 py-3 border border-slate-300 rounded-xl outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200" />
                 </div>
               </div>
-
               {isLoginMode && (
                 <label className="flex items-center gap-2 text-sm text-slate-600 mt-2 cursor-pointer font-medium pl-1">
-                  <input type="checkbox" checked={rememberId} onChange={(e) => setRememberId(e.target.checked)} className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-gray-300" />
-                  아이디 기억하기
+                  <input type="checkbox" checked={rememberId} onChange={(e) => setRememberId(e.target.checked)} className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-gray-300" /> 아이디 기억하기
                 </label>
               )}
-
               {!isLoginMode && (
                 <div className="space-y-4 pt-4 border-t border-slate-100 mt-2">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <label className="text-sm font-bold text-slate-700">이름</label>
-                      <input required type="text" name="name" value={formData.name} onChange={handleChange} placeholder="홍길동" className="w-full px-4 py-3 border border-slate-300 rounded-xl outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200" />
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-sm font-bold text-slate-700">소속</label>
-                      <input required type="text" name="department" value={formData.department} onChange={handleChange} placeholder="영업1팀" className="w-full px-4 py-3 border border-slate-300 rounded-xl outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200" />
-                    </div>
+                    <div className="space-y-1.5"><label className="text-sm font-bold text-slate-700">이름</label><input required type="text" name="name" value={formData.name} onChange={handleChange} placeholder="홍길동" className="w-full px-4 py-3 border border-slate-300 rounded-xl outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200" /></div>
+                    <div className="space-y-1.5"><label className="text-sm font-bold text-slate-700">소속</label><input required type="text" name="department" value={formData.department} onChange={handleChange} placeholder="영업1팀" className="w-full px-4 py-3 border border-slate-300 rounded-xl outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200" /></div>
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-sm font-bold text-slate-700">연락처</label>
-                    <div className="relative">
-                      <Phone className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                      <input required type="tel" name="phone" value={formData.phone} onChange={handleChange} placeholder="010-0000-0000" className="w-full pl-12 pr-4 py-3 border border-slate-300 rounded-xl outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200" />
-                    </div>
+                    <div className="relative"><Phone className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" /><input required type="tel" name="phone" value={formData.phone} onChange={handleChange} placeholder="010-0000-0000" className="w-full pl-12 pr-4 py-3 border border-slate-300 rounded-xl outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200" /></div>
                   </div>
                 </div>
               )}
-
               {errorMsg && <div className="p-3 bg-red-50 text-red-600 text-sm font-bold rounded-lg text-center border border-red-100">{errorMsg}</div>}
-
               <button type="submit" className="w-full py-4 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-all shadow-md mt-6 flex items-center justify-center gap-2 text-lg">
                 {isLoginMode ? <><ShieldCheck className="w-5 h-5" /> 로그인</> : '가입 완료 및 접속'}
               </button>
@@ -852,6 +1045,8 @@
 
     function PropertyDetailView({ property, onBack, onEdit, onDelete, currentUser, onUpdate }) {
       const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+      const [showShareModal, setShowShareModal] = useState(false); // 💡 공유 팝업 상태 추가
+      const [shareData, setShareData] = useState({ name: '', features: '' }); // 💡 공유 팝업 입력 데이터
       const [newLog, setNewLog] = useState('');
 
       const floorTotals = useMemo(() => {
@@ -880,6 +1075,54 @@
 
       return (
         <div className="max-w-5xl mx-auto space-y-4 md:space-y-6 pb-10 relative">
+          
+          {/* 💡 [요청사항] 물건 공유하기 팝업 모달 추가 */}
+          {showShareModal && (
+            <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4">
+              <div className="bg-white p-6 rounded-2xl shadow-2xl max-w-sm w-full border border-slate-200">
+                <div className="flex items-center gap-2 mb-4 text-blue-600">
+                  <Share className="w-5 h-5" />
+                  <h3 className="text-lg font-bold text-slate-800">물건 공유하기</h3>
+                </div>
+                
+                <div className="space-y-4">
+                  <FormGroup label="공유될 물건 이름 (가명)">
+                    <input type="text" value={shareData.name} onChange={e => setShareData({...shareData, name: e.target.value})} className="w-full p-2.5 border border-slate-300 rounded-lg outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 text-sm font-bold" placeholder="예: 강남 수익용 빌딩" />
+                  </FormGroup>
+
+                  <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-slate-500 font-bold">대지면적</span>
+                      <span className="text-slate-800 font-bold">{formatRoughPyeong(property.landArea)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-500 font-bold">건축면적</span>
+                      <span className="text-slate-800 font-bold">{formatRoughPyeong(property.buildingArea || property.totalFloorArea)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-500 font-bold">금액</span>
+                      <span className="text-slate-800 font-bold text-red-600">{formatKoreanCurrency(property.price?.sale || property.price?.deposit || 0)}</span>
+                    </div>
+                  </div>
+
+                  <FormGroup label="물건 특징">
+                    <textarea value={shareData.features} onChange={e => setShareData({...shareData, features: e.target.value})} className="w-full p-2.5 border border-slate-300 rounded-lg outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 text-sm resize-none" rows="3" placeholder="역세권, 수익률 우수 등 특징을 적어주세요." />
+                  </FormGroup>
+                </div>
+
+                <div className="flex gap-3 justify-end mt-6">
+                  <button onClick={() => setShowShareModal(false)} className="flex-1 px-4 py-2.5 bg-slate-100 rounded-xl text-slate-700 font-bold hover:bg-slate-200 transition-colors">취소</button>
+                  <button onClick={() => {
+                    if(!shareData.name) return alert('공유될 이름(가명)을 입력해주세요.');
+                    onUpdate({ ...property, is_shared: true, shared_name: shareData.name, shared_features: shareData.features });
+                    setShowShareModal(false);
+                  }} className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-colors shadow-md">확인 (공유)</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 삭제 확인 모달 */}
           {showDeleteConfirm && (
             <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4">
               <div className="bg-white p-6 rounded-2xl shadow-2xl max-w-sm w-full border border-slate-200">
@@ -896,14 +1139,30 @@
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <button onClick={onBack} className="flex items-center gap-2 text-slate-500 hover:text-slate-800 transition-colors px-3 py-2 sm:-ml-3 rounded-lg hover:bg-slate-100 font-bold"><ArrowLeft className="w-4 h-4" /> 목록으로 돌아가기</button>
             <div className="flex gap-2 w-full sm:w-auto">
-              <button onClick={onEdit} className="flex-1 sm:flex-none px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-bold text-blue-600 hover:bg-blue-50 transition-colors shadow-sm text-center">수정하기</button>
-              <button onClick={() => setShowDeleteConfirm(true)} className="flex-1 sm:flex-none px-4 py-2.5 bg-white border border-red-200 text-red-600 rounded-xl text-sm font-bold hover:bg-red-50 transition-colors shadow-sm text-center">삭제하기</button>
+              {/* 💡 [요청사항] 공유하기 버튼 수정 (팝업 모달 연결) */}
+              {property.status === '완료' && (
+                <button 
+                  onClick={() => {
+                     if(property.is_shared) {
+                        onUpdate({ ...property, is_shared: false, shared_name: null, shared_features: null });
+                     } else {
+                        setShareData({ name: '', features: '' });
+                        setShowShareModal(true);
+                     }
+                  }} 
+                  className={`flex-1 sm:flex-none px-4 py-2.5 border rounded-lg text-sm font-bold shadow-sm text-center transition-colors ${property.is_shared ? 'bg-slate-200 border-slate-300 text-slate-500' : 'bg-yellow-100 border-yellow-300 text-yellow-800 hover:bg-yellow-200'}`}
+                >
+                  <Share className="inline w-4 h-4 mr-1" /> {property.is_shared ? '공유 취소' : '공유하기'}
+                </button>
+              )}
+              <button onClick={onEdit} className="flex-1 sm:flex-none px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-sm font-bold text-blue-600 hover:bg-blue-50 transition-colors shadow-sm text-center">수정하기</button>
+              <button onClick={() => setShowDeleteConfirm(true)} className="flex-1 sm:flex-none px-4 py-2.5 bg-white border border-red-200 text-red-600 rounded-lg text-sm font-bold hover:bg-red-50 transition-colors shadow-sm text-center">삭제하기</button>
             </div>
           </div>
 
           <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-start gap-4">
-            <div className="w-full md:w-auto">
-              <div className="flex flex-wrap gap-2 mb-3 items-center">
+            <div>
+              <div className="flex gap-2 mb-3">
                 <span className={`px-2.5 py-1 rounded text-xs sm:text-sm font-bold shadow-sm ${STATUS_BADGE_COLORS[property.status || '보류']}`}>{property.status || '보류'}</span>
                 <span className={`px-2.5 py-1 rounded text-xs sm:text-sm font-bold shadow-sm ${property.transactionType === '매매' ? 'bg-slate-100 text-slate-600 border border-slate-200' : property.transactionType === '전세' ? 'bg-blue-500 text-white' : 'bg-emerald-500 text-white'}`}>{property.transactionType}</span>
                 <span className="px-2.5 py-1 rounded text-xs sm:text-sm font-medium bg-slate-100 text-slate-600 border border-slate-200">{property.type}</span>
@@ -934,7 +1193,7 @@
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
             <div className="space-y-4 sm:space-y-6">
                 <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                     <div className="p-3 sm:p-4 bg-slate-50 border-b border-slate-200"><h3 className="font-bold text-slate-800 flex items-center gap-2 text-sm sm:text-base"><UserCircle className="w-4 h-4 sm:w-5 sm:h-5 text-blue-500" /> 소유자 정보</h3></div>
@@ -1051,7 +1310,7 @@
           landArea: '', totalFloorArea: '', buildingArea: '', buildingCoverage: '', floorAreaRatio: '', floorUnderground: '', floorGround: '', elevators: '', parking: '', completionYear: '',
           sale: '', deposit: '', rent: '', maintenance: '',
           floorDetails: [{ id: Date.now(), floor: '1층', companyName: '', deposit: '', rent: '', maintenance: '' }],
-          direction: '남향', workLogs: [], status: '보류'
+          direction: '남향', workLogs: [], status: '보류', is_shared: false
         };
       });
 
@@ -1157,7 +1416,7 @@
       };
 
       return (
-        <div className="max-w-4xl mx-auto pb-10 relative">
+        <div className="max-w-3xl mx-auto pb-10 relative">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-6 w-full md:w-auto">
               <h2 className="text-xl sm:text-2xl font-bold text-slate-800 shrink-0">{initialData ? '등록된 물건 수정' : '신규 물건 등록'}</h2>
@@ -1444,9 +1703,7 @@
         e.stopPropagation(); 
         if (newMemo.trim()) {
           const newMemoObj = { id: `M-${Date.now()}`, user_id: currentUser.loginId, dateStr: dayStr, text: newMemo.trim() };
-          
           await supabase.from('crm_memos').insert([newMemoObj]);
-          
           setMemos(prev => [...prev, newMemoObj]);
         }
         setEditingDate(null); 
@@ -1471,7 +1728,6 @@
           const dayColor = currentDayOfWeek === 0 ? 'text-red-500' : currentDayOfWeek === 6 ? 'text-blue-500' : 'text-slate-700';
 
           const currentMemos = memos.filter(m => m.dateStr === dayStr && m.user_id === currentUser.loginId);
-          
           const completedCount = properties.filter(p => p.user_id === currentUser.loginId && p.date === dayStr && p.status === '완료').length;
 
           days.push(
@@ -1497,12 +1753,8 @@
                 )}
 
                 {editingDate === dayStr && (
-                  <div className="mt-1 flex flex-col gap-1" onClick={e => e.stopPropagation()}>
-                    <input autoFocus type="text" value={newMemo} onChange={e => setNewMemo(e.target.value)} onKeyDown={e => e.key === 'Enter' && saveMemo(e, dayStr)} placeholder="일정 입력..." className="w-full text-[10px] md:text-xs p-1 md:p-1.5 border border-blue-300 rounded outline-none focus:ring-1 focus:ring-blue-500 bg-white" />
-                    <div className="flex gap-1">
-                      <button onClick={(e) => saveMemo(e, dayStr)} className="text-[9px] md:text-[10px] bg-blue-600 text-white px-2 py-1 rounded font-medium flex-1 hover:bg-blue-700">저장</button>
-                      <button onClick={(e) => { e.stopPropagation(); setEditingDate(null); }} className="text-[9px] md:text-[10px] bg-slate-200 text-slate-700 px-2 py-1 rounded font-medium flex-1 hover:bg-slate-300">취소</button>
-                    </div>
+                  <div className="mt-1" onClick={e => e.stopPropagation()}>
+                    <input autoFocus type="text" value={newMemo} onChange={e => setNewMemo(e.target.value)} onKeyDown={e => e.key === 'Enter' && saveMemo(e, dayStr)} placeholder="일정 입력..." className="w-full text-[10px] md:text-xs p-1 md:p-1.5 border border-blue-300 rounded outline-none" />
                   </div>
                 )}
               </div>
@@ -1513,21 +1765,19 @@
       };
 
       return (
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-3 md:p-6 h-full flex flex-col">
-          <div className="flex flex-col sm:flex-row justify-between items-center mb-4 md:mb-6 gap-3 sm:gap-0">
-            <h2 className="text-lg md:text-xl font-bold text-slate-800 flex items-center gap-2 w-full sm:w-auto"><CalendarIcon className="w-5 h-5 md:w-6 md:h-6 text-blue-600" /> 개인 캘린더</h2>
-            <div className="flex items-center justify-between sm:justify-end gap-2 md:gap-4 w-full sm:w-auto bg-slate-50 sm:bg-transparent rounded-lg p-2 sm:p-0">
-              <button onClick={() => setDate(new Date(year, month - 1, 1))} className="p-2 bg-white sm:bg-transparent hover:bg-slate-100 rounded-full shadow-sm sm:shadow-none transition-colors"><ChevronLeft className="w-4 h-4 md:w-5 md:h-5 text-slate-600" /></button>
-              <span className="text-base md:text-lg font-bold text-slate-800 w-24 md:w-32 text-center">{year}년 {month + 1}월</span>
-              <button onClick={() => setDate(new Date(year, month + 1, 1))} className="p-2 bg-white sm:bg-transparent hover:bg-slate-100 rounded-full shadow-sm sm:shadow-none transition-colors"><ChevronRight className="w-4 h-4 md:w-5 md:h-5 text-slate-600" /></button>
+        <div className="bg-white p-6 rounded-2xl shadow h-full flex flex-col">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-xl font-bold"><CalendarIcon className="w-6 h-6 inline text-blue-600 mr-2"/>개인 캘린더</h2>
+            <div className="flex items-center gap-4">
+              <button onClick={() => setDate(new Date(year, month - 1, 1))} className="p-2 hover:bg-slate-100 rounded-full"><ChevronLeft className="w-5 h-5"/></button>
+              <span className="font-bold text-lg">{year}년 {month + 1}월</span>
+              <button onClick={() => setDate(new Date(year, month + 1, 1))} className="p-2 hover:bg-slate-100 rounded-full"><ChevronRight className="w-5 h-5"/></button>
             </div>
           </div>
-          <div className="grid grid-cols-7 gap-1 md:gap-2 mb-2">
-            {['일', '월', '화', '수', '목', '금', '토'].map((day, i) => (
-              <div key={day} className={`text-center text-xs md:text-sm font-bold py-1.5 md:py-2 bg-slate-50 rounded-lg ${i === 0 ? 'text-red-500' : i === 6 ? 'text-blue-500' : 'text-slate-600'}`}>{day}</div>
-            ))}
+          <div className="grid grid-cols-7 gap-2 mb-2 text-center font-bold text-sm">
+            <div className="text-red-500">일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div className="text-blue-500">토</div>
           </div>
-          <div className="grid grid-cols-7 gap-1 md:gap-2 flex-1 auto-rows-fr overflow-y-auto pr-1">{renderDays()}</div>
+          <div className="grid grid-cols-7 gap-2 flex-1 overflow-y-auto">{renderDays()}</div>
         </div>
       );
     }
