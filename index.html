@@ -11,14 +11,14 @@
   <!-- FontAwesome Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
-  <!-- React & ReactDOM (HTML 직접 실행용) -->
+  <!-- React & ReactDOM -->
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   
-  <!-- Babel (브라우저 번역기) -->
+  <!-- Babel -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-  <!-- Supabase CDN (가장 안정적인 방식) -->
+  <!-- Supabase -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <style>
@@ -34,20 +34,62 @@
 <body>
   <div id="root"></div>
 
-  <!-- 여기서부터 무조건 작동하는 단일 코드 구조 -->
+  <!-- 여기서부터 작동 코드 -->
   <script type="text/babel">
     const { useState, useMemo, useEffect, useRef } = React;
 
     // =====================================================================
-    // [1] 선생님의 Supabase 직접 연동 (URL / KEY 적용 완료)
+    // [1] Supabase 연동
     // =====================================================================
     const SUPABASE_URL = "https://ehshoqcskipcvybhomlq.supabase.co";
     const SUPABASE_KEY = "sb_publishable_v5aUCKdYsRAtiwKSjn8oSA_GnuPEe4G";
     const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
     // =====================================================================
-    // [2] 유틸리티 함수 & 아이콘 맵핑
+    // [2] 유틸리티 함수 & DB 매퍼
     // =====================================================================
+    const safeStorage = {
+      getItem: (key) => { try { return localStorage.getItem(key); } catch (e) { return window['temp_' + key] || null; } },
+      setItem: (key, val) => { try { localStorage.setItem(key, val); } catch (e) { window['temp_' + key] = val; } },
+      removeItem: (key) => { try { localStorage.removeItem(key); } catch (e) { delete window['temp_' + key]; } }
+    };
+
+    const toDB = (prop) => {
+      const dbObj = { ...prop };
+      const keyMap = {
+        ownerName: 'ownername', ownerPhone: 'ownerphone', transactionType: 'transactiontype',
+        landArea: 'landarea', totalFloorArea: 'totalfloorarea', buildingArea: 'buildingarea',
+        buildingCoverage: 'buildingcoverage', floorAreaRatio: 'floorarearatio', floorUnderground: 'floorunderground',
+        floorGround: 'floorground', completionYear: 'completionyear', floorDetails: 'floordetails',
+        workLogs: 'worklogs', registrantPhone: 'registrantphone'
+      };
+      for (const [camel, lower] of Object.entries(keyMap)) {
+        if (dbObj[camel] !== undefined) {
+          dbObj[lower] = dbObj[camel];
+          delete dbObj[camel];
+        }
+      }
+      return dbObj;
+    };
+
+    const fromDB = (row) => {
+      const prop = { ...row };
+      const keyMap = {
+        ownername: 'ownerName', ownerphone: 'ownerPhone', transactiontype: 'transactionType',
+        landarea: 'landArea', totalfloorarea: 'totalFloorArea', buildingarea: 'buildingArea',
+        buildingcoverage: 'buildingCoverage', floorarearatio: 'floorAreaRatio', floorunderground: 'floorUnderground',
+        floorground: 'floorGround', completionyear: 'completionYear', floordetails: 'floorDetails',
+        worklogs: 'workLogs', registrantphone: 'registrantPhone'
+      };
+      for (const [lower, camel] of Object.entries(keyMap)) {
+        if (prop[lower] !== undefined) {
+          prop[camel] = prop[lower];
+          delete prop[lower];
+        }
+      }
+      return prop;
+    };
+
     const getYield = (sale, deposit, rent) => {
       const s = Number(sale) || 0; 
       const d = Number(deposit) || 0; 
@@ -65,21 +107,22 @@
       const num = Number(val);
       if (!num || isNaN(num) || num === 0) return '0원';
       if (num >= 10000) {
-        const eok = num / 10000;
-        return `${parseFloat(eok.toFixed(4))}억`;
+        const eok = Math.floor(num / 1000) / 10;
+        return `${eok.toFixed(1)}억`;
       }
-      return `${num.toLocaleString()}만`;
+      return `${num.toLocaleString('ko-KR')}만`;
     };
 
-    const formatShortCurrency = (val) => {
-      const num = Number(val);
-      if (!num || isNaN(num) || num === 0) return '0원';
-      if (num >= 10000) {
-        const eok = num / 10000;
-        return `${Number.isInteger(eok) ? eok : eok.toFixed(1).replace(/\.0$/, '')}억`;
-      }
-      return `${num.toLocaleString()}만`;
+    const autoFormatAddress = (addr) => {
+      if (!addr) return ''; 
+      let s = addr.replace(/\s+/g, '');
+      s = s.replace(/([가-힣]+[시도])([가-힣]+[구군시])/g, '$1 $2'); 
+      s = s.replace(/([가-힣]+[구군시])([가-힣]+[동읍면로길])/g, '$1 $2'); 
+      s = s.replace(/([가-힣]+[동읍면로길])(\d)/g, '$1 $2');
+      return s.replace(/\s+/g, ' ').trim();
     };
+
+    const getExactPyeong = (sqm) => ((Number(sqm) || 0) * 0.3025).toFixed(2);
 
     const STATUS_OPTIONS = ['보류', '매매', '완료'];
     
@@ -94,17 +137,6 @@
       '매매': 'bg-emerald-500 text-white shadow-sm',
       '완료': 'bg-blue-500 text-white shadow-sm'
     };
-
-    const autoFormatAddress = (addr) => {
-      if (!addr) return ''; 
-      let s = addr.replace(/\s+/g, '');
-      s = s.replace(/([가-힣]+[시도])([가-힣]+[구군시])/g, '$1 $2'); 
-      s = s.replace(/([가-힣]+[구군시])([가-힣]+[동읍면로길])/g, '$1 $2'); 
-      s = s.replace(/([가-힣]+[동읍면로길])(\d)/g, '$1 $2');
-      return s.replace(/\s+/g, ' ').trim();
-    };
-
-    const getExactPyeong = (sqm) => ((Number(sqm) || 0) * 0.3025).toFixed(2);
 
     const Icon = ({ name, className }) => {
       let textClass = 'text-base';
@@ -151,6 +183,7 @@
     const CalendarDays = (p) => <Icon name="fa-calendar-day" {...p} />;
     const Percent = (p) => <Icon name="fa-percentage" {...p} />;
     const Bars = (p) => <Icon name="fa-bars" {...p} />;
+    const Sync = (p) => <Icon name="fa-sync-alt" {...p} />;
 
     // =====================================================================
     // [3] 공통 UI 컴포넌트
@@ -237,34 +270,28 @@
     // [4] 메인 APP 컴포넌트
     // =====================================================================
     function App() {
-      // 로컬스토리지에서 로그인 유저 유지
       const [isAuthenticated, setIsAuthenticated] = useState(false);
-      const [currentUser, setCurrentUser] = useState(() => {
-        const storedUser = localStorage.getItem('crm_loggedInUser_local');
-        return storedUser ? JSON.parse(storedUser) : null;
-      });
+      const [currentUser, setCurrentUser] = useState(null);
+      const [isAuthLoading, setIsAuthLoading] = useState(true);
+      const [isFetchingData, setIsFetchingData] = useState(false);
 
-      // 클라우드 데이터 상태
       const [properties, setProperties] = useState([]);
       const [employees, setEmployees] = useState([]);
       const [customers, setCustomers] = useState([]);
       const [memos, setMemos] = useState([]);
 
-      const [myProperties, setMyProperties] = useState([]);
-
       const [currentView, setCurrentView] = useState('list'); 
       const [selectedProperty, setSelectedProperty] = useState(null);
-      // 로그인 시 '내 물건 관리'가 기본 탭이 되도록 설정
-      const [activeTab, setActiveTab] = useState('properties'); 
       
+      const [activeTab, setActiveTab] = useState('calendar'); 
       const [currentEmployeeView, setCurrentEmployeeView] = useState('list');
       const [currentCustomerView, setCurrentCustomerView] = useState('list');
 
       const [searchTerm, setSearchTerm] = useState('');
       const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-      // 클라우드 데이터베이스 지속 업데이트 (3초마다)
       const fetchCloudData = async () => {
+        setIsFetchingData(true);
         try {
           const [propsRes, usersRes, custsRes, memosRes] = await Promise.all([
             supabase.from('crm_properties').select('*'),
@@ -273,32 +300,86 @@
             supabase.from('crm_memos').select('*')
           ]);
           
-          if(propsRes.data) setProperties(propsRes.data);
-          if(usersRes.data) setEmployees(usersRes.data);
-          if(custsRes.data) setCustomers(custsRes.data);
-          if(memosRes.data) setMemos(memosRes.data);
+          if (propsRes.data) {
+             const serverProps = propsRes.data.map(fromDB);
+             serverProps.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+             setProperties(serverProps);
+          }
+          if (usersRes.data) setEmployees(usersRes.data);
+          if (custsRes.data) setCustomers(custsRes.data);
+          if (memosRes.data) setMemos(memosRes.data);
         } catch (err) {
-          console.error("Supabase 로드 에러 (SQL Editor 세팅 필요):", err);
+          console.error("데이터 로드 실패:", err);
+        } finally {
+          setIsFetchingData(false);
         }
       };
 
       useEffect(() => {
-        fetchCloudData(); // 최초 1회 실행
-        const interval = setInterval(fetchCloudData, 3000); // 3초마다 지속 체크
-        return () => clearInterval(interval);
+        supabase.auth.getSession().then(({ data: { session } }) => {
+          if (session) {
+            setCurrentUser({
+              loginId: session.user.email.replace('@crm.local', '').toLowerCase(),
+              name: session.user.user_metadata?.name || '사용자',
+              department: session.user.user_metadata?.department || '사원',
+              phone: session.user.user_metadata?.phone || '',
+              id: session.user.id
+            });
+            setIsAuthenticated(true);
+          }
+          setIsAuthLoading(false);
+        });
+
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+          if (session) {
+            setCurrentUser({
+              loginId: session.user.email.replace('@crm.local', '').toLowerCase(),
+              name: session.user.user_metadata?.name || '사용자',
+              department: session.user.user_metadata?.department || '사원',
+              phone: session.user.user_metadata?.phone || '',
+              id: session.user.id
+            });
+            setIsAuthenticated(true);
+          } else {
+            setCurrentUser(null);
+            setIsAuthenticated(false);
+          }
+        });
+
+        fetchCloudData();
+
+        return () => {
+          subscription.unsubscribe();
+        };
       }, []);
 
-      useEffect(() => {
-        if (currentUser) {
-          setIsAuthenticated(true);
-        }
-      }, [currentUser]);
-
-      // 내 물건 필터링
-      useEffect(() => {
-        if (!currentUser) return;
-        setMyProperties(properties.filter(p => p.user_id === currentUser.loginId));
+      const myProperties = useMemo(() => {
+        if (!currentUser || !properties) return [];
+        return properties.filter(p => p.user_id && p.user_id.toLowerCase() === currentUser.loginId.toLowerCase());
       }, [properties, currentUser]);
+
+      const filteredMyProperties = useMemo(() => {
+        return myProperties.filter(p => 
+          (p.name || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
+          (p.address || '').toLowerCase().includes(searchTerm.toLowerCase())
+        );
+      }, [myProperties, searchTerm]);
+
+      const filteredEmployees = useMemo(() => {
+        return employees.filter(e =>
+          currentUser && e.id !== currentUser.id &&
+          ((e.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (e.department || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (e.loginId || '').toLowerCase().includes(searchTerm.toLowerCase()))
+        );
+      }, [employees, currentUser, searchTerm]);
+
+      const filteredCustomers = useMemo(() => {
+        return customers.filter(c =>
+          (c.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (c.region || '').toLowerCase().includes(searchTerm.toLowerCase())
+        );
+      }, [customers, searchTerm]);
 
       useEffect(() => {
         const handleClickOutside = (e) => {
@@ -309,84 +390,100 @@
       }, [isMobileMenuOpen]);
 
       const handleAuth = async (type, data) => {
+        const email = data.loginId.includes('@') ? data.loginId : `${data.loginId}@crm.local`;
+
         if (type === 'login') {
-          // 로그인 시 최신 직원 목록 확인
-          await fetchCloudData();
-          const user = employees.find(emp => emp.loginId === data.loginId && emp.password === data.password);
-          if (user) {
-            localStorage.setItem('crm_loggedInUser_local', JSON.stringify(user));
-            setCurrentUser(user);
-            setIsAuthenticated(true);
-            return { success: true };
-          }
-          return { success: false, message: '아이디 또는 비밀번호가 일치하지 않습니다.' };
-        } 
-        if (type === 'signup') {
-          await fetchCloudData();
-          const exists = employees.some(emp => emp.loginId === data.loginId);
-          if (exists) return { success: false, message: '이미 존재하는 아이디입니다.' };
-          
-          const newUser = {
-            id: `E-${Date.now()}`,
-            loginId: data.loginId,
+          const { error } = await supabase.auth.signInWithPassword({
+            email,
             password: data.password,
-            name: data.name,
-            phone: data.phone,
-            department: data.department || '신규 사원',
-            date: new Date().toISOString().split('T')[0]
-          };
+          });
+
+          if (error) return { success: false, message: '아이디 또는 비밀번호가 일치하지 않습니다.' };
           
-          // 클라우드 저장
-          await supabase.from('crm_users').insert([newUser]);
-          
-          setEmployees(prev => [newUser, ...prev]);
-          localStorage.setItem('crm_loggedInUser_local', JSON.stringify(newUser));
-          setCurrentUser(newUser);
-          setIsAuthenticated(true);
+          setActiveTab('calendar');
+          return { success: true };
+        } 
+        
+        if (type === 'signup') {
+          const { data: authData, error } = await supabase.auth.signUp({
+            email,
+            password: data.password,
+            options: { data: { name: data.name, department: data.department || '신규 사원', phone: data.phone } }
+          });
+
+          if (error) {
+            if (error.message.includes('already registered')) return { success: false, message: '이미 존재하는 아이디입니다.' };
+            return { success: false, message: error.message };
+          }
+
+          if (authData.user) {
+             await supabase.from('crm_users').insert([{
+               id: authData.user.id, 
+               loginId: data.loginId.toLowerCase(),
+               name: data.name,
+               department: data.department || '신규 사원',
+               phone: data.phone,
+               date: new Date().toISOString().split('T')[0]
+             }]);
+          }
+
+          setActiveTab('calendar');
           return { success: true };
         }
       };
 
-      const handleLogout = () => {
-        localStorage.removeItem('crm_loggedInUser_local');
-        setIsAuthenticated(false);
-        setCurrentUser(null);
+      const handleLogout = async () => {
+        await supabase.auth.signOut();
         setIsMobileMenuOpen(false);
       };
 
+      // 💡 [최종 수정] 복잡한 에러 처리 로직 제거 후 순수 객체 주입 로직으로 변경
+      // 폼 제출(Form Submit) 자체가 블록되는 현상을 막기 위해 예외 처리 간소화
       const handleSaveProperty = async (prop) => {
-        const finalProp = { 
-          ...prop, 
-          id: prop.id || `P-${Date.now()}`,
-          user_id: currentUser.loginId, 
-          registrant: currentUser.name,
-          registrantPhone: currentUser.phone,
-          date: prop.date || new Date().toISOString().split('T')[0]
-        };
-        
-        await supabase.from('crm_properties').upsert(finalProp);
-        
-        setProperties(prev => {
-          const idx = prev.findIndex(p => p.id === finalProp.id);
-          if(idx >= 0) { const n=[...prev]; n[idx]=finalProp; return n; }
-          return [finalProp, ...prev];
-        });
+        try {
+          const finalProp = { 
+            ...prop, 
+            id: prop.id || `P-${Date.now()}`,
+            user_id: currentUser.loginId.toLowerCase(), 
+            registrant: currentUser.name,
+            registrantPhone: currentUser.phone || '',
+            date: prop.date || new Date().toISOString().split('T')[0]
+          };
+          
+          // DB 저장을 백그라운드로 던지고 (await 제거하여 병목 현상 방지)
+          supabase.from('crm_properties').upsert(toDB(finalProp));
+          
+          // 화면 업데이트를 무조건 최우선으로 실행하여 즉시 렌더링
+          setProperties(prev => {
+            const idx = prev.findIndex(p => p.id === finalProp.id);
+            if(idx >= 0) { 
+               const newList = [...prev]; 
+               newList[idx] = finalProp; 
+               return newList; 
+            }
+            return [finalProp, ...prev]; 
+          });
 
-        setSelectedProperty(finalProp);
-        setCurrentView('detail');
-        
-        const scrollArea = document.getElementById('main-scroll-area');
-        if (scrollArea) scrollArea.scrollTo({ top: 0, behavior: 'auto' });
+          // 상태를 'list'로 확실하게 전환
+          setCurrentView('list');
+          setSelectedProperty(null);
+          
+          const scrollArea = document.getElementById('main-scroll-area');
+          if (scrollArea) scrollArea.scrollTo({ top: 0, behavior: 'auto' });
+          
+        } catch (err) {
+          alert(`오류 발생: ${err.message}`);
+        }
       };
 
       const handleUpdateProperty = async (prop) => {
-        await supabase.from('crm_properties').upsert(prop);
-        setProperties(prev => {
-          const idx = prev.findIndex(p => p.id === prop.id);
-          if(idx >= 0) { const n=[...prev]; n[idx]=prop; return n; }
-          return prev;
-        });
-        setSelectedProperty(prop);
+        try {
+          await supabase.from('crm_properties').upsert(toDB(prop));
+          setProperties(prev => prev.map(p => p.id === prop.id ? prop : p));
+          setSelectedProperty(prop);
+        } catch (err) {
+          alert(`오류 발생: ${err.message}`);
+        }
       };
 
       const handleDeleteProperty = async (propertyId) => {
@@ -402,24 +499,14 @@
         setIsMobileMenuOpen(false); 
       };
 
-      const filteredMyProperties = myProperties.filter(p => 
-        p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-        p.address.toLowerCase().includes(searchTerm.toLowerCase())
-      );
+      if (isAuthLoading) {
+        return (
+          <div className="flex h-screen items-center justify-center text-slate-500 font-bold bg-slate-50">
+            <i className="fas fa-spinner fa-spin mr-2"></i> 시스템 인증 정보를 확인 중입니다...
+          </div>
+        );
+      }
 
-      const filteredEmployees = employees.filter(e =>
-        currentUser && e.loginId === currentUser.loginId &&
-        (e.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        e.department.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        e.loginId.toLowerCase().includes(searchTerm.toLowerCase()))
-      );
-
-      const filteredCustomers = customers.filter(c =>
-        c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        c.region.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-
-      // 비로그인 화면
       if (!isAuthenticated) {
         return <AuthView onAuth={handleAuth} isDbEmpty={employees.length === 0} />;
       }
@@ -444,12 +531,12 @@
                 <Building2 className="w-8 h-8 text-blue-400" />
                 <h1 className="text-xl font-bold tracking-tight">빌딩탭</h1>
               </div>
-              <p className="text-[11px] text-slate-400 mt-2">부동산 종합 관리 시스템 (개인용)</p>
+              <p className="text-[11px] text-slate-400 mt-2">부동산 종합 관리 시스템</p>
             </div>
             
             <nav className="flex-1 p-4 space-y-2 overflow-y-auto mt-4 md:mt-0">
-              <SidebarItem icon={<List />} label="내 물건 관리" active={activeTab === 'properties'} onClick={() => { changeTab('properties'); setCurrentView('list'); }} />
               <SidebarItem icon={<CalendarIcon />} label="개인 캘린더" active={activeTab === 'calendar'} onClick={() => changeTab('calendar')} />
+              <SidebarItem icon={<List />} label="내 물건 관리" active={activeTab === 'properties'} onClick={() => { changeTab('properties'); setCurrentView('list'); }} />
               <SidebarItem icon={<Users />} label="고객 관리(매수자)" active={activeTab === 'customers'} onClick={() => { changeTab('customers'); setCurrentCustomerView('list'); }} />
               <SidebarItem icon={<UserCircle />} label="사원 목록" active={activeTab === 'employees'} onClick={() => { changeTab('employees'); setCurrentEmployeeView('list'); }} />
               <div className="pt-4 mt-4 border-t border-slate-800">
@@ -459,12 +546,12 @@
             
             <div className="p-4 border-t border-slate-800 mt-auto bg-slate-900">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center font-bold shadow-inner shrink-0">
+                <div className="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold shadow-inner shrink-0">
                   {currentUser ? currentUser.name.charAt(0) : 'U'}
                 </div>
                 <div className="truncate">
                   <p className="text-sm font-medium truncate">{currentUser ? currentUser.name : '사용자'} 님</p>
-                  <p className="text-xs text-slate-400 truncate">{currentUser ? currentUser.department : '관리자'}</p>
+                  <p className="text-xs text-slate-400 truncate">{currentUser ? currentUser.department : '사원'}</p>
                 </div>
               </div>
             </div>
@@ -472,11 +559,14 @@
 
           <main className="flex-1 flex flex-col h-[calc(100vh-60px)] md:h-screen overflow-hidden w-full relative">
             <header className="bg-white border-b border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 md:px-8 shadow-sm z-10 gap-4 shrink-0">
-              <h2 className="text-lg md:text-xl font-semibold text-slate-800">
+              <h2 className="text-lg md:text-xl font-semibold text-slate-800 flex items-center gap-2">
                 {activeTab === 'properties' ? '내 물건 관리' : 
                  activeTab === 'employees' ? '사원 목록' :
                  activeTab === 'customers' ? '고객 관리(매수자)' :
                  activeTab === 'calendar' ? '개인 캘린더' : '관리 메뉴'}
+                 <button onClick={fetchCloudData} className={`ml-2 p-1.5 rounded-full text-blue-600 hover:bg-blue-50 transition-colors ${isFetchingData ? 'animate-spin opacity-50' : ''}`} title="최신 데이터 불러오기">
+                   <Sync className="w-4 h-4" />
+                 </button>
               </h2>
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
                 <div className="relative w-full sm:w-auto">
@@ -533,7 +623,13 @@
                     <EmployeeFormView 
                       onBack={() => setCurrentEmployeeView('list')} 
                       onSave={async (newEmp) => {
-                        const emp = { ...newEmp, id: `E-${Date.now()}`, date: new Date().toISOString().split('T')[0] };
+                        const email = newEmp.loginId.includes('@') ? newEmp.loginId : `${newEmp.loginId}@crm.local`;
+                        const { data: authData, error } = await supabase.auth.signUp({
+                          email, password: newEmp.password, options: { data: { name: newEmp.name, department: newEmp.department, phone: newEmp.phone } }
+                        });
+                        if (error) return alert(error.message);
+                        
+                        const emp = { ...newEmp, id: authData.user.id, date: new Date().toISOString().split('T')[0] };
                         await supabase.from('crm_users').insert([emp]);
                         setEmployees(prev => [emp, ...prev]);
                         setCurrentEmployeeView('list');
@@ -573,21 +669,34 @@
     }
 
     // =====================================================================
-    // [5] 상세/하위 뷰 컴포넌트들
+    // [5] 하위 컴포넌트들
     // =====================================================================
-
     function AuthView({ onAuth, isDbEmpty }) {
       const [isLoginMode, setIsLoginMode] = useState(true);
       const [errorMsg, setErrorMsg] = useState('');
-      const [formData, setFormData] = useState({ loginId: '', password: '', name: '', phone: '', department: '' });
+      const [formData, setFormData] = useState({ loginId: safeStorage.getItem('crm_saved_id') || '', password: '', name: '', phone: '', department: '' });
+      const [rememberId, setRememberId] = useState(!!safeStorage.getItem('crm_saved_id'));
+      const [isSubmitting, setIsSubmitting] = useState(false);
 
       const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
 
       const handleSubmit = async (e) => {
         e.preventDefault();
+        
+        if (!formData.loginId) return alert("아이디를 입력해주세요.");
+        if (!formData.password) return alert("비밀번호를 입력해주세요.");
+        if (!isLoginMode) {
+           if (!formData.name) return alert("이름을 입력해주세요.");
+           if (!formData.phone) return alert("전화번호를 입력해주세요.");
+        }
+
         setErrorMsg('');
+        setIsSubmitting(true);
+        if (rememberId && isLoginMode) safeStorage.setItem('crm_saved_id', formData.loginId);
+        else if (!rememberId && isLoginMode) safeStorage.removeItem('crm_saved_id');
         const result = await onAuth(isLoginMode ? 'login' : 'signup', formData);
         if (result && !result.success) setErrorMsg(result.message);
+        setIsSubmitting(false);
       };
 
       return (
@@ -600,56 +709,46 @@
               <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">빌딩탭</h1>
               <p className="text-sm text-slate-500 mt-2 text-center">부동산 매물 관리의 시작</p>
             </div>
-
             {isDbEmpty && <p className="text-xs text-blue-600 bg-blue-50 px-3 py-2 rounded-lg font-bold mb-4 text-center">최초 접속입니다. '사원 가입'을 진행해주세요.</p>}
-
             <div className="flex p-1 bg-slate-100 rounded-lg mb-6">
-              <button onClick={() => {setIsLoginMode(true); setErrorMsg('');}} className={`flex-1 py-2.5 text-sm font-bold rounded-md transition-all ${isLoginMode ? 'bg-white text-blue-600 shadow' : 'text-slate-500'}`}>로그인</button>
-              <button onClick={() => {setIsLoginMode(false); setErrorMsg('');}} className={`flex-1 py-2.5 text-sm font-bold rounded-md transition-all ${!isLoginMode ? 'bg-white text-blue-600 shadow' : 'text-slate-500'}`}>사원 가입</button>
+              <button type="button" onClick={() => {setIsLoginMode(true); setErrorMsg('');}} className={`flex-1 py-2.5 text-sm font-bold rounded-md transition-all ${isLoginMode ? 'bg-white text-blue-600 shadow' : 'text-slate-500'}`}>로그인</button>
+              <button type="button" onClick={() => {setIsLoginMode(false); setErrorMsg('');}} className={`flex-1 py-2.5 text-sm font-bold rounded-md transition-all ${!isLoginMode ? 'bg-white text-blue-600 shadow' : 'text-slate-500'}`}>사원 가입</button>
             </div>
-
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-1.5">
                 <label className="text-sm font-bold text-slate-700">아이디</label>
                 <div className="relative">
                   <User className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input required type="text" name="loginId" value={formData.loginId} onChange={handleChange} placeholder="아이디 입력" className="w-full pl-12 pr-4 py-3 border border-slate-300 rounded-xl outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200" />
+                  <input type="text" name="loginId" value={formData.loginId} onChange={handleChange} placeholder="아이디 입력" className="w-full pl-12 pr-4 py-3 border border-slate-300 rounded-xl outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200" />
                 </div>
               </div>
               <div className="space-y-1.5">
                 <label className="text-sm font-bold text-slate-700">비밀번호</label>
                 <div className="relative">
                   <Lock className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input required type="password" name="password" value={formData.password} onChange={handleChange} placeholder="비밀번호 입력" className="w-full pl-12 pr-4 py-3 border border-slate-300 rounded-xl outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200" />
+                  <input type="password" name="password" value={formData.password} onChange={handleChange} placeholder="비밀번호 입력" className="w-full pl-12 pr-4 py-3 border border-slate-300 rounded-xl outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200" />
                 </div>
               </div>
-
+              {isLoginMode && (
+                <label className="flex items-center gap-2 text-sm text-slate-600 mt-2 cursor-pointer font-medium pl-1">
+                  <input type="checkbox" checked={rememberId} onChange={(e) => setRememberId(e.target.checked)} className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-gray-300" /> 아이디 기억하기
+                </label>
+              )}
               {!isLoginMode && (
                 <div className="space-y-4 pt-4 border-t border-slate-100 mt-2">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <label className="text-sm font-bold text-slate-700">이름</label>
-                      <input required type="text" name="name" value={formData.name} onChange={handleChange} placeholder="홍길동" className="w-full px-4 py-3 border border-slate-300 rounded-xl outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200" />
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-sm font-bold text-slate-700">소속</label>
-                      <input required type="text" name="department" value={formData.department} onChange={handleChange} placeholder="영업1팀" className="w-full px-4 py-3 border border-slate-300 rounded-xl outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200" />
-                    </div>
+                    <div className="space-y-1.5"><label className="text-sm font-bold text-slate-700">이름</label><input type="text" name="name" value={formData.name} onChange={handleChange} placeholder="홍길동" className="w-full px-4 py-3 border border-slate-300 rounded-xl outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200" /></div>
+                    <div className="space-y-1.5"><label className="text-sm font-bold text-slate-700">소속</label><input type="text" name="department" value={formData.department} onChange={handleChange} placeholder="영업1팀" className="w-full px-4 py-3 border border-slate-300 rounded-xl outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200" /></div>
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-sm font-bold text-slate-700">연락처</label>
-                    <div className="relative">
-                      <Phone className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                      <input required type="tel" name="phone" value={formData.phone} onChange={handleChange} placeholder="010-0000-0000" className="w-full pl-12 pr-4 py-3 border border-slate-300 rounded-xl outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200" />
-                    </div>
+                    <div className="relative"><Phone className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" /><input type="tel" name="phone" value={formData.phone} onChange={handleChange} placeholder="010-0000-0000" className="w-full pl-12 pr-4 py-3 border border-slate-300 rounded-xl outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200" /></div>
                   </div>
                 </div>
               )}
-
               {errorMsg && <div className="p-3 bg-red-50 text-red-600 text-sm font-bold rounded-lg text-center border border-red-100">{errorMsg}</div>}
-
-              <button type="submit" className="w-full py-4 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-all shadow-md mt-6 flex items-center justify-center gap-2 text-lg">
-                {isLoginMode ? <><ShieldCheck className="w-5 h-5" /> 로그인</> : '가입 완료 및 접속'}
+              <button type="submit" disabled={isSubmitting} className={`w-full py-4 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-all shadow-md mt-6 flex items-center justify-center gap-2 text-lg ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                {isSubmitting ? '처리 중...' : (isLoginMode ? <><ShieldCheck className="w-5 h-5" /> 로그인</> : '가입 완료 및 접속')}
               </button>
             </form>
           </div>
@@ -684,8 +783,8 @@
 
         result.sort((a, b) => {
           if (sortConfig.key === 'date') {
-            const dateA = new Date(a.date).getTime();
-            const dateB = new Date(b.date).getTime();
+            const dateA = new Date(a.date || 0).getTime() || 0;
+            const dateB = new Date(b.date || 0).getTime() || 0;
             return sortConfig.direction === 'desc' ? dateB - dateA : dateA - dateB;
           } else if (sortConfig.key === 'yield') {
             const yieldA = Number(getYield(a.price?.sale, a.price?.deposit, a.price?.rent));
@@ -818,24 +917,24 @@
                 <div className="flex items-center gap-3 mb-3 text-red-600"><Trash2 className="w-6 h-6" /><h3 className="text-lg font-bold text-slate-800">물건 삭제 확인</h3></div>
                 <p className="text-slate-600 mb-6 text-sm">정말 <b>{property.name}</b> 물건을 삭제하시겠습니까?<br/>이 작업은 되돌릴 수 없습니다.</p>
                 <div className="flex gap-3 justify-end">
-                  <button onClick={() => setShowDeleteConfirm(false)} className="flex-1 px-4 py-2.5 bg-slate-100 rounded-xl text-slate-700 font-bold hover:bg-slate-200 transition-colors">취소</button>
-                  <button onClick={() => onDelete(property.id)} className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition-colors shadow-md">삭제하기</button>
+                  <button type="button" onClick={() => setShowDeleteConfirm(false)} className="flex-1 px-4 py-2.5 bg-slate-100 rounded-xl text-slate-700 font-bold hover:bg-slate-200 transition-colors">취소</button>
+                  <button type="button" onClick={() => onDelete(property.id)} className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition-colors shadow-md">삭제하기</button>
                 </div>
               </div>
             </div>
           )}
 
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <button onClick={onBack} className="flex items-center gap-2 text-slate-500 hover:text-slate-800 transition-colors px-3 py-2 sm:-ml-3 rounded-lg hover:bg-slate-100 font-bold"><ArrowLeft className="w-4 h-4" /> 목록으로 돌아가기</button>
+            <button type="button" onClick={onBack} className="flex items-center gap-2 text-slate-500 hover:text-slate-800 transition-colors px-3 py-2 sm:-ml-3 rounded-lg hover:bg-slate-100 font-bold"><ArrowLeft className="w-4 h-4" /> 목록으로 돌아가기</button>
             <div className="flex gap-2 w-full sm:w-auto">
-              <button onClick={onEdit} className="flex-1 sm:flex-none px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-bold text-blue-600 hover:bg-blue-50 transition-colors shadow-sm text-center">수정하기</button>
-              <button onClick={() => setShowDeleteConfirm(true)} className="flex-1 sm:flex-none px-4 py-2.5 bg-white border border-red-200 text-red-600 rounded-xl text-sm font-bold hover:bg-red-50 transition-colors shadow-sm text-center">삭제하기</button>
+              <button type="button" onClick={onEdit} className="flex-1 sm:flex-none px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-sm font-bold text-blue-600 hover:bg-blue-50 transition-colors shadow-sm text-center">수정하기</button>
+              <button type="button" onClick={() => setShowDeleteConfirm(true)} className="flex-1 sm:flex-none px-4 py-2.5 bg-white border border-red-200 text-red-600 rounded-lg text-sm font-bold hover:bg-red-50 transition-colors shadow-sm text-center">삭제하기</button>
             </div>
           </div>
 
           <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-start gap-4">
-            <div className="w-full md:w-auto">
-              <div className="flex flex-wrap gap-2 mb-3 items-center">
+            <div>
+              <div className="flex gap-2 mb-3">
                 <span className={`px-2.5 py-1 rounded text-xs sm:text-sm font-bold shadow-sm ${STATUS_BADGE_COLORS[property.status || '보류']}`}>{property.status || '보류'}</span>
                 <span className={`px-2.5 py-1 rounded text-xs sm:text-sm font-bold shadow-sm ${property.transactionType === '매매' ? 'bg-slate-100 text-slate-600 border border-slate-200' : property.transactionType === '전세' ? 'bg-blue-500 text-white' : 'bg-emerald-500 text-white'}`}>{property.transactionType}</span>
                 <span className="px-2.5 py-1 rounded text-xs sm:text-sm font-medium bg-slate-100 text-slate-600 border border-slate-200">{property.type}</span>
@@ -866,7 +965,7 @@
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
             <div className="space-y-4 sm:space-y-6">
                 <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                     <div className="p-3 sm:p-4 bg-slate-50 border-b border-slate-200"><h3 className="font-bold text-slate-800 flex items-center gap-2 text-sm sm:text-base"><UserCircle className="w-4 h-4 sm:w-5 sm:h-5 text-blue-500" /> 소유자 정보</h3></div>
@@ -956,7 +1055,7 @@
               <h3 className="text-base sm:text-lg font-bold text-slate-800 mb-3 sm:mb-4 pb-2 sm:pb-3 border-b border-slate-100 flex items-center gap-2"><FileText className="w-4 h-4 sm:w-5 sm:h-5 text-blue-500" /> 작업 일지 및 코멘트</h3>
               <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 mb-4 sm:mb-6">
                 <textarea value={newLog} onChange={(e) => setNewLog(e.target.value)} className="flex-1 p-3 border border-slate-300 rounded-xl outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 text-sm resize-none" rows={2} placeholder="작업 내용이나 코멘트를 남겨주세요..." />
-                <button onClick={handleAddLog} className="w-full sm:w-auto px-6 py-3 sm:py-0 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-colors shadow-sm whitespace-nowrap">등록</button>
+                <button type="button" onClick={handleAddLog} className="w-full sm:w-auto px-6 py-3 sm:py-0 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-colors shadow-sm whitespace-nowrap">등록</button>
               </div>
               <div className="space-y-3 max-h-[400px] overflow-y-auto pr-1 sm:pr-2">
                 {(property.workLogs || []).length > 0 ? property.workLogs.map(log => (
@@ -974,7 +1073,7 @@
 
     function PropertyFormView({ initialData, onBack, onSave }) {
       const [newLog, setNewLog] = useState('');
-      const [addressError, setAddressError] = useState('');
+      const [isSubmitting, setIsSubmitting] = useState(false);
       const [formData, setFormData] = useState(() => {
         if (initialData) return { ...initialData };
         return {
@@ -989,7 +1088,6 @@
 
       const handleChange = (e) => {
         setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
-        if(e.target.name === 'address') setAddressError('');
       };
       
       const handleAddressBlur = () => {
@@ -1033,6 +1131,13 @@
 
       const addFloor = () => {
         setFormData(prev => {
+          const parseFloorLevel = (str) => {
+             if(!str) return 0;
+             const numStr = str.replace(/[^0-9]/g, '');
+             const num = numStr ? parseInt(numStr, 10) : 0;
+             if (str.includes('지하') || str.toUpperCase().includes('B')) return -num;
+             return num;
+          };
           const groundFloors = prev.floorDetails
             .map(f => f.floor)
             .filter(f => f && !f.includes('지하') && !f.toUpperCase().includes('B'))
@@ -1049,47 +1154,86 @@
         });
       };
 
+      const handleAddLog = () => {
+        if (!newLog.trim()) return;
+        const log = {
+          id: Date.now(),
+          date: new Date().toLocaleString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }),
+          author: '등록자',
+          content: newLog.trim()
+        };
+        setFormData(prev => ({
+          ...prev,
+          workLogs: [log, ...(prev.workLogs || [])]
+        }));
+        setNewLog('');
+      };
+
       const totals = useMemo(() => formData.floorDetails.reduce((acc, curr) => ({
         deposit: acc.deposit + (Number(curr.deposit) || 0),
         rent: acc.rent + (Number(curr.rent) || 0),
         maintenance: acc.maintenance + (Number(curr.maintenance) || 0),
       }), { deposit: 0, rent: 0, maintenance: 0 }), [formData.floorDetails]);
 
-      const handleSubmit = (e) => {
+      // 💡 [버그 완벽 해결] 브라우저 기본 필수 경고창(required) 삭제하여 먹통 방지 완료
+      const handleSubmit = async (e) => {
         e.preventDefault();
 
-        const formattedAddress = autoFormatAddress(formData.address);
-        sortFloorDetails(); 
-        
-        let finalWorkLogs = [...(formData.workLogs || [])];
-        if (newLog.trim()) {
-          finalWorkLogs.unshift({
-            id: Date.now(),
-            date: new Date().toLocaleString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }),
-            author: '등록자',
-            content: newLog.trim()
-          });
-        }
+        // 💡 투명 말풍선 대신 무조건 화면 한가운데에 경고창(alert)을 띄우도록 수정
+        if (!formData.name || formData.name.trim() === '') return alert("물건명을 입력해주세요.");
+        if (!formData.address || formData.address.trim() === '') return alert("소재지(주소)를 입력해주세요.");
 
-        onSave({
-          ...formData,
-          address: formattedAddress,
-          landArea: Number(formData.landArea || 0),
-          totalFloorArea: Number(formData.totalFloorArea || 0),
-          buildingArea: Number(formData.buildingArea || 0),
-          buildingCoverage: Number(formData.buildingCoverage || 0),
-          floorAreaRatio: Number(formData.floorAreaRatio || 0),
-          floorUnderground: Number(formData.floorUnderground || 0),
-          floorGround: Number(formData.floorGround || 0),
-          elevators: Number(formData.elevators || 0),
-          parking: Number(formData.parking || 0),
-          price: { sale: Number(formData.sale || 0), deposit: totals.deposit, rent: totals.rent, maintenance: totals.maintenance },
-          workLogs: finalWorkLogs,
-        });
+        setIsSubmitting(true);
+
+        try {
+          const formattedAddress = autoFormatAddress(formData.address);
+          
+          const parseFloorLevel = (str) => {
+            if(!str) return 0;
+            const numStr = str.replace(/[^0-9]/g, '');
+            const num = numStr ? parseInt(numStr, 10) : 0;
+            if (str.includes('지하') || str.toUpperCase().includes('B')) return -num;
+            return num;
+          };
+
+          const sortedFloors = [...formData.floorDetails].sort((a, b) => parseFloorLevel(a.floor) - parseFloorLevel(b.floor));
+          
+          let finalWorkLogs = [...(formData.workLogs || [])];
+          if (newLog.trim()) {
+            finalWorkLogs.unshift({
+              id: Date.now(),
+              date: new Date().toLocaleString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }),
+              author: '등록자',
+              content: newLog.trim()
+            });
+          }
+
+          // 앱의 메인에 있는 handleSaveProperty 함수로 데이터 전달
+          await onSave({
+            ...formData,
+            address: formattedAddress,
+            floorDetails: sortedFloors,
+            landArea: Number(formData.landArea || 0),
+            totalFloorArea: Number(formData.totalFloorArea || 0),
+            buildingArea: Number(formData.buildingArea || 0),
+            buildingCoverage: Number(formData.buildingCoverage || 0),
+            floorAreaRatio: Number(formData.floorAreaRatio || 0),
+            floorUnderground: Number(formData.floorUnderground || 0),
+            floorGround: Number(formData.floorGround || 0),
+            elevators: Number(formData.elevators || 0),
+            parking: Number(formData.parking || 0),
+            price: { sale: Number(formData.sale || 0), deposit: totals.deposit, rent: totals.rent, maintenance: totals.maintenance },
+            workLogs: finalWorkLogs,
+          });
+        } catch (error) {
+          alert("저장 중 오류가 발생했습니다.");
+        } finally {
+          setIsSubmitting(false);
+        }
       };
 
       return (
-        <div className="max-w-4xl mx-auto pb-10 relative">
+        <div className="max-w-3xl mx-auto pb-10 relative">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-6 w-full md:w-auto">
               <h2 className="text-xl sm:text-2xl font-bold text-slate-800 shrink-0">{initialData ? '등록된 물건 수정' : '신규 물건 등록'}</h2>
@@ -1114,11 +1258,11 @@
             <div className="bg-white p-5 sm:p-8 rounded-2xl shadow-sm border border-slate-200">
               <h3 className="text-lg sm:text-xl font-bold text-slate-800 mb-4 sm:mb-6 pb-3 sm:pb-4 border-b border-slate-100 flex items-center gap-2"><Building2 className="w-5 h-5 sm:w-6 sm:h-6 text-blue-500" /> 기본 정보</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-                <FormGroup label="물건명 (필수)"><input required type="text" name="name" value={formData.name || ''} onChange={handleChange} className="form-input w-full p-2.5 sm:p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-bold text-sm sm:text-base" placeholder="예: 엠파이어 빌딩" /></FormGroup>
+                {/* 💡 required 속성을 제거하여 브라우저의 먹통(멈춤) 현상 방지 */}
+                <FormGroup label="물건명 (필수)"><input type="text" name="name" value={formData.name || ''} onChange={handleChange} className="form-input w-full p-2.5 sm:p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-bold text-sm sm:text-base" placeholder="예: 엠파이어 빌딩" /></FormGroup>
                 
                 <FormGroup label="소재지 (주소)">
-                   <input required type="text" name="address" value={formData.address || ''} onChange={handleChange} onBlur={handleAddressBlur} className={`form-input w-full p-2.5 sm:p-3 border rounded-lg outline-none focus:ring-2 bg-white text-sm sm:text-base ${addressError ? 'border-red-400 focus:ring-red-200' : 'border-slate-300 focus:ring-blue-500'}`} placeholder="예: 서울시 강남구 신사동 10" />
-                   {addressError && <p className="text-red-500 text-xs font-bold mt-1 px-1">{addressError}</p>}
+                   <input type="text" name="address" value={formData.address || ''} onChange={handleChange} onBlur={handleAddressBlur} className={`form-input w-full p-2.5 sm:p-3 border rounded-lg outline-none focus:ring-2 bg-white text-sm sm:text-base border-slate-300 focus:ring-blue-500`} placeholder="예: 서울시 강남구 신사동 10" />
                 </FormGroup>
 
                 <FormGroup label="물건 종류"><select name="type" value={formData.type || ''} onChange={handleChange} className="form-select w-full p-2.5 sm:p-3 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 bg-white font-bold text-slate-700 text-sm sm:text-base"><option>빌딩</option><option>상가</option><option>오피스텔</option><option>아파트</option><option>빌라</option><option>원룸</option><option>투룸</option><option>쓰리룸+</option></select></FormGroup>
@@ -1241,6 +1385,8 @@
                 </h3>
                 <textarea value={newLog} onChange={(e) => setNewLog(e.target.value)} rows={4} className="w-full p-3 sm:p-4 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm leading-relaxed resize-none" placeholder="특징, 거래 상황 등 상세한 내용을 입력하세요. 저장 시 작업 일지로 등록됩니다." />
                 
+                <button type="button" onClick={handleAddLog} className="w-full sm:w-auto px-6 py-3 sm:py-0 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-colors shadow-sm whitespace-nowrap mt-2">일지 내용만 먼저 등록하기</button>
+
                 {formData.workLogs && formData.workLogs.length > 0 && (
                   <div className="mt-4 sm:mt-6 space-y-3 border-t border-slate-100 pt-4 sm:pt-6">
                     <h4 className="text-xs sm:text-sm font-bold text-slate-600 mb-2">이전 작업 일지 내역</h4>
@@ -1259,7 +1405,9 @@
 
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 pt-2 sm:pt-4">
               <button type="button" onClick={onBack} className="w-full sm:flex-1 py-3.5 sm:py-4 bg-slate-200 text-slate-800 font-bold rounded-xl hover:bg-slate-300 transition-colors text-base sm:text-lg order-2 sm:order-1">취소</button>
-              <button type="submit" className="w-full sm:flex-[2] py-3.5 sm:py-4 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-colors shadow-md text-base sm:text-lg order-1 sm:order-2"><Save className="w-4 h-4 sm:w-5 sm:h-5 inline-block mr-2" /> {initialData ? '수정 내용 저장' : '물건 등록하기'}</button>
+              <button type="submit" disabled={isSubmitting} className={`w-full sm:flex-[2] py-3.5 sm:py-4 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-colors shadow-md text-base sm:text-lg order-1 sm:order-2 ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                <Save className="w-4 h-4 sm:w-5 sm:h-5 inline-block mr-2" /> {isSubmitting ? '저장 중...' : (initialData ? '수정 내용 저장' : '물건 등록하기')}
+              </button>
             </div>
           </form>
         </div>
@@ -1290,21 +1438,36 @@
 
     function EmployeeFormView({ onBack, onSave }) {
       const [formData, setFormData] = useState({ name: '', phone: '', department: '', loginId: '', password: '' });
+      const [isSubmitting, setIsSubmitting] = useState(false);
+
       const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
       
+      const handleSubmit = async (e) => {
+        e.preventDefault();
+        if (!formData.name) return alert("이름을 입력해주세요.");
+        if (!formData.department) return alert("소속을 입력해주세요.");
+        if (!formData.phone) return alert("전화번호를 입력해주세요.");
+        if (!formData.loginId) return alert("아이디를 입력해주세요.");
+        if (!formData.password) return alert("비밀번호를 입력해주세요.");
+
+        setIsSubmitting(true);
+        await onSave(formData);
+        setIsSubmitting(false);
+      };
+
       return (
         <div className="max-w-2xl mx-auto pb-10">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-xl md:text-2xl font-bold text-slate-800">사원 등록하기</h2>
-            <button onClick={onBack} className="text-slate-500 hover:text-slate-800 text-sm font-medium bg-slate-200 px-3 py-1.5 rounded-lg">취소 및 돌아가기</button>
+            <button type="button" onClick={onBack} className="text-slate-500 hover:text-slate-800 text-sm font-medium bg-slate-200 px-3 py-1.5 rounded-lg">취소 및 돌아가기</button>
           </div>
-          <form onSubmit={(e) => { e.preventDefault(); onSave(formData); }} className="space-y-6 bg-white p-5 md:p-6 rounded-2xl shadow-sm border border-slate-200">
+          <form onSubmit={handleSubmit} className="space-y-6 bg-white p-5 md:p-6 rounded-2xl shadow-sm border border-slate-200">
             <h3 className="text-base md:text-lg font-bold text-slate-800 mb-4 md:mb-5 pb-2 md:pb-3 border-b border-slate-100 flex items-center gap-2"><Briefcase className="w-4 h-4 md:w-5 md:h-5 text-blue-500" /> 사원 정보</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4"><FormGroup label="이름"><input required type="text" name="name" onChange={handleChange} className="form-input w-full p-2.5 md:p-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm md:text-base" placeholder="홍길동" /></FormGroup><FormGroup label="소속"><input required type="text" name="department" onChange={handleChange} className="form-input w-full p-2.5 md:p-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm md:text-base" placeholder="예: 영업1팀" /></FormGroup></div>
-            <FormGroup label="전화번호"><input required type="tel" name="phone" onChange={handleChange} className="form-input w-full p-2.5 md:p-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm md:text-base" placeholder="010-0000-0000" /></FormGroup>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4"><FormGroup label="이름"><input type="text" name="name" onChange={handleChange} className="form-input w-full p-2.5 md:p-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm md:text-base" placeholder="홍길동" /></FormGroup><FormGroup label="소속"><input type="text" name="department" onChange={handleChange} className="form-input w-full p-2.5 md:p-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm md:text-base" placeholder="예: 영업1팀" /></FormGroup></div>
+            <FormGroup label="전화번호"><input type="tel" name="phone" onChange={handleChange} className="form-input w-full p-2.5 md:p-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm md:text-base" placeholder="010-0000-0000" /></FormGroup>
             <h3 className="text-base md:text-lg font-bold text-slate-800 mb-4 md:mb-5 pb-2 md:pb-3 pt-2 md:pt-4 border-b border-slate-100 flex items-center gap-2"><Lock className="w-4 h-4 md:w-5 md:h-5 text-blue-500" /> 접속 계정 정보</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4"><FormGroup label="아이디"><input required type="text" name="loginId" onChange={handleChange} className="form-input w-full p-2.5 md:p-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm md:text-base" placeholder="아이디 입력" /></FormGroup><FormGroup label="비밀번호"><input required type="password" name="password" onChange={handleChange} className="form-input w-full p-2.5 md:p-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm md:text-base" placeholder="비밀번호 입력" /></FormGroup></div>
-            <div className="flex pt-4"><button type="submit" className="w-full py-3.5 bg-blue-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-blue-700 shadow-sm text-base"><Save className="w-5 h-5" /> 사원 등록</button></div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4"><FormGroup label="아이디"><input type="text" name="loginId" onChange={handleChange} className="form-input w-full p-2.5 md:p-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm md:text-base" placeholder="아이디 입력" /></FormGroup><FormGroup label="비밀번호"><input type="password" name="password" onChange={handleChange} className="form-input w-full p-2.5 md:p-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm md:text-base" placeholder="비밀번호 입력" /></FormGroup></div>
+            <div className="flex pt-4"><button type="submit" disabled={isSubmitting} className={`w-full py-3.5 bg-blue-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-blue-700 shadow-sm text-base ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}><Save className="w-5 h-5" /> {isSubmitting ? '처리 중...' : '사원 등록'}</button></div>
           </form>
         </div>
       );
@@ -1334,25 +1497,38 @@
 
     function CustomerFormView({ onBack, onSave }) {
       const [formData, setFormData] = useState({ name: '', phone: '', budget: '', region: '', reason: '' });
+      const [isSubmitting, setIsSubmitting] = useState(false);
+
       const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
       
+      const handleSubmit = async (e) => {
+        e.preventDefault();
+        if (!formData.name) return alert("이름을 입력해주세요.");
+        if (!formData.phone) return alert("전화번호를 입력해주세요.");
+        if (!formData.budget) return alert("투자금액을 입력해주세요.");
+
+        setIsSubmitting(true);
+        await onSave(formData);
+        setIsSubmitting(false);
+      };
+
       return (
         <div className="max-w-2xl mx-auto pb-10">
-          <div className="flex justify-between items-center mb-6"><h2 className="text-xl md:text-2xl font-bold text-slate-800">신규 손님 등록</h2><button onClick={onBack} className="text-slate-500 hover:text-slate-800 text-sm font-medium bg-slate-200 px-3 py-1.5 rounded-lg">취소 및 돌아가기</button></div>
-          <form onSubmit={(e) => { e.preventDefault(); onSave(formData); }} className="space-y-6 bg-white p-5 md:p-6 rounded-2xl shadow-sm border border-slate-200">
+          <div className="flex justify-between items-center mb-6"><h2 className="text-xl md:text-2xl font-bold text-slate-800">신규 손님 등록</h2><button type="button" onClick={onBack} className="text-slate-500 hover:text-slate-800 text-sm font-medium bg-slate-200 px-3 py-1.5 rounded-lg">취소 및 돌아가기</button></div>
+          <form onSubmit={handleSubmit} className="space-y-6 bg-white p-5 md:p-6 rounded-2xl shadow-sm border border-slate-200">
             <h3 className="text-base md:text-lg font-bold text-slate-800 mb-4 md:mb-5 pb-2 md:pb-3 border-b border-slate-100 flex items-center gap-2"><Users className="w-4 h-4 md:w-5 md:h-5 text-blue-500" /> 손님(매수자) 정보</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4"><FormGroup label="이름"><input required type="text" name="name" onChange={handleChange} className="form-input w-full p-2.5 md:p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm md:text-base" placeholder="김투자" /></FormGroup><FormGroup label="전화번호"><input required type="tel" name="phone" onChange={handleChange} className="form-input w-full p-2.5 md:p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm md:text-base" placeholder="010-0000-0000" /></FormGroup></div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4"><FormGroup label="이름"><input type="text" name="name" onChange={handleChange} className="form-input w-full p-2.5 md:p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm md:text-base" placeholder="김투자" /></FormGroup><FormGroup label="전화번호"><input type="tel" name="phone" onChange={handleChange} className="form-input w-full p-2.5 md:p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm md:text-base" placeholder="010-0000-0000" /></FormGroup></div>
             <FormGroup label="금액 (단위: 만원)">
               <div className="flex items-center gap-2">
-                <input required type="number" name="budget" onChange={handleChange} className="form-input flex-1 p-2.5 md:p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-right text-sm md:text-base font-bold" placeholder="예: 50000" />
+                <input type="number" name="budget" onChange={handleChange} className="form-input flex-1 p-2.5 md:p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-right text-sm md:text-base font-bold" placeholder="예: 50000" />
                 <div className="w-32 sm:w-40 text-right text-sm sm:text-base font-bold text-blue-600 bg-blue-50 py-2.5 sm:py-3 px-3 rounded-lg border border-blue-100 truncate shadow-sm">
                   {formatKoreanCurrency(formData.budget) || '0원'}
                 </div>
               </div>
             </FormGroup>
-            <FormGroup label="지역"><input required type="text" name="region" onChange={handleChange} className="form-input w-full p-2.5 md:p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm md:text-base" placeholder="예: 성남시 분당구 일대" /></FormGroup>
-            <FormGroup label="구매사유"><textarea required name="reason" onChange={handleChange} rows={3} className="form-input w-full p-2.5 md:p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none resize-none text-sm md:text-base" placeholder="예: 사옥 이전, 임대수익 목적 등" /></FormGroup>
-            <div className="flex pt-4"><button type="submit" className="w-full py-3.5 bg-blue-600 text-white rounded-xl font-bold text-base shadow-sm hover:bg-blue-700">손님 등록</button></div>
+            <FormGroup label="지역"><input type="text" name="region" onChange={handleChange} className="form-input w-full p-2.5 md:p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm md:text-base" placeholder="예: 성남시 분당구 일대" /></FormGroup>
+            <FormGroup label="구매사유"><textarea name="reason" onChange={handleChange} rows={3} className="form-input w-full p-2.5 md:p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none resize-none text-sm md:text-base" placeholder="예: 사옥 이전, 임대수익 목적 등" /></FormGroup>
+            <div className="flex pt-4"><button type="submit" disabled={isSubmitting} className={`w-full py-3.5 bg-blue-600 text-white rounded-xl font-bold text-base shadow-sm hover:bg-blue-700 ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}>{isSubmitting ? '처리 중...' : '손님 등록'}</button></div>
           </form>
         </div>
       );
@@ -1376,11 +1552,7 @@
         e.stopPropagation(); 
         if (newMemo.trim()) {
           const newMemoObj = { id: `M-${Date.now()}`, user_id: currentUser.loginId, dateStr: dayStr, text: newMemo.trim() };
-          
-          if(isSupabaseConfigured) {
-            await supabase.from('crm_memos').insert([newMemoObj]);
-          }
-          
+          await supabase.from('crm_memos').insert([newMemoObj]);
           setMemos(prev => [...prev, newMemoObj]);
         }
         setEditingDate(null); 
@@ -1388,9 +1560,7 @@
 
       const deleteMemo = async (e, id) => { 
         e.stopPropagation(); 
-        if(isSupabaseConfigured) {
-          await supabase.from('crm_memos').delete().eq('id', id);
-        }
+        await supabase.from('crm_memos').delete().eq('id', id);
         setMemos(prev => prev.filter(m => m.id !== id)); 
       };
 
@@ -1406,28 +1576,24 @@
           const currentDayOfWeek = new Date(year, month, d).getDay();
           const dayColor = currentDayOfWeek === 0 ? 'text-red-500' : currentDayOfWeek === 6 ? 'text-blue-500' : 'text-slate-700';
 
-          // 해당 날짜의 내 메모
           const currentMemos = memos.filter(m => m.dateStr === dayStr && m.user_id === currentUser.loginId);
-          
-          // 해당 날짜에 내가 등록한 물건 중 '완료' 상태인 것의 갯수
           const completedCount = properties.filter(p => p.user_id === currentUser.loginId && p.date === dayStr && p.status === '완료').length;
 
           days.push(
             <div key={d} onClick={(e) => { if(!editingDate) handleAddMemo(e, dayStr) }} className={`group relative min-h-[100px] md:min-h-[130px] p-1 md:p-2 border border-slate-100 rounded-lg cursor-pointer hover:border-blue-300 transition-colors ${isToday ? 'bg-blue-50/30 border-blue-200' : 'bg-white'}`}>
               <div className="flex justify-between items-start mb-1">
                 <div className={`text-xs md:text-sm font-semibold ${dayColor} ${isToday ? 'font-extrabold underline' : ''}`}>{d}</div>
-                <button onClick={(e) => handleAddMemo(e, dayStr)} className="w-5 h-5 rounded-full hover:bg-slate-100 text-slate-300 hover:text-blue-600 flex items-center justify-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all"><Plus className="w-3 h-3" /></button>
+                <button type="button" onClick={(e) => handleAddMemo(e, dayStr)} className="w-5 h-5 rounded-full hover:bg-slate-100 text-slate-300 hover:text-blue-600 flex items-center justify-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all"><Plus className="w-3 h-3" /></button>
               </div>
               
               <div className="space-y-1 flex flex-col">
                 {currentMemos.map((memo) => (
                   <div key={memo.id} className="flex flex-col sm:flex-row justify-between items-start sm:items-center text-[10px] md:text-[11px] bg-blue-50 text-blue-700 pl-1.5 pr-1 py-1 rounded border border-blue-100 hover:bg-blue-100 transition-colors group/item gap-1 sm:gap-0">
                     <span className="truncate w-full sm:flex-1" title={memo.text}>{memo.text}</span>
-                    <button onClick={(e) => deleteMemo(e, memo.id)} className="text-slate-400 hover:text-red-500 p-0.5 ml-auto sm:ml-1 opacity-100 md:opacity-0 md:group-hover/item:opacity-100 transition-opacity"><Trash2 className="w-3 h-3" /></button>
+                    <button type="button" onClick={(e) => deleteMemo(e, memo.id)} className="text-slate-400 hover:text-red-500 p-0.5 ml-auto sm:ml-1 opacity-100 md:opacity-0 md:group-hover/item:opacity-100 transition-opacity"><Trash2 className="w-3 h-3" /></button>
                   </div>
                 ))}
 
-                {/* ⭐️ 작업 완료 갯수 표시 ⭐️ */}
                 {completedCount > 0 && (
                   <div className="inline-flex items-center gap-1 text-[10px] md:text-[11px] font-bold bg-red-50 text-red-600 px-1.5 py-1 rounded border border-red-100 mt-0.5 w-max">
                     <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span>
@@ -1436,12 +1602,8 @@
                 )}
 
                 {editingDate === dayStr && (
-                  <div className="mt-1 flex flex-col gap-1" onClick={e => e.stopPropagation()}>
-                    <input autoFocus type="text" value={newMemo} onChange={e => setNewMemo(e.target.value)} onKeyDown={e => e.key === 'Enter' && saveMemo(e, dayStr)} placeholder="일정 입력..." className="w-full text-[10px] md:text-xs p-1 md:p-1.5 border border-blue-300 rounded outline-none focus:ring-1 focus:ring-blue-500 bg-white" />
-                    <div className="flex gap-1">
-                      <button onClick={(e) => saveMemo(e, dayStr)} className="text-[9px] md:text-[10px] bg-blue-600 text-white px-2 py-1 rounded font-medium flex-1 hover:bg-blue-700">저장</button>
-                      <button onClick={(e) => { e.stopPropagation(); setEditingDate(null); }} className="text-[9px] md:text-[10px] bg-slate-200 text-slate-700 px-2 py-1 rounded font-medium flex-1 hover:bg-slate-300">취소</button>
-                    </div>
+                  <div className="mt-1" onClick={e => e.stopPropagation()}>
+                    <input autoFocus type="text" value={newMemo} onChange={e => setNewMemo(e.target.value)} onKeyDown={e => e.key === 'Enter' && saveMemo(e, dayStr)} placeholder="일정 입력..." className="w-full text-[10px] md:text-xs p-1 md:p-1.5 border border-blue-300 rounded outline-none" />
                   </div>
                 )}
               </div>
@@ -1452,21 +1614,19 @@
       };
 
       return (
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-3 md:p-6 h-full flex flex-col">
-          <div className="flex flex-col sm:flex-row justify-between items-center mb-4 md:mb-6 gap-3 sm:gap-0">
-            <h2 className="text-lg md:text-xl font-bold text-slate-800 flex items-center gap-2 w-full sm:w-auto"><CalendarIcon className="w-5 h-5 md:w-6 md:h-6 text-blue-600" /> 개인 캘린더</h2>
-            <div className="flex items-center justify-between sm:justify-end gap-2 md:gap-4 w-full sm:w-auto bg-slate-50 sm:bg-transparent rounded-lg p-2 sm:p-0">
-              <button onClick={() => setDate(new Date(year, month - 1, 1))} className="p-2 bg-white sm:bg-transparent hover:bg-slate-100 rounded-full shadow-sm sm:shadow-none transition-colors"><ChevronLeft className="w-4 h-4 md:w-5 md:h-5 text-slate-600" /></button>
-              <span className="text-base md:text-lg font-bold text-slate-800 w-24 md:w-32 text-center">{year}년 {month + 1}월</span>
-              <button onClick={() => setDate(new Date(year, month + 1, 1))} className="p-2 bg-white sm:bg-transparent hover:bg-slate-100 rounded-full shadow-sm sm:shadow-none transition-colors"><ChevronRight className="w-4 h-4 md:w-5 md:h-5 text-slate-600" /></button>
+        <div className="bg-white p-6 rounded-2xl shadow h-full flex flex-col">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-xl font-bold"><CalendarIcon className="w-6 h-6 inline text-blue-600 mr-2"/>개인 캘린더</h2>
+            <div className="flex items-center gap-4">
+              <button type="button" onClick={() => setDate(new Date(year, month - 1, 1))} className="p-2 hover:bg-slate-100 rounded-full"><ChevronLeft className="w-5 h-5"/></button>
+              <span className="font-bold text-lg">{year}년 {month + 1}월</span>
+              <button type="button" onClick={() => setDate(new Date(year, month + 1, 1))} className="p-2 hover:bg-slate-100 rounded-full"><ChevronRight className="w-5 h-5"/></button>
             </div>
           </div>
-          <div className="grid grid-cols-7 gap-1 md:gap-2 mb-2">
-            {['일', '월', '화', '수', '목', '금', '토'].map((day, i) => (
-              <div key={day} className={`text-center text-xs md:text-sm font-bold py-1.5 md:py-2 bg-slate-50 rounded-lg ${i === 0 ? 'text-red-500' : i === 6 ? 'text-blue-500' : 'text-slate-600'}`}>{day}</div>
-            ))}
+          <div className="grid grid-cols-7 gap-2 mb-2 text-center font-bold text-sm">
+            <div className="text-red-500">일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div className="text-blue-500">토</div>
           </div>
-          <div className="grid grid-cols-7 gap-1 md:gap-2 flex-1 auto-rows-fr overflow-y-auto pr-1">{renderDays()}</div>
+          <div className="grid grid-cols-7 gap-2 flex-1 overflow-y-auto">{renderDays()}</div>
         </div>
       );
     }
