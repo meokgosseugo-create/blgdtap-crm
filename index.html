@@ -39,14 +39,7 @@
     const { useState, useMemo, useEffect, useRef } = React;
 
     // =====================================================================
-    // [1] Supabase 연동
-    // =====================================================================
-    const SUPABASE_URL = "https://ehshoqcskipcvybhomlq.supabase.co";
-    const SUPABASE_KEY = "sb_publishable_v5aUCKdYsRAtiwKSjn8oSA_GnuPEe4G";
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
-    // =====================================================================
-    // [2] 유틸리티 함수 & DB 매퍼
+    // [1] 유틸리티 스토리지 (로그인 유지를 위해 먼저 선언)
     // =====================================================================
     const safeStorage = {
       getItem: (key) => { try { return localStorage.getItem(key); } catch (e) { return window['temp_' + key] || null; } },
@@ -54,6 +47,24 @@
       removeItem: (key) => { try { localStorage.removeItem(key); } catch (e) { delete window['temp_' + key]; } }
     };
 
+    // =====================================================================
+    // [2] Supabase 연동 (초기화 및 코드 업데이트 시 로그인 안 풀리게 강제 고정)
+    // =====================================================================
+    const SUPABASE_URL = "https://ehshoqcskipcvybhomlq.supabase.co";
+    const SUPABASE_KEY = "sb_publishable_v5aUCKdYsRAtiwKSjn8oSA_GnuPEe4G";
+    
+    // 💡 persistSession 옵션을 켜서 코드를 덮어써도 로그인이 유지되도록 못을 박습니다.
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+      auth: {
+        storage: safeStorage,
+        storageKey: 'building_tab_crm_session',
+        autoRefreshToken: true,
+        persistSession: true,
+        detectSessionInUrl: false
+      }
+    });
+
+    // 프론트엔드 CamelCase <-> DB LowerCase 변환기
     const toDB = (prop) => {
       const dbObj = { ...prop };
       const keyMap = {
@@ -390,7 +401,9 @@
       }, [isMobileMenuOpen]);
 
       const handleAuth = async (type, data) => {
-        const email = data.loginId.includes('@') ? data.loginId : `${data.loginId}@crm.local`;
+        // 💡 [버그 완벽 수정] 대소문자나 공백 때문에 아이디를 못 찾는 현상 100% 방지
+        const safeId = data.loginId.toLowerCase().trim();
+        const email = safeId.includes('@') ? safeId : `${safeId}@crm.local`;
 
         if (type === 'login') {
           const { error } = await supabase.auth.signInWithPassword({
@@ -508,7 +521,8 @@
       }
 
       if (!isAuthenticated) {
-        return <AuthView onAuth={handleAuth} isDbEmpty={employees.length === 0} />;
+        // 💡 [버그 수정] 데이터 로딩 중에 '최초 접속'이라고 잘못 안내하는 현상 방지
+        return <AuthView onAuth={handleAuth} isDbEmpty={employees.length === 0 && !isFetchingData} />;
       }
 
       return (
