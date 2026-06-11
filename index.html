@@ -65,11 +65,10 @@
       const num = Number(val);
       if (!num || isNaN(num) || num === 0) return '0원';
       if (num >= 10000) {
-        // 무조건 소수점 첫째 자리(천만 원 단위)까지만 남기고 자르기
-        const eok = Math.floor(num / 1000) / 10;
-        return `${eok.toFixed(1)}억`;
+        const eok = num / 10000;
+        return `${parseFloat(eok.toFixed(4))}억`;
       }
-      return `${num.toLocaleString('ko-KR')}만`;
+      return `${num.toLocaleString()}만`;
     };
 
     const formatShortCurrency = (val) => {
@@ -255,8 +254,8 @@
 
       const [currentView, setCurrentView] = useState('list'); 
       const [selectedProperty, setSelectedProperty] = useState(null);
-      // 로그인 시 '개인 캘린더'가 기본 탭이 되도록 설정
-      const [activeTab, setActiveTab] = useState('calendar'); 
+      // 로그인 시 '내 물건 관리'가 기본 탭이 되도록 설정
+      const [activeTab, setActiveTab] = useState('properties'); 
       
       const [currentEmployeeView, setCurrentEmployeeView] = useState('list');
       const [currentCustomerView, setCurrentCustomerView] = useState('list');
@@ -449,8 +448,8 @@
             </div>
             
             <nav className="flex-1 p-4 space-y-2 overflow-y-auto mt-4 md:mt-0">
-              <SidebarItem icon={<CalendarIcon />} label="개인 캘린더" active={activeTab === 'calendar'} onClick={() => changeTab('calendar')} />
               <SidebarItem icon={<List />} label="내 물건 관리" active={activeTab === 'properties'} onClick={() => { changeTab('properties'); setCurrentView('list'); }} />
+              <SidebarItem icon={<CalendarIcon />} label="개인 캘린더" active={activeTab === 'calendar'} onClick={() => changeTab('calendar')} />
               <SidebarItem icon={<Users />} label="고객 관리(매수자)" active={activeTab === 'customers'} onClick={() => { changeTab('customers'); setCurrentCustomerView('list'); }} />
               <SidebarItem icon={<UserCircle />} label="사원 목록" active={activeTab === 'employees'} onClick={() => { changeTab('employees'); setCurrentEmployeeView('list'); }} />
               <div className="pt-4 mt-4 border-t border-slate-800">
