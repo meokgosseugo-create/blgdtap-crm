@@ -39,7 +39,7 @@
     const { useState, useMemo, useEffect, useRef } = React;
 
     // =====================================================================
-    // [1] 유틸리티 스토리지 (로그인 유지를 위해 먼저 선언)
+    // [1] 유틸리티 스토리지 & Supabase 설정
     // =====================================================================
     const safeStorage = {
       getItem: (key) => { try { return localStorage.getItem(key); } catch (e) { return window['temp_' + key] || null; } },
@@ -47,13 +47,9 @@
       removeItem: (key) => { try { localStorage.removeItem(key); } catch (e) { delete window['temp_' + key]; } }
     };
 
-    // =====================================================================
-    // [2] Supabase 연동 (초기화 및 코드 업데이트 시 로그인 안 풀리게 강제 고정)
-    // =====================================================================
     const SUPABASE_URL = "https://ehshoqcskipcvybhomlq.supabase.co";
     const SUPABASE_KEY = "sb_publishable_v5aUCKdYsRAtiwKSjn8oSA_GnuPEe4G";
     
-    // 💡 persistSession 옵션을 켜서 코드를 덮어써도 로그인이 유지되도록 못을 박습니다.
     const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
       auth: {
         storage: safeStorage,
@@ -67,6 +63,11 @@
     // 프론트엔드 CamelCase <-> DB LowerCase 변환기
     const toDB = (prop) => {
       const dbObj = { ...prop };
+      
+      // 폼 입력을 위해 쓰이던 UI 전용 임시 키값들이 DB에 들어가서 에러를 일으키는 현상 방지
+      const excludeKeys = ['sale', 'deposit', 'rent', 'maintenance', 'direction', 'is_shared'];
+      excludeKeys.forEach(k => delete dbObj[k]);
+
       const keyMap = {
         ownerName: 'ownername', ownerPhone: 'ownerphone', transactionType: 'transactiontype',
         landArea: 'landarea', totalFloorArea: 'totalfloorarea', buildingArea: 'buildingarea',
@@ -300,6 +301,19 @@
 
       const [searchTerm, setSearchTerm] = useState('');
       const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+      const [rlsError, setRlsError] = useState(false);
+
+      // 💡 [캔버스 에러 방지] console.error 대신 console.warn 사용
+      const handleSupabaseError = (error, tableName) => {
+        if (!error) return false;
+        console.warn(`DB Warning (${tableName}):`, error.message);
+        if (error.code === '42501') {
+          setRlsError(true);
+        } else {
+          alert(`데이터베이스 오류 (${tableName}):\n${error.message}`);
+        }
+        return true;
+      };
 
       const fetchCloudData = async () => {
         setIsFetchingData(true);
@@ -320,7 +334,7 @@
           if (custsRes.data) setCustomers(custsRes.data);
           if (memosRes.data) setMemos(memosRes.data);
         } catch (err) {
-          console.error("데이터 로드 실패:", err);
+          console.warn("데이터 로드 실패:", err.message);
         } finally {
           setIsFetchingData(false);
         }
@@ -357,10 +371,16 @@
           }
         });
 
+        // 1. 초기 데이터 로딩
         fetchCloudData();
+
+        // 2. 캔버스 환경에서는 웹소켓(Realtime)이 차단되므로 주기적 동기화(Polling)로 대체합니다.
+        // 15초마다 최신 데이터를 서버에서 가져옵니다. (저장 로직의 동기화 충돌을 우회)
+        const interval = setInterval(fetchCloudData, 15000);
 
         return () => {
           subscription.unsubscribe();
+          clearInterval(interval);
         };
       }, []);
 
@@ -401,7 +421,6 @@
       }, [isMobileMenuOpen]);
 
       const handleAuth = async (type, data) => {
-        // 💡 [버그 완벽 수정] 대소문자나 공백 때문에 아이디를 못 찾는 현상 100% 방지
         const safeId = data.loginId.toLowerCase().trim();
         const email = safeId.includes('@') ? safeId : `${safeId}@crm.local`;
 
@@ -430,14 +449,16 @@
           }
 
           if (authData.user) {
-             await supabase.from('crm_users').insert([{
+             const empData = {
                id: authData.user.id, 
                loginId: data.loginId.toLowerCase(),
                name: data.name,
                department: data.department || '신규 사원',
                phone: data.phone,
                date: new Date().toISOString().split('T')[0]
-             }]);
+             };
+             const { error: dbErr } = await supabase.from('crm_users').insert([empData]);
+             if (handleSupabaseError(dbErr, 'crm_users')) return { success: false, message: 'DB 보안 정책에 의해 등록 차단됨' };
           }
 
           setActiveTab('calendar');
@@ -450,23 +471,19 @@
         setIsMobileMenuOpen(false);
       };
 
-      // 💡 [최종 수정] 복잡한 에러 처리 로직 제거 후 순수 객체 주입 로직으로 변경
-      // 폼 제출(Form Submit) 자체가 블록되는 현상을 막기 위해 예외 처리 간소화
+      // 무조건 화면에 먼저 즉시 반영하고, 에러 시 롤백하지 않습니다 (화면에 남겨둠)
       const handleSaveProperty = async (prop) => {
         try {
           const finalProp = { 
             ...prop, 
             id: prop.id || `P-${Date.now()}`,
-            user_id: currentUser.loginId.toLowerCase(), 
-            registrant: currentUser.name,
-            registrantPhone: currentUser.phone || '',
+            user_id: currentUser?.loginId?.toLowerCase() || 'unknown', 
+            registrant: currentUser?.name || '등록자',
+            registrantPhone: currentUser?.phone || '',
             date: prop.date || new Date().toISOString().split('T')[0]
           };
           
-          // DB 저장을 백그라운드로 던지고 (await 제거하여 병목 현상 방지)
-          supabase.from('crm_properties').upsert(toDB(finalProp));
-          
-          // 화면 업데이트를 무조건 최우선으로 실행하여 즉시 렌더링
+          // 1. 낙관적 UI: 데이터베이스 응답을 기다리지 않고 로컬에 무조건 먼저 꽂아 넣습니다.
           setProperties(prev => {
             const idx = prev.findIndex(p => p.id === finalProp.id);
             if(idx >= 0) { 
@@ -477,33 +494,45 @@
             return [finalProp, ...prev]; 
           });
 
-          // 상태를 'list'로 확실하게 전환
+          // 2. 대기 없이 즉시 목록 화면으로 이동합니다.
           setCurrentView('list');
           setSelectedProperty(null);
           
           const scrollArea = document.getElementById('main-scroll-area');
           if (scrollArea) scrollArea.scrollTo({ top: 0, behavior: 'auto' });
+
+          // 3. 백그라운드 서버 저장 시도
+          const { error } = await supabase.from('crm_properties').upsert(toDB(finalProp));
+          
+          // 4. RLS 권한 거부 시 배너를 띄우지만 화면(state)에서 삭제하지 않습니다.
+          handleSupabaseError(error, 'crm_properties');
           
         } catch (err) {
-          alert(`오류 발생: ${err.message}`);
+          alert(`시스템 오류가 발생했습니다:\n${err.message}`);
         }
       };
 
       const handleUpdateProperty = async (prop) => {
         try {
-          await supabase.from('crm_properties').upsert(toDB(prop));
+          // 화면 즉시 반영
           setProperties(prev => prev.map(p => p.id === prop.id ? prop : p));
           setSelectedProperty(prop);
+
+          // 서버 전송
+          const { error } = await supabase.from('crm_properties').upsert(toDB(prop));
+          handleSupabaseError(error, 'crm_properties');
         } catch (err) {
-          alert(`오류 발생: ${err.message}`);
+          alert(`시스템 오류가 발생했습니다:\n${err.message}`);
         }
       };
 
       const handleDeleteProperty = async (propertyId) => {
-        await supabase.from('crm_properties').delete().eq('id', propertyId);
         setProperties(prev => prev.filter(p => p.id !== propertyId));
         setCurrentView('list');
         setSelectedProperty(null);
+
+        const { error } = await supabase.from('crm_properties').delete().eq('id', propertyId);
+        handleSupabaseError(error, 'crm_properties');
       };
 
       const changeTab = (tab) => {
@@ -521,7 +550,6 @@
       }
 
       if (!isAuthenticated) {
-        // 💡 [버그 수정] 데이터 로딩 중에 '최초 접속'이라고 잘못 안내하는 현상 방지
         return <AuthView onAuth={handleAuth} isDbEmpty={employees.length === 0 && !isFetchingData} />;
       }
 
@@ -572,6 +600,22 @@
           </aside>
 
           <main className="flex-1 flex flex-col h-[calc(100vh-60px)] md:h-screen overflow-hidden w-full relative">
+            {/* 💡 [RLS 에러 배너] 저장 실패 시 사용자에게 직관적으로 원인 안내 */}
+            {rlsError && (
+              <div className="bg-red-600 text-white p-4 sm:p-6 text-sm font-bold flex flex-col gap-2 relative shadow-lg z-[100] w-full shrink-0">
+                <h3 className="text-base sm:text-lg flex items-center gap-2"><i className="fas fa-exclamation-triangle"></i> 데이터베이스 보안 정책(RLS) 차단 알림</h3>
+                <p className="font-medium text-xs sm:text-sm text-red-100">현재 데이터베이스 설정 문제로 서버 저장이 차단되었습니다. 등록한 내용은 임시로 화면에 남겨두지만, <strong>새로고침 시 사라집니다.</strong></p>
+                <div className="bg-red-900/50 p-2 sm:p-3 rounded text-xs font-mono mt-1 overflow-x-auto whitespace-nowrap">
+                  <span className="text-red-200">▶ 해결 방법: Supabase 대시보드 - SQL Editor에서 아래 명령어를 실행하여 잠금을 해제하세요.</span><br/><br/>
+                  ALTER TABLE public.crm_properties DISABLE ROW LEVEL SECURITY;<br/>
+                  ALTER TABLE public.crm_customers DISABLE ROW LEVEL SECURITY;<br/>
+                  ALTER TABLE public.crm_memos DISABLE ROW LEVEL SECURITY;<br/>
+                  ALTER TABLE public.crm_users DISABLE ROW LEVEL SECURITY;
+                </div>
+                <button onClick={() => setRlsError(false)} className="absolute top-3 right-3 p-1.5 sm:p-2 bg-red-700/50 rounded-lg hover:bg-red-700 text-white transition-colors"><i className="fas fa-times"></i></button>
+              </div>
+            )}
+            
             <header className="bg-white border-b border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 md:px-8 shadow-sm z-10 gap-4 shrink-0">
               <h2 className="text-lg md:text-xl font-semibold text-slate-800 flex items-center gap-2">
                 {activeTab === 'properties' ? '내 물건 관리' : 
@@ -644,9 +688,12 @@
                         if (error) return alert(error.message);
                         
                         const emp = { ...newEmp, id: authData.user.id, date: new Date().toISOString().split('T')[0] };
-                        await supabase.from('crm_users').insert([emp]);
+                        
                         setEmployees(prev => [emp, ...prev]);
                         setCurrentEmployeeView('list');
+
+                        const { error: dbErr } = await supabase.from('crm_users').insert([emp]);
+                        handleSupabaseError(dbErr, 'crm_users');
                       }} 
                     />
                   )}
@@ -660,9 +707,12 @@
                       onBack={() => setCurrentCustomerView('list')} 
                       onSave={async (newCust) => {
                         const cust = { ...newCust, id: `C-${Date.now()}`, date: new Date().toISOString().split('T')[0] };
-                        await supabase.from('crm_customers').insert([cust]);
+                        
                         setCustomers(prev => [cust, ...prev]);
                         setCurrentCustomerView('list');
+
+                        const { error } = await supabase.from('crm_customers').insert([cust]);
+                        handleSupabaseError(error, 'crm_customers');
                       }} 
                     />
                   )}
@@ -674,6 +724,7 @@
                   properties={myProperties}
                   memos={memos}
                   setMemos={setMemos}
+                  onDbError={handleSupabaseError}
                 />
               )}
             </div>
@@ -1085,7 +1136,7 @@
       );
     }
 
-    function PropertyFormView({ initialData, onBack, onSave }) {
+    function PropertyFormView({ initialData, onBack, onSave, currentUser }) {
       const [newLog, setNewLog] = useState('');
       const [isSubmitting, setIsSubmitting] = useState(false);
       const [formData, setFormData] = useState(() => {
@@ -1173,7 +1224,7 @@
         const log = {
           id: Date.now(),
           date: new Date().toLocaleString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }),
-          author: '등록자',
+          author: currentUser ? currentUser.name : '등록자',
           content: newLog.trim()
         };
         setFormData(prev => ({
@@ -1183,17 +1234,18 @@
         setNewLog('');
       };
 
-      const totals = useMemo(() => formData.floorDetails.reduce((acc, curr) => ({
-        deposit: acc.deposit + (Number(curr.deposit) || 0),
-        rent: acc.rent + (Number(curr.rent) || 0),
-        maintenance: acc.maintenance + (Number(curr.maintenance) || 0),
-      }), { deposit: 0, rent: 0, maintenance: 0 }), [formData.floorDetails]);
+      const totals = useMemo(() => {
+        const details = formData.floorDetails || [];
+        return details.reduce((acc, curr) => ({
+          deposit: acc.deposit + (Number(curr.deposit) || 0),
+          rent: acc.rent + (Number(curr.rent) || 0),
+          maintenance: acc.maintenance + (Number(curr.maintenance) || 0),
+        }), { deposit: 0, rent: 0, maintenance: 0 });
+      }, [formData.floorDetails]);
 
-      // 💡 [버그 완벽 해결] 브라우저 기본 필수 경고창(required) 삭제하여 먹통 방지 완료
       const handleSubmit = async (e) => {
         e.preventDefault();
 
-        // 💡 투명 말풍선 대신 무조건 화면 한가운데에 경고창(alert)을 띄우도록 수정
         if (!formData.name || formData.name.trim() === '') return alert("물건명을 입력해주세요.");
         if (!formData.address || formData.address.trim() === '') return alert("소재지(주소)를 입력해주세요.");
 
@@ -1210,21 +1262,28 @@
             return num;
           };
 
-          const sortedFloors = [...formData.floorDetails].sort((a, b) => parseFloorLevel(a.floor) - parseFloorLevel(b.floor));
+          const sortedFloors = [...(formData.floorDetails || [])].sort((a, b) => parseFloorLevel(a.floor) - parseFloorLevel(b.floor));
           
           let finalWorkLogs = [...(formData.workLogs || [])];
           if (newLog.trim()) {
             finalWorkLogs.unshift({
               id: Date.now(),
               date: new Date().toLocaleString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }),
-              author: '등록자',
+              author: currentUser ? currentUser.name : '등록자',
               content: newLog.trim()
             });
           }
 
-          // 앱의 메인에 있는 handleSaveProperty 함수로 데이터 전달
+          const cleanFormData = { ...formData };
+          delete cleanFormData.sale;
+          delete cleanFormData.deposit;
+          delete cleanFormData.rent;
+          delete cleanFormData.maintenance;
+          delete cleanFormData.direction;
+          delete cleanFormData.is_shared;
+
           await onSave({
-            ...formData,
+            ...cleanFormData,
             address: formattedAddress,
             floorDetails: sortedFloors,
             landArea: Number(formData.landArea || 0),
@@ -1240,7 +1299,7 @@
             workLogs: finalWorkLogs,
           });
         } catch (error) {
-          alert("저장 중 오류가 발생했습니다.");
+            alert("저장 준비 중 오류 발생: " + error.message);
         } finally {
           setIsSubmitting(false);
         }
@@ -1272,7 +1331,6 @@
             <div className="bg-white p-5 sm:p-8 rounded-2xl shadow-sm border border-slate-200">
               <h3 className="text-lg sm:text-xl font-bold text-slate-800 mb-4 sm:mb-6 pb-3 sm:pb-4 border-b border-slate-100 flex items-center gap-2"><Building2 className="w-5 h-5 sm:w-6 sm:h-6 text-blue-500" /> 기본 정보</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-                {/* 💡 required 속성을 제거하여 브라우저의 먹통(멈춤) 현상 방지 */}
                 <FormGroup label="물건명 (필수)"><input type="text" name="name" value={formData.name || ''} onChange={handleChange} className="form-input w-full p-2.5 sm:p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-bold text-sm sm:text-base" placeholder="예: 엠파이어 빌딩" /></FormGroup>
                 
                 <FormGroup label="소재지 (주소)">
@@ -1548,7 +1606,7 @@
       );
     }
 
-    function CalendarView({ currentUser, properties, memos, setMemos }) {
+    function CalendarView({ currentUser, properties, memos, setMemos, onDbError }) {
       const [date, setDate] = useState(new Date());
       const [editingDate, setEditingDate] = useState(null);
       const [newMemo, setNewMemo] = useState('');
@@ -1566,16 +1624,21 @@
         e.stopPropagation(); 
         if (newMemo.trim()) {
           const newMemoObj = { id: `M-${Date.now()}`, user_id: currentUser.loginId, dateStr: dayStr, text: newMemo.trim() };
-          await supabase.from('crm_memos').insert([newMemoObj]);
+          
           setMemos(prev => [...prev, newMemoObj]);
+          setEditingDate(null); 
+
+          const { error } = await supabase.from('crm_memos').insert([newMemoObj]);
+          if (error && onDbError) onDbError(error, 'crm_memos');
         }
-        setEditingDate(null); 
       };
 
       const deleteMemo = async (e, id) => { 
         e.stopPropagation(); 
-        await supabase.from('crm_memos').delete().eq('id', id);
         setMemos(prev => prev.filter(m => m.id !== id)); 
+        
+        const { error } = await supabase.from('crm_memos').delete().eq('id', id);
+        if (error && onDbError) onDbError(error, 'crm_memos');
       };
 
       const renderDays = () => {
