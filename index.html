@@ -184,9 +184,11 @@
       const labelOf = (s) => { const n = norm(s); const f = LABELS.find(([, re]) => re.test(n)); return f ? f[0] : null; };
       const joinSpaced = (t) => /^(?:[가-힣]\s)+[가-힣]$/.test(t || '') ? t.replace(/\s+/g, '') : (t || '').trim();   // "사 무 소"→"사무소", "롯데 리아"는 그대로
 
-      const raw = {}; const notes = []; const floorsOut = []; let coverName = '', markName = '';
+      const raw = {}; const notes = []; const floorsOut = []; let coverName = '', markName = ''; let addrLabel = null;
+      const allLines = [];
+      const ADDR_RE = /[가-힣]+(?:구|군|시)\s+[가-힣0-9]+(?:동|읍|면|리|가)\s*\d+(?:-\d+)?(?:번지)?|[가-힣]+(?:구|군|시)\s+[가-힣0-9]+(?:로|길)\s*\d+(?:-\d+)?/;
       pages.forEach((pg, pi) => {
-        const lines = pdfGroupLines(pg.items);
+        const lines = pdfGroupLines(pg.items); allLines.push(lines);
 
         if (pi === 0 && lines.length) {
           // (a) 표지: 글자가 거의 없는 첫 장에서 주소 줄 앞의 글자 = 물건명
@@ -206,13 +208,16 @@
           let cur = null;
           line.cells.forEach(c => {
             const key = labelOf(c.s);
-            if (key) { cur = key; if (!(key in raw)) { raw[key] = []; pending.push({ key, y: line.y, x2: c.x2 }); } else cur = '__dup__'; return; }
+            if (key) { cur = key; if (!(key in raw)) { raw[key] = []; pending.push({ key, y: line.y, x2: c.x2 }); if (key === 'address') addrLabel = { pi, y: line.y }; } else cur = '__dup__'; return; }
             if (c.s.startsWith('▶')) return;                         // 참고 문장은 값이 아님
             if (cur && cur !== '__dup__') raw[cur].push(c.s);
           });
           line.cells.forEach(c => { if (c.s.startsWith('▶')) notes.push(c.s.replace(/^▶\s*/, '').trim()); });
         });
-        if (lines.some(l => l.cells.some(c => labelOf(c.s)))) lines.forEach(l => l.cells.forEach(c => { if (/^\d+\.\s+\S/.test(c.s) && c.s.length > 6) notes.push(c.s.replace(/^\d+\.\s*/, '').trim()); }));
+        if (lines.some(l => l.cells.some(c => labelOf(c.s)))) lines.forEach(l => l.cells.forEach(c => {
+          if (/^\d{1,2}\.\s+[가-힣]/.test(c.s) && c.s.length > 6) notes.push(c.s.replace(/^\d+\.\s*/, '').trim());
+          else if (c.s.startsWith('■') && c.s.replace(/\s/g, '').length > 14) notes.push(c.s.replace(/^■\s*/, '').trim());
+        }));
         pending.forEach(pd => {
           if (!['address', 'zoning'].includes(pd.key) || raw[pd.key].length) return;
           const cand = lines.filter(l => !l.cells.some(c => labelOf(c.s)) && Math.abs(l.y - pd.y) <= 20 && l.cells.some(c => c.x >= pd.x2 - 2 && !c.s.startsWith('▶')))
@@ -252,7 +257,13 @@
       const put = (key, val, label) => { if (val !== null && val !== undefined && val !== '' && !Number.isNaN(val)) { fields[key] = val; filled.push(label); } };
       const m2 = (k) => { const m = join(k).replace(/,/g, '').match(/(\d+(?:\.\d+)?)\s*㎡/); return m ? Number(m[1]) : null; };
 
-      put('address', join('address'), '소재지');
+      let addrText = join('address');
+      if (!ADDR_RE.test(addrText) && addrLabel) {
+        const cand = allLines[addrLabel.pi].flatMap(l => l.cells.map(c => ({ s: c.s, y: l.y }))).filter(c => ADDR_RE.test(c.s) && !c.s.startsWith('▶') && c.s.length <= 60)
+          .sort((a, b) => Math.abs(a.y - addrLabel.y) - Math.abs(b.y - addrLabel.y))[0];
+        if (cand) addrText = cand.s;
+      }
+      put('address', addrText, '소재지');
       put('landArea', m2('landArea') !== null ? m2('landArea') : m2('landArea2'), '대지면적');
       put('zoning', join('zoning'), '용도지역');
       const cm = join('completion'); let comp = null;
@@ -267,9 +278,9 @@
       const rt = join('ratios').match(/([\d.]+)\s*%\s*([\d.]+)\s*%/);
       if (rt) { cov = Number(rt[1]); far = Number(rt[2]); }
       else { const a = join('coverage').match(/[\d.]+/), b = join('far').match(/[\d.]+/); cov = a ? Number(a[0]) : null; far = b ? Number(b[0]) : null; }
-      put('buildingCoverage', cov, '건폐율'); put('floorAreaRatio', far, '용적률');
-      const pk = join('parking').match(/(\d+)\s*대/); put('parking', pk ? Number(pk[1]) : null, '주차대수');
-      const el = join('elevator').match(/(\d+)\s*대/); put('elevators', el ? Number(el[1]) : null, '엘리베이터');
+      put('buildingCoverage', cov > 0 ? cov : null, '건폐율'); put('floorAreaRatio', far > 0 ? far : null, '용적률');
+      const pk = join('parking').match(/(\d+)\s*대/); put('parking', pk && Number(pk[1]) > 0 ? Number(pk[1]) : null, '주차대수');
+      const el = join('elevator').match(/(\d+)\s*대/); put('elevators', el && Number(el[1]) > 0 ? Number(el[1]) : null, '엘리베이터');
       const sale = parseMan(join('sale'));
       if (sale > 0) { put('sale', sale, '매매가'); fields.transactionType = '매매'; }
       else {
@@ -291,6 +302,10 @@
         return { id: Date.now() + i, floor: label, companyName: [tenant, note].filter(Boolean).join(' · '), deposit: num(row.deposit), rent: num(row.rent), maintenance: num(row.maint) };
       });
       if (floors.length) filled.push(`층별 현황 ${floors.length}건`);
+      if (floors.length && floors.every(f => f.deposit === '' && f.rent === '')) {
+        const parts = [['보증금', 'deposit'], ['임대료', 'rent'], ['관리비', 'maint']].filter(([, k]) => parseMan(join(k)) > 0).map(([n, k]) => `${n} ${join(k)}`);
+        if (parts.length) notes.unshift('임대 합계(PDF 표기, 층별 금액은 없음): ' + parts.join(' / '));
+      }
 
       const SKIP = { station: '주변역', road: '도로조건', publicPrice: '공시지가', mainUse: '주용도/구조', heating: '냉난방', perPy: '평단가', buildingPerPy: '건물가/평', landPerPy: '토지가/평', monthIncome: '월수익', maintExpense: '관리비지출', yield: '수익률', bond: '채권최고액' };
       const meaningful = (k) => join(k).replace(/만원|원|%|㎡|평/g, '').trim() !== '';
