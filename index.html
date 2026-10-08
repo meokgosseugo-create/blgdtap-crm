@@ -34,6 +34,9 @@
   <!-- Supabase -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
+  <!-- PDF 글자 읽기 (매물 소개서 PDF → 물건카드 자동 입력) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+
   <!-- 고화질 PDF 변환 엔진 -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
@@ -124,6 +127,135 @@
     };
 
     const getExactPyeong = (sqm) => ((Number(sqm) || 0) * 0.3025).toFixed(2);
+
+    // ───────── PDF 매물 소개서 읽기 ─────────
+    // ── PDF 매물 소개서 → 물건카드 항목 (브라우저/Node 공용, 순수 함수) ──
+    // pages: [{ width, items: [{ s, x, y, w }] }]  (y는 위에서 아래로 커지는 값)
+    function pdfGroupLines(items) {
+      const sorted = [...items].sort((a, b) => a.y - b.y || a.x - b.x);
+      const lines = [];
+      for (const it of sorted) {
+        const last = lines[lines.length - 1];
+        if (last && Math.abs(it.y - last.y) <= 4) { last.items.push(it); last.y = (last.y * (last.items.length - 1) + it.y) / last.items.length; }
+        else lines.push({ y: it.y, items: [it] });
+      }
+      return lines.map(l => {
+        const cells = [];
+        for (const it of l.items.sort((a, b) => a.x - b.x)) {
+          const c = cells[cells.length - 1];
+          if (c && it.x - c.x2 < 14) { c.s += (it.x - c.x2 > 1.5 ? ' ' : '') + it.s; c.x2 = Math.max(c.x2, it.x + it.w); }
+          else cells.push({ s: it.s, x: it.x, x2: it.x + it.w });
+        }
+        const clean = cells.map(c => ({ ...c, s: c.s.replace(/\s+/g, ' ').trim() })).filter(c => c.s);
+        const merged = [];
+        for (const c of clean) {
+          const p = merged[merged.length - 1];
+          const short = (t) => t.replace(/\s/g, '').length <= 2 && /^[가-힣]/.test(t);
+          if (p && short(p.s) && short(c.s) && c.x - p.x2 < 40) { p.s += c.s; p.x2 = c.x2; } else merged.push({ ...c });
+        }
+        return { y: l.y, cells: merged };
+      });
+    }
+
+    function parsePropertyPdf(pages) {
+      const norm = (t) => t.replace(/[\s·ㆍ:：]/g, '');
+      const toNum = (t) => { const m = String(t).replace(/,/g, '').match(/-?\d+(?:\.\d+)?/); return m ? Number(m[0]) : null; };
+      const LABELS = [
+        ['address', /^소재지$/], ['landArea', /^대지면적$/], ['zoning', /^지역$/], ['road', /^도로조건$/], ['publicPrice', /^공시지가$/],
+        ['completion', /^준공/], ['totalFloorArea', /^연면적$/], ['buildingArea', /^건축면적$/], ['floors', /^층수$/], ['ratios', /^건폐율/],
+        ['mainUse', /^주용도/], ['parking', /^주차장$/], ['elevator', /^승강기$/], ['heating', /^냉난방$/],
+        ['deposit', /^보증금$/], ['rent', /^임대료$/], ['maint', /^관리비$/], ['yield', /^년수익률$/], ['bond', /^채권최고액$/],
+        ['buildingPerPy', /^건물가/], ['landPerPy', /^토지가/], ['sale', /^매매가$/]
+      ];
+      const labelOf = (s) => { const n = norm(s); const f = LABELS.find(([, re]) => re.test(n)); return f ? f[0] : null; };
+
+      const raw = {}; const notes = []; const floorsOut = []; let coverName = '';
+      pages.forEach((pg, pi) => {
+        const lines = pdfGroupLines(pg.items);
+
+        // 표지(첫 장): 주소 줄 앞의 글자를 물건명으로
+        if (pi === 0 && lines.length) {
+          const texts = lines.map(l => l.cells.map(c => c.s).join(' ').trim()).filter(Boolean);
+          const idx = texts.findIndex(t => /번지|\d+-\d+/.test(t));
+          if (idx > 0) coverName = texts.slice(0, idx).join(' ').trim();
+        }
+
+        // 이름 칸 → 값 칸
+        lines.forEach(line => {
+          let cur = null; let curLeft = true;
+          line.cells.forEach(c => {
+            const key = labelOf(c.s);
+            if (key) { cur = key; curLeft = c.x < pg.width * 0.5; if (!(key in raw)) raw[key] = []; else cur = '__dup__'; return; }
+            if (c.s.startsWith('▶')) return;                         // 참고 문장은 값이 아님
+            if (curLeft && c.x > pg.width * 0.55) return;            // 왼쪽 표의 이름 칸이 오른쪽 표의 글자를 가져가지 않게
+            if (cur && cur !== '__dup__') raw[cur].push(c.s);
+          });
+          line.cells.forEach(c => { if (c.s.startsWith('▶')) notes.push(c.s.replace(/^▶\s*/, '').trim()); });
+        });
+
+        // 층별 현황 표
+        const hi = lines.findIndex(l => l.cells.some(c => norm(c.s) === '임차인현황') && l.cells.some(c => norm(c.s) === '비고'));
+        if (hi >= 0) {
+          const hy = lines[hi].y;
+          const head = [];
+          lines.forEach(l => { if (Math.abs(l.y - hy) <= 16) l.cells.forEach(c => { const n = norm(c.s); if (['층', '임차인현황', '면적', '보증금', '임대료', '관리비', '비고'].includes(n)) head.push({ n, cx: (c.x + c.x2) / 2 }); }); });
+          head.sort((a, b) => a.cx - b.cx);
+          let areaSeen = 0;
+          const cols = head.map(h => ({ cx: h.cx, name: h.n === '층' ? 'floor' : h.n === '임차인현황' ? 'tenant' : h.n === '면적' ? (areaSeen++ === 0 ? 'areaM2' : 'areaPy') : h.n === '보증금' ? 'deposit' : h.n === '임대료' ? 'rent' : h.n === '관리비' ? 'maint' : 'note' }));
+          const colOf = (cx) => { let best = cols[0], d = 1e9; cols.forEach(c => { const dd = Math.abs(c.cx - cx); if (dd < d) { d = dd; best = c; } }); return best ? best.name : 'note'; };
+          lines.forEach(l => {
+            if (l.y <= hy + 16) return;
+            const f = l.cells[0] && l.cells[0].s.replace(/\s+/g, '');
+            if (!f || !/^(B\d+|\d+F|지하\d+층?|\d+층|옥탑|PH)$/i.test(f)) return;
+            const row = {};
+            l.cells.slice(1).forEach(c => { const k = colOf((c.x + c.x2) / 2); row[k] = (row[k] ? row[k] + ' ' : '') + c.s; });
+            floorsOut.push({ f, row });
+          });
+        }
+      });
+
+      const join = (k) => (raw[k] || []).join(' ').trim();
+      const fields = {}; const filled = []; const skipped = [];
+      const put = (key, val, label) => { if (val !== null && val !== undefined && val !== '' && !Number.isNaN(val)) { fields[key] = val; filled.push(label); } };
+      const m2 = (k) => { const m = join(k).replace(/,/g, '').match(/(\d+(?:\.\d+)?)\s*㎡/); return m ? Number(m[1]) : null; };
+
+      put('address', join('address'), '소재지');
+      put('landArea', m2('landArea'), '대지면적');
+      put('zoning', join('zoning'), '용도지역');
+      const comp = join('completion').match(/\d{4}[-.]\d{1,2}[-.]\d{1,2}|\d{4}/); put('completionYear', comp ? comp[0] : '', '준공(사용승인)');
+      put('totalFloorArea', m2('totalFloorArea'), '연면적');
+      put('buildingArea', m2('buildingArea'), '건축면적');
+      const fl = join('floors').match(/지하\s*(\d+)\s*지상\s*(\d+)/);
+      if (fl) { put('floorUnderground', Number(fl[1]), '지하 층수'); put('floorGround', Number(fl[2]), '지상 층수'); }
+      const rt = join('ratios').match(/([\d.]+)\s*%\s*([\d.]+)\s*%/);
+      if (rt) { put('buildingCoverage', Number(rt[1]), '건폐율'); put('floorAreaRatio', Number(rt[2]), '용적률'); }
+      const pk = join('parking').match(/(\d+)\s*대/); put('parking', pk ? Number(pk[1]) : null, '주차대수');
+      const el = join('elevator').match(/(\d+)\s*대/); put('elevators', el ? Number(el[1]) : null, '엘리베이터');
+      const saleM = join('sale').match(/[\d,]+(?:\.\d+)?/); const sale = saleM ? toNum(saleM[0]) : null;
+      if (sale > 0) { put('sale', sale, '매매가'); fields.transactionType = '매매'; }
+
+      let name = coverName;
+      if (!name && fields.address) { const t = fields.address.split(/\s+/); name = t.slice(-2).join(' '); }
+      put('name', name, '물건명');
+
+      const floors = floorsOut.map(({ f, row }, i) => {
+        const u = f.toUpperCase();
+        const label = /^B\d+$/.test(u) ? `지하${u.slice(1)}층` : /^\d+F$/.test(u) ? `${u.slice(0, -1)}층` : f;
+        const tenant = (row.tenant || '').replace(/\s+/g, '');
+        const note = (row.note || '').replace(/\s+/g, (m) => m).replace(/(?<=[가-힣])\s+(?=[가-힣])/g, '').trim();
+        const num = (v) => { const n = v ? toNum(v) : null; return n === null ? '' : n; };
+        return { id: Date.now() + i, floor: label, companyName: [tenant, note].filter(Boolean).join(' · '), deposit: num(row.deposit), rent: num(row.rent), maintenance: num(row.maint) };
+      });
+      if (floors.length) filled.push(`층별 현황 ${floors.length}개 층`);
+
+      const has = (k) => k in raw;
+      if (has('road')) skipped.push('도로조건'); if (has('publicPrice')) skipped.push('공시지가');
+      if (has('mainUse')) skipped.push('주용도/구조'); if (has('heating')) skipped.push('냉난방');
+      if (floorsOut.some(x => x.row.areaM2)) skipped.push('층별 면적');
+      const nonNum = ['deposit', 'rent', 'maint'].filter(k => has(k) && join(k) && toNum(join(k)) === null);
+      if (nonNum.length) skipped.push('보증금/임대료/관리비(숫자가 아닌 값)');
+      return { fields, floors, notes, filled, skipped };
+    }
 
     const STATUS_OPTIONS = ['보류', '매매', '완료'];
     const STATUS_FORM_COLORS = { '보류': 'bg-yellow-400 text-white shadow', '매매': 'bg-emerald-500 text-white shadow', '완료': 'bg-blue-500 text-white shadow' };
@@ -1014,6 +1146,37 @@
     function PropertyFormView({ initialData, onBack, onSave, currentUser }) {
       const [newLog, setNewLog] = useState('');
       const [isSubmitting, setIsSubmitting] = useState(false);
+      const [pdfBusy, setPdfBusy] = useState(false);
+      const [pdfInfo, setPdfInfo] = useState(null);
+      const readPdf = async (file) => {
+        if (!file) return;
+        if (!/\.pdf$/i.test(file.name) && file.type !== 'application/pdf') { setPdfInfo({ error: 'PDF 파일만 올릴 수 있어요.' }); return; }
+        if (!window.pdfjsLib) { setPdfInfo({ error: 'PDF 읽기 도구를 불러오지 못했어요. 인터넷 연결을 확인하고 새로고침해 주세요.' }); return; }
+        setPdfBusy(true); setPdfInfo(null);
+        try {
+          window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+          const doc = await window.pdfjsLib.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
+          const pages = [];
+          for (let i = 1; i <= doc.numPages; i++) {
+            const page = await doc.getPage(i);
+            const vp = page.getViewport({ scale: 1 });
+            const tc = await page.getTextContent();
+            pages.push({ width: vp.width, items: tc.items.filter(t => t.str && t.str.trim()).map(t => ({ s: t.str, x: t.transform[4], y: vp.height - t.transform[5], w: t.width })) });
+          }
+          const r = parsePropertyPdf(pages);
+          if (r.filled.length === 0) {
+            setPdfInfo({ error: '이 PDF에서 물건 정보를 찾지 못했어요. 사진이나 스캔한 PDF이거나, 지원하지 않는 형식일 수 있어요.' });
+          } else {
+            setFormData(prev => ({ ...prev, ...r.fields, floorDetails: r.floors.length ? r.floors : prev.floorDetails }));
+            if (r.notes.length) setNewLog(prev => prev || ('[PDF 참고사항]\n' + r.notes.map(n => '- ' + n).join('\n')));
+            setPdfInfo({ ok: true, filled: r.filled, skipped: r.skipped, hasNotes: r.notes.length > 0, fileName: file.name });
+          }
+        } catch (e) {
+          setPdfInfo({ error: 'PDF를 읽는 중 문제가 생겼어요: ' + e.message });
+        } finally {
+          setPdfBusy(false);
+        }
+      };
       const [formData, setFormData] = useState(() => {
         if (initialData) {
           return { 
@@ -1221,6 +1384,30 @@
           </div>
 
           <form onSubmit={handleSubmit} onKeyDown={(e) => { if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') e.preventDefault(); }} className="space-y-4 sm:space-y-6">
+            {!initialData && (
+              <div onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); readPdf(e.dataTransfer.files[0]); }} className="rounded-2xl border-2 border-dashed border-gold-300 bg-gold-50/70 p-5 sm:p-6">
+                <div className="flex flex-col sm:flex-row items-center gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-gold-400 text-ink-900 flex items-center justify-center shrink-0"><FileText className="w-6 h-6" /></div>
+                  <div className="flex-1 text-center sm:text-left">
+                    <p className="font-bold text-slate-800">PDF로 자동 입력</p>
+                    <p className="text-sm text-slate-500 mt-0.5">매물 소개서 PDF를 끌어다 놓거나 선택하면 아래 입력칸이 채워져요. 파일은 이 컴퓨터에서만 읽고 밖으로 보내지 않아요.</p>
+                  </div>
+                  <label className="px-5 py-2.5 rounded-xl bg-ink-900 text-gold-200 text-sm font-bold cursor-pointer hover:bg-ink-700 transition-colors whitespace-nowrap">
+                    {pdfBusy ? '읽는 중...' : 'PDF 선택'}
+                    <input type="file" accept="application/pdf,.pdf" className="hidden" onChange={(e) => { readPdf(e.target.files[0]); e.target.value = ''; }} />
+                  </label>
+                </div>
+                {pdfInfo && pdfInfo.error && <div className="mt-4 p-3 bg-red-50 border border-red-100 text-red-600 text-sm font-semibold rounded-lg">{pdfInfo.error}</div>}
+                {pdfInfo && pdfInfo.ok && (
+                  <div className="mt-4 p-4 bg-white border border-gold-200 rounded-xl text-sm text-slate-700 space-y-1.5">
+                    <p className="font-bold text-slate-800">✓ {pdfInfo.fileName}에서 {pdfInfo.filled.length}개 항목을 채웠어요. 내용을 확인한 뒤 저장해 주세요.</p>
+                    <p><span className="font-semibold">채운 항목:</span> {pdfInfo.filled.join(', ')}</p>
+                    {pdfInfo.skipped.length > 0 && <p className="text-slate-500"><span className="font-semibold">넣지 않은 항목(물건카드에 칸이 없거나 숫자가 아님):</span> {pdfInfo.skipped.join(', ')}</p>}
+                    {pdfInfo.hasNotes && <p className="text-slate-500">PDF의 참고사항은 맨 아래 <b>작업 일지</b> 입력칸에 넣어 두었어요. 필요 없으면 지우고 저장하세요.</p>}
+                  </div>
+                )}
+              </div>
+            )}
             <div className="bg-white p-5 sm:p-8 rounded-2xl shadow-sm border border-slate-200">
               <h3 className="text-lg sm:text-xl font-bold text-slate-800 mb-4 sm:mb-6 pb-3 sm:pb-4 border-b border-slate-100 flex items-center gap-2"><Building2 className="w-5 h-5 sm:w-6 sm:h-6 text-blue-500" /> 기본 정보</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
