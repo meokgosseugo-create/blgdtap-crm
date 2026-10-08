@@ -571,7 +571,7 @@
       );
     }
 
-    function PropertyListView({ properties, onViewDetail, showRegistrant }) {
+    function PropertyListView({ properties, onViewDetail, showRegistrant, selectable, onBulkDelete }) {
       const [statusFilter, setStatusFilter] = useState('전체');
       const [addressFilter, setAddressFilter] = useState('');
       const [minPrice, setMinPrice] = useState('');
@@ -581,6 +581,8 @@
       const [minYield, setMinYield] = useState('');
       const [sortConfig, setSortConfig] = useState({ key: 'date', direction: 'desc' });
       const [typeFilters, setTypeFilters] = useState([]);
+      const [selectedIds, setSelectedIds] = useState([]);
+      const [showBulkConfirm, setShowBulkConfirm] = useState(false);
       const toggleTypeFilter = (t) => setTypeFilters(prev => prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t]);
 
       const handleSort = (key) => {
@@ -628,6 +630,12 @@
         return result;
       }, [properties, statusFilter, typeFilters, addressFilter, minPrice, maxPrice, minLandArea, maxLandArea, minYield, sortConfig]);
 
+      const visibleIds = filteredAndSortedProperties.map(p => p.id);
+      const checkedIds = selectedIds.filter(id => visibleIds.includes(id));
+      const allChecked = visibleIds.length > 0 && checkedIds.length === visibleIds.length;
+      const toggleOne = (id) => setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+      const toggleAll = () => setSelectedIds(allChecked ? [] : visibleIds);
+      const colCount = 14 + (showRegistrant ? 1 : 0) + (selectable ? 1 : 0);
       const counts = { '전체': properties.length };
       ['보류', '매매', '완료'].forEach(st => { counts[st] = properties.filter(p => (p.status || '보류') === st).length; });
       const TYPE_BADGE = { '매매': 'bg-sky-600 text-white', '전세': 'bg-emerald-600 text-white', '월세': 'bg-red-600 text-white', '연세': 'bg-purple-600 text-white' };
@@ -638,6 +646,18 @@
 
       return (
         <div className="bg-white rounded-xl border border-stone-300 overflow-hidden w-full flex flex-col shadow-sm">
+          {showBulkConfirm && (
+            <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4">
+              <div className="bg-white p-6 rounded-2xl shadow-2xl max-w-sm w-full border border-slate-200">
+                <div className="flex items-center gap-3 mb-3 text-red-600"><Trash2 className="w-6 h-6" /><h3 className="text-lg font-bold text-slate-800">선택한 물건 삭제</h3></div>
+                <p className="text-slate-600 mb-6 text-sm">선택한 <b>{checkedIds.length}건</b>을 삭제할까요?<br/>이 작업은 되돌릴 수 없습니다.</p>
+                <div className="flex gap-3 justify-end">
+                  <button type="button" onClick={() => setShowBulkConfirm(false)} className="flex-1 px-4 py-2.5 bg-slate-100 rounded-xl text-slate-700 font-bold hover:bg-slate-200 transition-colors">취소</button>
+                  <button type="button" onClick={() => { onBulkDelete(checkedIds); setSelectedIds([]); setShowBulkConfirm(false); }} className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition-colors shadow-md">삭제하기</button>
+                </div>
+              </div>
+            </div>
+          )}
           {/* 검색 조건 (한 화면에 매물이 많이 보이도록 촘촘하게) */}
           <div className="px-4 py-3 border-b border-stone-200 bg-stone-50 flex flex-col gap-2.5">
             <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
@@ -655,7 +675,12 @@
                   ))}
                 </div>
               </div>
-              <span className="ml-auto text-xs text-slate-500">검색 결과 <span className="font-bold text-ink-900">{filteredAndSortedProperties.length}</span>건</span>
+              <div className="ml-auto flex items-center gap-3">
+                {selectable && (
+                  <button type="button" disabled={checkedIds.length === 0} onClick={() => setShowBulkConfirm(true)} className={`h-8 px-3 rounded-md text-xs font-bold flex items-center gap-1.5 border transition-colors ${checkedIds.length > 0 ? 'bg-red-600 border-red-600 text-white hover:bg-red-700 shadow-sm' : 'bg-white border-stone-300 text-slate-300 cursor-not-allowed'}`}><Trash2 className="w-3 h-3" /> 선택 삭제{checkedIds.length > 0 ? ` (${checkedIds.length})` : ''}</button>
+                )}
+                <span className="text-xs text-slate-500">검색 결과 <span className="font-bold text-ink-900">{filteredAndSortedProperties.length}</span>건</span>
+              </div>
             </div>
             <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
               <label className="flex items-center gap-2 text-xs font-bold text-slate-600">소재지
@@ -684,6 +709,7 @@
             <table className="w-full text-left border-collapse whitespace-nowrap min-w-[1000px]">
               <thead>
                 <tr>
+                  {selectable && <th className={th + " text-center w-10"}><input type="checkbox" checked={allChecked} onChange={toggleAll} title="전체 선택" className="w-4 h-4 accent-ink-900 cursor-pointer" /></th>}
                   <th className={th + " text-center w-12"}>No</th>
                   <th className={th + " text-center"}>상태</th>
                   <th className={th}>종류</th>
@@ -704,6 +730,7 @@
               <tbody className="text-[13px]">
                 {filteredAndSortedProperties.length > 0 ? filteredAndSortedProperties.map((prop, idx) => (
                   <tr key={prop.id} onClick={() => onViewDetail(prop)} className="h-11 border-b border-stone-100 hover:bg-gold-100/70 cursor-pointer transition-colors">
+                    {selectable && <td className="px-2.5 text-center" onClick={(e) => e.stopPropagation()}><input type="checkbox" checked={checkedIds.includes(prop.id)} onChange={() => toggleOne(prop.id)} className="w-4 h-4 accent-ink-900 cursor-pointer" /></td>}
                     <td className="px-2.5 text-center text-slate-400 text-xs">{idx + 1}</td>
                     <td className="px-2.5 text-center"><span className={`px-2 py-0.5 rounded text-[11px] font-bold ${STATUS_BADGE_COLORS[prop.status || '보류']}`}>{prop.status || '보류'}</span></td>
                     <td className="px-2.5 text-slate-700">{prop.type}</td>
@@ -725,7 +752,7 @@
                     <td className="px-2.5 text-center font-bold text-emerald-600">{prop.transactionType === '매매' ? `${getYield(prop.price?.sale, prop.price?.deposit, prop.price?.rent)}%` : '-'}</td>
                     <td className="px-2.5 text-center text-slate-500 text-xs">{prop.date}</td>
                   </tr>
-                )) : <tr><td colSpan={showRegistrant ? 15 : 14} className="p-12 text-center text-slate-500 font-medium bg-stone-50">조건에 맞는 물건이 없습니다.</td></tr>}
+                )) : <tr><td colSpan={colCount} className="p-12 text-center text-slate-500 font-medium bg-stone-50">조건에 맞는 물건이 없습니다.</td></tr>}
               </tbody>
             </table>
           </div>
@@ -749,8 +776,8 @@
         <div>
           {rows.map(([label, value], i) => (
             <div key={label + i} className="flex border-b border-stone-200 last:border-b-0 min-h-[42px]">
-              <div className="w-32 shrink-0 bg-stone-50 px-3 py-2.5 text-[12px] font-semibold text-slate-500 flex items-center border-r border-stone-200">{label}</div>
-              <div className="flex-1 min-w-0 px-3 py-2.5 text-sm text-slate-800 font-medium flex items-center break-words">{value}</div>
+              <div className="w-24 shrink-0 bg-stone-50 px-2.5 py-2.5 text-[12px] font-semibold text-slate-500 flex items-center border-r border-stone-200">{label}</div>
+              <div className="flex-1 min-w-0 px-2.5 py-2.5 text-sm text-slate-800 font-medium flex items-center break-words">{value}</div>
             </div>
           ))}
         </div>
@@ -792,7 +819,7 @@
       const isSale = property.transactionType === '매매';
 
       return (
-        <div className="max-w-4xl mx-auto space-y-5 pb-10 relative">
+        <div className="max-w-[1400px] mx-auto space-y-5 pb-10 relative">
           {showDeleteConfirm && (
             <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4">
               <div className="bg-white p-6 rounded-2xl shadow-2xl max-w-sm w-full border border-slate-200">
@@ -859,6 +886,7 @@
 
           {/* 위에서 아래로 차례로: 물건정보 → 물건금액 → 소유자 → 등록정보 → 층별 현황 → 코멘트 */}
           <div className="flex flex-col gap-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 items-start">
               <InfoSection title="물건정보" icon={<Building2 className="w-4 h-4" />}>
                 <InfoGrid rows={[
                   ['종류', property.type || '-'],
@@ -904,11 +932,12 @@
               <InfoSection title="등록 정보" icon={<CalendarDays className="w-4 h-4" />}>
                 <InfoGrid rows={[
                   ['등록자', property.registrant || '-'],
-                  ['등록자 연락처', property.registrantPhone || '-'],
+                  ['연락처', property.registrantPhone || '-'],
                   ['등록일', property.date || '-'],
                   ['매물번호', property.id]
                 ]} />
               </InfoSection>
+          </div>
 
           <InfoSection title="층별 현황 내역" icon={<Maximize className="w-4 h-4" />}>
             <div className="p-0 overflow-x-auto w-full">
@@ -1149,6 +1178,7 @@
 
           const cleanFormData = { ...formData };
           delete cleanFormData.sale; delete cleanFormData.deposit; delete cleanFormData.rent; delete cleanFormData.maintenance; delete cleanFormData.direction; delete cleanFormData.is_shared;
+          if (formData.is_shared === true || (initialData && initialData.is_shared !== undefined)) cleanFormData.is_shared = !!formData.is_shared;
 
           await onSave({
             ...cleanFormData,
@@ -1184,6 +1214,7 @@
                   <button key={s} type="button" onClick={() => setFormData(prev => ({...prev, status: s}))} className={`flex-1 sm:flex-none items-center justify-center gap-1 sm:gap-2 px-3 sm:px-4 py-1.5 rounded-lg text-xs sm:text-sm font-bold transition-all duration-300 ${formData.status === s || (!formData.status && s==='보류') ? STATUS_FORM_COLORS[s] : 'text-slate-400 hover:text-slate-600'}`}>{s}</button>
                 ))}
               </div>
+              <button type="button" onClick={() => setFormData(prev => ({ ...prev, is_shared: !prev.is_shared }))} title="켜면 모든 직원의 '공동 물건'에 보여요. 소유자 정보는 가려집니다." className={`flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold border transition-all w-full sm:w-auto ${formData.is_shared ? 'bg-gold-400 border-gold-400 text-ink-900 shadow' : 'bg-white border-slate-300 text-slate-500 hover:text-slate-800'}`}><ShareIcon className="w-4 h-4" /> 공동 물건 {formData.is_shared ? 'ON' : 'OFF'}</button>
             </div>
             <div className="flex items-center gap-2 w-full md:w-auto">
               <button type="button" onClick={onBack} className="flex-1 md:flex-none text-slate-500 hover:text-slate-800 text-sm font-bold bg-slate-200 px-4 py-2.5 sm:py-2 rounded-lg text-center transition-colors">취소 및 돌아가기</button>
@@ -1755,6 +1786,34 @@
         };
       }, []);
 
+      // 브라우저 뒤로가기/앞으로가기 버튼으로 화면(목록·상세·수정·리포트)을 오갈 수 있게 한다.
+      const propsRef = useRef([]);
+      propsRef.current = properties;
+      const navInit = useRef(false);
+      useEffect(() => {
+        const st = { tab: activeTab, view: currentView, emp: currentEmployeeView, cust: currentCustomerView, sel: selectedProperty ? selectedProperty.id : null };
+        const cur = window.history.state;
+        if (!navInit.current) { navInit.current = true; try { window.history.replaceState(st, ''); } catch (e) {} return; }
+        if (!cur || cur.tab !== st.tab || cur.view !== st.view || cur.emp !== st.emp || cur.cust !== st.cust || cur.sel !== st.sel) {
+          try { window.history.pushState(st, ''); } catch (e) {}
+        }
+      }, [activeTab, currentView, currentEmployeeView, currentCustomerView, selectedProperty ? selectedProperty.id : null]);
+      useEffect(() => {
+        const onPop = (e) => {
+          const st = e.state;
+          if (!st) return;
+          const found = st.sel ? propsRef.current.find(p => p.id === st.sel) : null;
+          const needsProperty = (st.tab === 'properties' || st.tab === 'shared') && st.view !== 'list' && !(st.view === 'form' && !st.sel);
+          setActiveTab(st.tab);
+          setCurrentEmployeeView(st.emp || 'list');
+          setCurrentCustomerView(st.cust || 'list');
+          setSelectedProperty(found || null);
+          setCurrentView(needsProperty && !found ? 'list' : st.view);
+        };
+        window.addEventListener('popstate', onPop);
+        return () => window.removeEventListener('popstate', onPop);
+      }, []);
+
       const myProperties = useMemo(() => {
         if (!currentUser || !properties) return [];
         return properties.filter(p => p.user_id && p.user_id.toLowerCase() === currentUser.loginId.toLowerCase());
@@ -1844,7 +1903,7 @@
           const existing = properties.find(p => p.id === prop.id);
           const finalProp = { 
             ...prop, 
-            ...(existing && existing.is_shared !== undefined ? { is_shared: existing.is_shared } : {}),
+            ...(existing && existing.is_shared !== undefined && prop.is_shared === undefined ? { is_shared: existing.is_shared } : {}),
             id: prop.id || `P-${Date.now()}`,
             user_id: prop.user_id || currentUser?.loginId?.toLowerCase() || 'unknown', 
             registrant: prop.registrant || currentUser?.name || '등록자',
@@ -1864,7 +1923,15 @@
           const scrollArea = document.getElementById('main-scroll-area');
           if (scrollArea) scrollArea.scrollTo({ top: 0, behavior: 'auto' });
 
-          const { error } = await supabase.from('crm_properties').upsert(toDB(finalProp));
+          let { error } = await supabase.from('crm_properties').upsert(toDB(finalProp));
+          if (error && /is_shared/.test(error.message || '')) {
+            const { is_shared, ...rest } = finalProp;
+            ({ error } = await supabase.from('crm_properties').upsert(toDB(rest)));
+            if (!error) {
+              setProperties(prev => prev.map(p => p.id === finalProp.id ? { ...p, is_shared: false } : p));
+              alert('물건은 저장되었어요. 다만 공동 물건 설정은 Supabase에 공유용 SQL을 먼저 실행해야 쓸 수 있습니다.');
+            }
+          }
           handleSupabaseError(error, 'crm_properties');
           
         } catch (err) {
@@ -1920,6 +1987,12 @@
           if (error.code === '42501') handleSupabaseError(error, 'crm_comments');
           else alert(SHARE_SQL_HINT + '\n\n(원인: ' + error.message + ')');
         }
+      };
+
+      const handleBulkDelete = async (ids) => {
+        setProperties(prev => prev.filter(p => !ids.includes(p.id)));
+        const { error } = await supabase.from('crm_properties').delete().in('id', ids);
+        handleSupabaseError(error, 'crm_properties');
       };
 
       const changeTab = (tab) => {
@@ -2046,7 +2119,7 @@
             <div id="main-scroll-area" className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:px-10 md:py-8 relative bg-ivory print-wrapper">
               {activeTab === 'properties' && (
                 <>
-                  {currentView === 'list' && <PropertyListView properties={filteredMyProperties} onViewDetail={(p) => { setSelectedProperty(p); setCurrentView('detail'); }} />}
+                  {currentView === 'list' && <PropertyListView properties={filteredMyProperties} selectable onBulkDelete={handleBulkDelete} onViewDetail={(p) => { setSelectedProperty(p); setCurrentView('detail'); }} />}
                   {currentView === 'detail' && (
                     <PropertyDetailView 
                       property={selectedProperty} 
