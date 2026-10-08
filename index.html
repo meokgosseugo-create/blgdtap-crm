@@ -746,7 +746,7 @@
         <div>
           {rows.map(([label, value], i) => (
             <div key={label + i} className="flex border-b border-stone-200 last:border-b-0 min-h-[42px]">
-              <div className="w-28 shrink-0 bg-stone-50 px-3 py-2.5 text-[12px] font-semibold text-slate-500 flex items-center border-r border-stone-200">{label}</div>
+              <div className="w-32 shrink-0 bg-stone-50 px-3 py-2.5 text-[12px] font-semibold text-slate-500 flex items-center border-r border-stone-200">{label}</div>
               <div className="flex-1 min-w-0 px-3 py-2.5 text-sm text-slate-800 font-medium flex items-center break-words">{value}</div>
             </div>
           ))}
@@ -787,7 +787,7 @@
       const isSale = property.transactionType === '매매';
 
       return (
-        <div className="max-w-[1400px] mx-auto space-y-5 pb-10 relative">
+        <div className="max-w-4xl mx-auto space-y-5 pb-10 relative">
           {showDeleteConfirm && (
             <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4">
               <div className="bg-white p-6 rounded-2xl shadow-2xl max-w-sm w-full border border-slate-200">
@@ -844,9 +844,8 @@
             </div>
           </div>
 
-          {/* 3단: 물건정보 | 물건금액 · 등록정보 | 등록자 코멘트 */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-start">
-            <div className="flex flex-col gap-5">
+          {/* 위에서 아래로 차례로: 물건정보 → 물건금액 → 소유자 → 등록정보 → 층별 현황 → 코멘트 */}
+          <div className="flex flex-col gap-5">
               <InfoSection title="물건정보" icon={<Building2 className="w-4 h-4" />}>
                 <InfoGrid rows={[
                   ['종류', property.type || '-'],
@@ -864,15 +863,7 @@
                   ['준공년도', property.completionYear || '-']
                 ]} />
               </InfoSection>
-              <InfoSection title="소유자 정보" icon={<UserCircle className="w-4 h-4" />}>
-                <InfoGrid rows={[
-                  ['소유자명', <b className="text-ink-900">{property.ownerName || '-'}</b>],
-                  ['연락처', <b className="text-ink-900">{property.ownerPhone || '-'}</b>]
-                ]} />
-              </InfoSection>
-            </div>
 
-            <div className="flex flex-col gap-5">
               <InfoSection title="물건금액" icon={<Banknote className="w-4 h-4" />}>
                 <InfoGrid rows={[
                   ['거래방식', <span className="flex gap-1.5">{['매매', '전세', '월세'].map(t => <span key={t} className={`px-2.5 py-1 rounded text-xs font-bold ${property.transactionType === t ? TYPE_BADGE[t] : 'bg-stone-100 text-slate-300'}`}>{t}</span>)}</span>],
@@ -883,6 +874,14 @@
                   ...(isSale ? [['수익률', <span className="text-emerald-600 font-bold text-base">{getYield(property.price?.sale, property.price?.deposit, property.price?.rent)}%</span>]] : [])
                 ]} />
               </InfoSection>
+
+              <InfoSection title="소유자 정보" icon={<UserCircle className="w-4 h-4" />}>
+                <InfoGrid rows={[
+                  ['소유자명', <b className="text-ink-900">{property.ownerName || '-'}</b>],
+                  ['연락처', <b className="text-ink-900">{property.ownerPhone || '-'}</b>]
+                ]} />
+              </InfoSection>
+
               <InfoSection title="등록 정보" icon={<CalendarDays className="w-4 h-4" />}>
                 <InfoGrid rows={[
                   ['등록자', property.registrant || '-'],
@@ -891,28 +890,6 @@
                   ['매물번호', property.id]
                 ]} />
               </InfoSection>
-            </div>
-
-            <InfoSection title="등록자 코멘트 (작업 일지)" icon={<FileText className="w-4 h-4" />}>
-              <div className="p-4 flex flex-col gap-3">
-                <div className="flex flex-col gap-2">
-                  <textarea value={newLog} onChange={(e) => setNewLog(e.target.value)} className="w-full p-3 border border-stone-300 rounded-lg outline-none focus:border-gold-400 focus:ring-2 focus:ring-gold-400/30 text-sm resize-none" rows={3} placeholder="작업 내용이나 코멘트를 남겨주세요." />
-                  <button type="button" onClick={handleAddLog} className="self-end px-5 py-2 bg-gold-400 hover:bg-gold-300 text-ink-900 text-sm font-bold rounded-lg transition-colors">등록</button>
-                </div>
-                <div className="space-y-2.5 max-h-[460px] overflow-y-auto pr-1">
-                  {(property.workLogs || []).length > 0 ? property.workLogs.map(log => (
-                    <div key={log.id} className="p-3 bg-stone-50 rounded-lg border border-stone-200 text-xs flex flex-col gap-1.5">
-                      <div className="flex flex-wrap items-center justify-between gap-1 border-b border-stone-200 pb-1.5">
-                        <span className="font-semibold text-slate-700 flex items-center gap-1.5"><UserCircle className="w-3.5 h-3.5 text-gold-500" /> {log.author}</span>
-                        <span className="text-slate-400">{log.date}</span>
-                      </div>
-                      <p className="text-slate-800 whitespace-pre-line leading-relaxed text-[13px]">{log.content}</p>
-                    </div>
-                  )) : <div className="py-8 text-center text-slate-400 text-xs bg-stone-50 rounded-lg border border-dashed border-stone-200">등록된 작업 일지가 없습니다.</div>}
-                </div>
-              </div>
-            </InfoSection>
-          </div>
 
           <InfoSection title="층별 현황 내역" icon={<Maximize className="w-4 h-4" />}>
             <div className="p-0 overflow-x-auto w-full">
@@ -939,6 +916,27 @@
               </table>
             </div>
           </InfoSection>
+
+            <InfoSection title="등록자 코멘트 (작업 일지)" icon={<FileText className="w-4 h-4" />}>
+              <div className="p-4 flex flex-col gap-3">
+                <div className="flex flex-col gap-2">
+                  <textarea value={newLog} onChange={(e) => setNewLog(e.target.value)} className="w-full p-3 border border-stone-300 rounded-lg outline-none focus:border-gold-400 focus:ring-2 focus:ring-gold-400/30 text-sm resize-none" rows={3} placeholder="작업 내용이나 코멘트를 남겨주세요." />
+                  <button type="button" onClick={handleAddLog} className="self-end px-5 py-2 bg-gold-400 hover:bg-gold-300 text-ink-900 text-sm font-bold rounded-lg transition-colors">등록</button>
+                </div>
+                <div className="space-y-2.5 max-h-[460px] overflow-y-auto pr-1">
+                  {(property.workLogs || []).length > 0 ? property.workLogs.map(log => (
+                    <div key={log.id} className="p-3 bg-stone-50 rounded-lg border border-stone-200 text-xs flex flex-col gap-1.5">
+                      <div className="flex flex-wrap items-center justify-between gap-1 border-b border-stone-200 pb-1.5">
+                        <span className="font-semibold text-slate-700 flex items-center gap-1.5"><UserCircle className="w-3.5 h-3.5 text-gold-500" /> {log.author}</span>
+                        <span className="text-slate-400">{log.date}</span>
+                      </div>
+                      <p className="text-slate-800 whitespace-pre-line leading-relaxed text-[13px]">{log.content}</p>
+                    </div>
+                  )) : <div className="py-8 text-center text-slate-400 text-xs bg-stone-50 rounded-lg border border-dashed border-stone-200">등록된 작업 일지가 없습니다.</div>}
+                </div>
+              </div>
+            </InfoSection>
+          </div>
         </div>
       );
     }
