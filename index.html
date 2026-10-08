@@ -170,10 +170,10 @@
       };
       const LABELS = [
         ['address', /^소재지$/], ['station', /^주변역$/], ['road', /^도로(조건|상황)$/],
-        ['landArea', /^대지면적$/], ['zoning', /^(용도)?지역$/], ['publicPrice', /^공시지가$/],
+        ['landArea', /^대지면적$/], ['landArea2', /^면적$/], ['zoning', /^(용도)?지역$/], ['publicPrice', /^공시지가$/],
         ['completion', /^(준공|사용승인)/], ['totalFloorArea', /^연면적$/], ['buildingArea', /^건축면적$/],
-        ['floors', /^층수$/], ['ratios', /^건폐율.*용적[률율]$/], ['coverage', /^건폐율$/], ['far', /^용적[률율]$/],
-        ['mainUse', /^주용도/], ['parking', /^주차(장)?$/], ['elevator', /^승강기$/], ['heating', /^냉난방$/],
+        ['floors', /^(층수|규모)$/], ['ratios', /^건폐율.*용적[률율]$/], ['coverage', /^건폐율$/], ['far', /^용적[률율]$/],
+        ['mainUse', /^주용도/], ['parking', /^주차(장|대수)?$/], ['elevator', /^승강기$/], ['heating', /^냉난방$/],
         ['deposit', /^보증금$/], ['rent', /^(월)?임대료$/], ['maint', /^관리비$/], ['yield', /^(년)?수익[률율]$/], ['bond', /^채권최고액$/],
         ['buildingPerPy', /^건물가/], ['landPerPy', /^토지가/], ['perPy', /^평단가$/], ['monthIncome', /^월수익$/], ['maintExpense', /^관리비지출$/], ['sale', /^매매가$/]
       ];
@@ -190,6 +190,7 @@
             const texts = lines.map(l => l.cells.map(c => c.s).join(' ').trim()).filter(Boolean);
             const idx = texts.findIndex(t => /번지|\d+-\d+/.test(t));
             if (idx > 0) coverName = texts.slice(0, idx).join(' ').trim();
+            else if (idx === 0) { const m = texts[0].match(/^(.*?\d+(?:-\d+)?(?:번지)?)\s+(\S.*)$/); if (m) coverName = m[2].trim(); }
           }
           // (b) '◎ 이름' 형태의 제목
           lines.forEach(l => l.cells.forEach(c => { if (!markName && /^◎\s*\S/.test(c.s)) markName = c.s.replace(/^◎\s*/, '').trim(); }));
@@ -207,37 +208,38 @@
           });
           line.cells.forEach(c => { if (c.s.startsWith('▶')) notes.push(c.s.replace(/^▶\s*/, '').trim()); });
         });
+        if (lines.some(l => l.cells.some(c => labelOf(c.s)))) lines.forEach(l => l.cells.forEach(c => { if (/^\d+\.\s+\S/.test(c.s) && c.s.length > 6) notes.push(c.s.replace(/^\d+\.\s*/, '').trim()); }));
         pending.forEach(pd => {
           if (!['address', 'zoning'].includes(pd.key) || raw[pd.key].length) return;
-          const cand = lines.filter(l => !l.cells.some(c => labelOf(c.s)) && Math.abs(l.y - pd.y) <= 14 && l.cells.some(c => c.x >= pd.x2 - 2 && !c.s.startsWith('▶')))
+          const cand = lines.filter(l => !l.cells.some(c => labelOf(c.s)) && Math.abs(l.y - pd.y) <= 20 && l.cells.some(c => c.x >= pd.x2 - 2 && !c.s.startsWith('▶')))
             .sort((a, b) => Math.abs(a.y - pd.y) - Math.abs(b.y - pd.y))[0];
           if (cand) raw[pd.key] = cand.cells.filter(c => c.x >= pd.x2 - 2 && !c.s.startsWith('▶')).map(c => c.s);
         });
 
-        // 층별 현황 표 (머리글: 층 | 임차인현황/업종 | (면적) | 보증금 | (월)임대료 | 관리비 | 비고)
-        const TENANT = ['임차인현황', '업종', '임차인'];
-        const hi = lines.findIndex(l => l.cells.some(c => norm(c.s) === '층') && l.cells.some(c => TENANT.includes(norm(c.s))) && l.cells.some(c => norm(c.s) === '비고'));
+        // 층별 현황 표 (머리글 예: 층 | 임차인현황/업종/업체명 | (건축)면적 | 보증금 | (월)임대료 | 관리비 | 비고/임대만기)
+        const headName = (n) => /^층$/.test(n) ? 'floor' : /^(임차인현황|업종|업체명|임차인)$/.test(n) ? 'tenant' : /^(건축)?면적/.test(n) ? 'area' : /^보증금/.test(n) ? 'deposit' : /임대료/.test(n) ? 'rent' : /^관리비/.test(n) ? 'maint' : /^(비고|임대만기)$/.test(n) ? 'note' : null;
+        const hi = lines.findIndex(l => l.cells.some(c => headName(norm(c.s)) === 'floor') && l.cells.some(c => headName(norm(c.s)) === 'tenant') && l.cells.some(c => headName(norm(c.s)) === 'note'));
         if (hi >= 0) {
           const hy = lines[hi].y;
-          const HEAD = { 층: 'floor', 임차인현황: 'tenant', 업종: 'tenant', 임차인: 'tenant', 면적: 'area', 건축면적: 'area', 보증금: 'deposit', 임대료: 'rent', 월임대료: 'rent', 관리비: 'maint', 비고: 'note' };
-          const cols = [];
-          lines.forEach(l => { if (Math.abs(l.y - hy) <= 16) l.cells.forEach(c => { const n = norm(c.s); if (HEAD[n]) cols.push({ name: HEAD[n], cx: (c.x + c.x2) / 2 }); }); });
+          const cols = []; const headTexts = [];
+          lines.forEach(l => { if (Math.abs(l.y - hy) <= 16) l.cells.forEach(c => { const n = norm(c.s); headTexts.push(n); const h = headName(n); if (h) cols.push({ name: h, cx: (c.x + c.x2) / 2 }); }); });
+          const won = headTexts.some(t => /\(원\)/.test(t)) && !headTexts.some(t => /\(만원\)/.test(t));   // 금액 단위가 '원'이면 만원으로 바꾼다
           const colOf = (cx) => { let best = cols[0], d = 1e9; cols.forEach(c => { const dd = Math.abs(c.cx - cx); if (dd < d) { d = dd; best = c; } }); return best ? best.name : 'note'; };
-          const isFloor = (t) => /^(B\d+|-?\d+F?|지하\d+층?|\d+층|옥탑|PH)$/i.test(t.replace(/\s+/g, ''));
+          const isFloor = (t) => /^(B\d+|-?\d+F?|지하\d+층?|\d+층|\d+\/\d+|옥상|옥탑|PH)$/i.test(t.replace(/\s+/g, ''));
           const pageRows = []; const orphans = [];
           lines.forEach(l => {
             if (l.y <= hy + 16) return;
-            const first = l.cells[0];
-            if (first && isFloor(first.s) && colOf((first.x + first.x2) / 2) === 'floor') {
+            const fc = l.cells.find(c => isFloor(c.s) && colOf((c.x + c.x2) / 2) === 'floor');
+            if (fc) {
               const row = {}; const frags = [];
-              l.cells.slice(1).forEach(c => { const k = colOf((c.x + c.x2) / 2); if (k === 'note') frags.push({ y: l.y, t: c.s }); else row[k] = (row[k] ? row[k] + ' ' : '') + c.s; });
-              const item = { f: first.s.replace(/\s+/g, ''), row, y: l.y, frags }; pageRows.push(item); floorsOut.push(item);
+              l.cells.forEach(c => { if (c === fc) return; const k = colOf((c.x + c.x2) / 2); if (k === 'note') frags.push({ y: l.y, t: c.s }); else row[k] = (row[k] ? row[k] + ' ' : '') + c.s; });
+              const item = { f: fc.s.replace(/\s+/g, ''), row, y: l.y, frags, won }; pageRows.push(item); floorsOut.push(item);
             } else if (l.cells.length && l.cells.every(c => !c.s.startsWith('※') && colOf((c.x + c.x2) / 2) === 'note')) {
               orphans.push({ y: l.y, t: l.cells.map(c => c.s).join(' ') });
             }
           });
           orphans.forEach(o => { let best = null, d = 1e9; pageRows.forEach(r => { const dd = Math.abs(r.y - o.y); if (dd < d) { d = dd; best = r; } }); if (best && d < 20) best.frags.push({ y: o.y, t: o.t }); });
-          pageRows.forEach(r => { r.row.note = r.frags.sort((a, b) => a.y - b.y).map(x => x.t).join(' '); });
+          pageRows.forEach(r => { r.row.note = r.frags.sort((x, y) => x.y - y.y).map(x => x.t).join(' '); });
         }
       });
 
@@ -247,11 +249,11 @@
       const m2 = (k) => { const m = join(k).replace(/,/g, '').match(/(\d+(?:\.\d+)?)\s*㎡/); return m ? Number(m[1]) : null; };
 
       put('address', join('address'), '소재지');
-      put('landArea', m2('landArea'), '대지면적');
+      put('landArea', m2('landArea') !== null ? m2('landArea') : m2('landArea2'), '대지면적');
       put('zoning', join('zoning'), '용도지역');
       const cm = join('completion'); let comp = null;
-      const m8 = cm.match(/\b(\d{4})(\d{2})(\d{2})\b/);
-      if (m8) comp = `${m8[1]}-${m8[2]}-${m8[3]}`; else { const m = cm.match(/\d{4}[-.]\d{1,2}[-.]\d{1,2}|\d{4}/); comp = m ? m[0] : null; }
+      const m8 = cm.match(/\b(\d{4})(\d{2})(\d{2})\b/); const mk = cm.match(/(\d{4})\s*년\s*(\d{1,2})\s*월\s*(\d{1,2})\s*일/);
+      if (mk) comp = `${mk[1]}-${String(mk[2]).padStart(2, '0')}-${String(mk[3]).padStart(2, '0')}`; else if (m8) comp = `${m8[1]}-${m8[2]}-${m8[3]}`; else { const m = cm.match(/\d{4}[-.]\d{1,2}[-.]\d{1,2}|\d{4}/); comp = m ? m[0] : null; }
       put('completionYear', comp, '준공(사용승인)');
       put('totalFloorArea', m2('totalFloorArea'), '연면적');
       put('buildingArea', m2('buildingArea'), '건축면적');
@@ -277,11 +279,11 @@
       if (!name && fields.address) name = fields.address.split(/\s+/).slice(-2).join(' ');
       put('name', name, '물건명');
 
-      const floors = floorsOut.map(({ f, row }, i) => {
+      const floors = floorsOut.map(({ f, row, won }, i) => {
         const u = f.toUpperCase(); let m;
-        const label = (m = u.match(/^B(\d+)$/)) ? `지하${m[1]}층` : (m = u.match(/^-(\d+)F?$/)) ? `지하${m[1]}층` : (m = u.match(/^(\d+)F?$/)) ? `${m[1]}층` : (m = u.match(/^지하(\d+)층?$/)) ? `지하${m[1]}층` : f;
+        const label = (m = u.match(/^B(\d+)$/)) ? `지하${m[1]}층` : (m = u.match(/^-(\d+)F?$/)) ? `지하${m[1]}층` : (m = u.match(/^(\d+)F?$/)) ? `${m[1]}층` : (m = u.match(/^지하(\d+)층?$/)) ? `지하${m[1]}층` : /^\d+\/\d+$/.test(u) ? `${u}층` : f;
         const tenant = joinSpaced(row.tenant), note = joinSpaced(row.note);
-        const num = (v) => { const n = v ? parseMan(v) : null; return n === null ? '' : n; };
+        const num = (v) => { let n = v ? parseMan(v) : null; if (n !== null && won) n = Math.round(n / 10000 * 100) / 100; return n === null ? '' : n; };
         return { id: Date.now() + i, floor: label, companyName: [tenant, note].filter(Boolean).join(' · '), deposit: num(row.deposit), rent: num(row.rent), maintenance: num(row.maint) };
       });
       if (floors.length) filled.push(`층별 현황 ${floors.length}건`);
@@ -1291,8 +1293,9 @@
       const sortFloorDetails = () => {
         const parseFloorLevel = (str) => {
           if(!str) return 0;
-          const numStr = str.replace(/[^0-9]/g, '');
-          const num = numStr ? parseInt(numStr, 10) : 0;
+          if (/옥상|옥탑|PH|루프/i.test(str)) return 1000;
+          const mm = str.match(/\d+/);
+          const num = mm ? parseInt(mm[0], 10) : 0;
           if (str.includes('지하') || str.toUpperCase().includes('B')) return -num;
           return num;
         };
@@ -1358,8 +1361,9 @@
           
           const parseFloorLevel = (str) => {
             if(!str) return 0;
-            const numStr = str.replace(/[^0-9]/g, '');
-            const num = numStr ? parseInt(numStr, 10) : 0;
+            if (/옥상|옥탑|PH|루프/i.test(str)) return 1000;
+            const mm = str.match(/\d+/);
+            const num = mm ? parseInt(mm[0], 10) : 0;
             if (str.includes('지하') || str.toUpperCase().includes('B')) return -num;
             return num;
           };
