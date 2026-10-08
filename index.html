@@ -776,8 +776,8 @@
         <div>
           {rows.map(([label, value], i) => (
             <div key={label + i} className="flex border-b border-stone-200 last:border-b-0 min-h-[42px]">
-              <div className="w-24 shrink-0 bg-stone-50 px-2.5 py-2.5 text-[12px] font-semibold text-slate-500 flex items-center border-r border-stone-200">{label}</div>
-              <div className="flex-1 min-w-0 px-2.5 py-2.5 text-sm text-slate-800 font-medium flex items-center break-words">{value}</div>
+              <div className="w-28 shrink-0 bg-stone-50 px-3 py-2.5 text-[12px] font-semibold text-slate-500 flex items-center border-r border-stone-200">{label}</div>
+              <div className="flex-1 min-w-0 px-3 py-2.5 text-sm text-slate-800 font-medium flex items-center break-words">{value}</div>
             </div>
           ))}
         </div>
@@ -886,7 +886,7 @@
 
           {/* 위에서 아래로 차례로: 물건정보 → 물건금액 → 소유자 → 등록정보 → 층별 현황 → 코멘트 */}
           <div className="flex flex-col gap-5">
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 items-start">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
               <InfoSection title="물건정보" icon={<Building2 className="w-4 h-4" />}>
                 <InfoGrid rows={[
                   ['종류', property.type || '-'],
@@ -904,7 +904,7 @@
                   ['준공년도', property.completionYear || '-']
                 ]} />
               </InfoSection>
-
+            <div className="flex flex-col gap-4">
               <InfoSection title="물건금액" icon={<Banknote className="w-4 h-4" />}>
                 <InfoGrid rows={[
                   ['거래방식', <span className="flex gap-1.5">{['매매', '전세', '월세'].map(t => <span key={t} className={`px-2.5 py-1 rounded text-xs font-bold ${property.transactionType === t ? TYPE_BADGE[t] : 'bg-stone-100 text-slate-300'}`}>{t}</span>)}</span>],
@@ -915,8 +915,7 @@
                   ...(isSale ? [['수익률', <span className="text-emerald-600 font-bold text-base">{getYield(property.price?.sale, property.price?.deposit, property.price?.rent)}%</span>]] : [])
                 ]} />
               </InfoSection>
-
-{readOnly ? (
+          {readOnly ? (
             <InfoSection title="소유자 정보" icon={<Lock className="w-4 h-4" />}>
               <div className="px-4 py-7 text-center text-sm text-slate-400 flex items-center justify-center gap-2"><Lock className="w-4 h-4" /> 소유자 정보는 비공개입니다.</div>
             </InfoSection>
@@ -928,15 +927,15 @@
                 ]} />
               </InfoSection>
           )}
-
               <InfoSection title="등록 정보" icon={<CalendarDays className="w-4 h-4" />}>
                 <InfoGrid rows={[
                   ['등록자', property.registrant || '-'],
-                  ['연락처', property.registrantPhone || '-'],
+                  ['등록자 연락처', property.registrantPhone || '-'],
                   ['등록일', property.date || '-'],
                   ['매물번호', property.id]
                 ]} />
               </InfoSection>
+            </div>
           </div>
 
           <InfoSection title="층별 현황 내역" icon={<Maximize className="w-4 h-4" />}>
