@@ -78,7 +78,7 @@
 
     const toDB = (prop) => {
       const dbObj = { ...prop };
-      const excludeKeys = ['sale', 'deposit', 'rent', 'maintenance', 'direction', 'is_shared'];
+      const excludeKeys = ['sale', 'deposit', 'rent', 'maintenance', 'direction'];
       excludeKeys.forEach(k => delete dbObj[k]);
 
       const keyMap = { ownerName: 'ownername', ownerPhone: 'ownerphone', transactionType: 'transactiontype', landArea: 'landarea', totalFloorArea: 'totalfloorarea', buildingArea: 'buildingarea', groundFloorArea: 'groundfloorarea', buildingCoverage: 'buildingcoverage', floorAreaRatio: 'floorarearatio', floorUnderground: 'floorunderground', floorGround: 'floorground', completionYear: 'completionyear', floorDetails: 'floordetails', workLogs: 'worklogs', registrantPhone: 'registrantphone' };
@@ -170,6 +170,7 @@
     const Bars = (p) => <Icon name="fa-bars" {...p} />;
     const Sync = (p) => <Icon name="fa-sync-alt" {...p} />;
     const Sparkles = (p) => <Icon name="fa-sparkles" {...p} />;
+    const ShareIcon = (p) => <Icon name="fa-share-alt" {...p} />;
 
     function SidebarItem({ icon, label, active, onClick }) {
       return (
@@ -570,7 +571,7 @@
       );
     }
 
-    function PropertyListView({ properties, onViewDetail }) {
+    function PropertyListView({ properties, onViewDetail, showRegistrant }) {
       const [statusFilter, setStatusFilter] = useState('전체');
       const [addressFilter, setAddressFilter] = useState('');
       const [minPrice, setMinPrice] = useState('');
@@ -688,6 +689,7 @@
                   <th className={th}>종류</th>
                   <th className={th}>물건명</th>
                   <th className={th}>지번주소</th>
+                  {showRegistrant && <th className={th}>등록자</th>}
                   <th className={th + " text-center"}>층수</th>
                   <th className={th + " text-right"}>대지(평)</th>
                   <th className={th + " text-right"}>연면(평)</th>
@@ -705,13 +707,14 @@
                     <td className="px-2.5 text-center text-slate-400 text-xs">{idx + 1}</td>
                     <td className="px-2.5 text-center"><span className={`px-2 py-0.5 rounded text-[11px] font-bold ${STATUS_BADGE_COLORS[prop.status || '보류']}`}>{prop.status || '보류'}</span></td>
                     <td className="px-2.5 text-slate-700">{prop.type}</td>
-                    <td className="px-2.5 max-w-[190px]"><span className="font-semibold text-blue-600 hover:underline truncate block" title={prop.name}>{prop.name}</span></td>
+                    <td className="px-2.5 max-w-[190px]"><span className="flex items-center gap-1.5"><span className="font-semibold text-blue-600 hover:underline truncate" title={prop.name}>{prop.name}</span>{prop.is_shared && !showRegistrant && <span className="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-bold bg-gold-100 text-gold-700">공유</span>}</span></td>
                     <td className="px-2.5 max-w-[210px]">
                       <span className="flex items-center gap-1.5 text-slate-600">
                         <a href={`https://map.naver.com/v5/search/${encodeURIComponent(prop.address || '')}`} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} title="네이버 지도" className="text-purple-500 hover:text-purple-700 shrink-0"><MapPin className="w-3.5 h-3.5" /></a>
                         <span className="truncate" title={prop.address}>{prop.address}</span>
                       </span>
                     </td>
+                    {showRegistrant && <td className="px-2.5 text-slate-700 text-xs">{prop.registrant || '-'}</td>}
                     <td className="px-2.5 text-center text-slate-600 text-xs">지상 {prop.floorGround || 0} · 지하 {prop.floorUnderground || 0}</td>
                     <td className="px-2.5 text-right text-slate-600">{getExactPyeong(prop.landArea)}</td>
                     <td className="px-2.5 text-right text-slate-600">{getExactPyeong(prop.totalFloorArea)}</td>
@@ -722,7 +725,7 @@
                     <td className="px-2.5 text-center font-bold text-emerald-600">{prop.transactionType === '매매' ? `${getYield(prop.price?.sale, prop.price?.deposit, prop.price?.rent)}%` : '-'}</td>
                     <td className="px-2.5 text-center text-slate-500 text-xs">{prop.date}</td>
                   </tr>
-                )) : <tr><td colSpan="14" className="p-12 text-center text-slate-500 font-medium bg-stone-50">조건에 맞는 물건이 없습니다.</td></tr>}
+                )) : <tr><td colSpan={showRegistrant ? 15 : 14} className="p-12 text-center text-slate-500 font-medium bg-stone-50">조건에 맞는 물건이 없습니다.</td></tr>}
               </tbody>
             </table>
           </div>
@@ -754,9 +757,11 @@
       );
     }
 
-    function PropertyDetailView({ property, onBack, onEdit, onDelete, onReport, currentUser, onUpdate }) {
+    function PropertyDetailView({ property, onBack, onEdit, onDelete, onReport, currentUser, onUpdate, readOnly, onToggleShare, comments = [], onAddComment }) {
       const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
       const [newLog, setNewLog] = useState('');
+      const [newComment, setNewComment] = useState('');
+      const submitComment = () => { if (!newComment.trim()) return; onAddComment(property.id, newComment.trim()); setNewComment(''); };
 
       const floorTotals = useMemo(() => {
         if (!property || !property.floorDetails) return { deposit: 0, rent: 0, maintenance: 0 };
@@ -803,12 +808,19 @@
 
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
             <button type="button" onClick={onBack} className="flex items-center gap-2 text-slate-500 hover:text-ink-900 transition-colors px-3 py-2 sm:-ml-3 rounded-lg hover:bg-white font-semibold text-sm"><ArrowLeft className="w-4 h-4" /> 목록으로</button>
-            <div className="flex gap-2 w-full sm:w-auto">
+            <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+              {!readOnly && (
+                <button type="button" onClick={() => onToggleShare(property)} className={`flex-1 sm:flex-none px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors shadow-sm flex items-center justify-center gap-2 ${property.is_shared ? 'bg-gold-50 border border-gold-300 text-gold-700 hover:bg-gold-100' : 'bg-gold-400 hover:bg-gold-300 text-ink-900'}`}><ShareIcon className="w-4 h-4" /> {property.is_shared ? '공유 해제' : '공유하기'}</button>
+              )}
               <button type="button" onClick={onReport} className="flex-1 sm:flex-none px-4 py-2.5 bg-ink-900 text-gold-200 rounded-lg text-sm font-semibold hover:bg-ink-700 transition-colors shadow-sm flex items-center justify-center gap-2"><FileText className="w-4 h-4" /> 컨설팅 리포트</button>
-              <button type="button" onClick={onEdit} className="flex-1 sm:flex-none px-4 py-2.5 bg-white border border-stone-300 rounded-lg text-sm font-semibold text-ink-900 hover:bg-stone-50 transition-colors shadow-sm">수정하기</button>
-              <button type="button" onClick={() => setShowDeleteConfirm(true)} className="flex-1 sm:flex-none px-4 py-2.5 bg-white border border-red-200 text-red-600 rounded-lg text-sm font-semibold hover:bg-red-50 transition-colors shadow-sm">삭제하기</button>
+              {!readOnly && <button type="button" onClick={onEdit} className="flex-1 sm:flex-none px-4 py-2.5 bg-white border border-stone-300 rounded-lg text-sm font-semibold text-ink-900 hover:bg-stone-50 transition-colors shadow-sm">수정하기</button>}
+              {!readOnly && <button type="button" onClick={() => setShowDeleteConfirm(true)} className="flex-1 sm:flex-none px-4 py-2.5 bg-white border border-red-200 text-red-600 rounded-lg text-sm font-semibold hover:bg-red-50 transition-colors shadow-sm">삭제하기</button>}
             </div>
           </div>
+
+          {readOnly && (
+            <div className="bg-gold-50 border border-gold-200 text-gold-700 rounded-lg px-4 py-2.5 text-sm font-medium flex items-center gap-2"><ShareIcon className="w-4 h-4" /> 공동 물건입니다. 수정은 등록자({property.registrant || '-'})의 개인 카드에서만 할 수 있어요. 코멘트는 누구나 남길 수 있습니다.</div>
+          )}
 
           {/* 요약: 물건명 · 주소 · 대표 금액 */}
           <div className="bg-white rounded-xl border border-stone-300 shadow-sm overflow-hidden">
@@ -820,6 +832,7 @@
                   <span className={`px-2.5 py-1 rounded text-xs font-bold ${TYPE_BADGE[property.transactionType] || 'bg-slate-500 text-white'}`}>{property.transactionType}</span>
                   <span className="px-2.5 py-1 rounded text-xs font-medium bg-stone-100 text-slate-600 border border-stone-200">{property.type}</span>
                   <span className="px-2.5 py-1 rounded text-xs font-medium bg-ink-900 text-gold-200">No. {property.id}</span>
+                  {property.is_shared && <span className="px-2.5 py-1 rounded text-xs font-bold bg-gold-400 text-ink-900 flex items-center gap-1"><ShareIcon className="w-3 h-3" /> 공유중</span>}
                 </div>
                 <div className="flex flex-wrap items-center gap-3 mb-2">
                   <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-ink-900 leading-tight">{property.name}</h1>
@@ -875,12 +888,18 @@
                 ]} />
               </InfoSection>
 
+{readOnly ? (
+            <InfoSection title="소유자 정보" icon={<Lock className="w-4 h-4" />}>
+              <div className="px-4 py-7 text-center text-sm text-slate-400 flex items-center justify-center gap-2"><Lock className="w-4 h-4" /> 소유자 정보는 비공개입니다.</div>
+            </InfoSection>
+          ) : (
               <InfoSection title="소유자 정보" icon={<UserCircle className="w-4 h-4" />}>
                 <InfoGrid rows={[
                   ['소유자명', <b className="text-ink-900">{property.ownerName || '-'}</b>],
                   ['연락처', <b className="text-ink-900">{property.ownerPhone || '-'}</b>]
                 ]} />
               </InfoSection>
+          )}
 
               <InfoSection title="등록 정보" icon={<CalendarDays className="w-4 h-4" />}>
                 <InfoGrid rows={[
@@ -917,6 +936,7 @@
             </div>
           </InfoSection>
 
+{!readOnly && (
             <InfoSection title="등록자 코멘트 (작업 일지)" icon={<FileText className="w-4 h-4" />}>
               <div className="p-4 flex flex-col gap-3">
                 <div className="flex flex-col gap-2">
@@ -936,6 +956,28 @@
                 </div>
               </div>
             </InfoSection>
+          )}
+          {(readOnly || property.is_shared) && (
+            <InfoSection title="공유 코멘트" icon={<ShareIcon className="w-4 h-4" />}>
+              <div className="p-4 flex flex-col gap-3">
+                <div className="flex flex-col gap-2">
+                  <textarea value={newComment} onChange={(e) => setNewComment(e.target.value)} className="w-full p-3 border border-stone-300 rounded-lg outline-none focus:border-gold-400 focus:ring-2 focus:ring-gold-400/30 text-sm resize-none" rows={3} placeholder="이 물건에 대한 의견이나 문의를 남겨주세요. (모든 직원에게 보여요)" />
+                  <button type="button" onClick={submitComment} className="self-end px-5 py-2 bg-gold-400 hover:bg-gold-300 text-ink-900 text-sm font-bold rounded-lg transition-colors">코멘트 등록</button>
+                </div>
+                <div className="space-y-2.5 max-h-[460px] overflow-y-auto pr-1">
+                  {comments.length > 0 ? [...comments].sort((x, y) => Number(String(y.id).replace(/\D/g, '')) - Number(String(x.id).replace(/\D/g, ''))).map(c => (
+                    <div key={c.id} className="p-3 bg-stone-50 rounded-lg border border-stone-200 text-xs flex flex-col gap-1.5">
+                      <div className="flex flex-wrap items-center justify-between gap-1 border-b border-stone-200 pb-1.5">
+                        <span className="font-semibold text-slate-700 flex items-center gap-1.5"><UserCircle className="w-3.5 h-3.5 text-gold-500" /> {c.author}</span>
+                        <span className="text-slate-400">{c.date}</span>
+                      </div>
+                      <p className="text-slate-800 whitespace-pre-line leading-relaxed text-[13px]">{c.content}</p>
+                    </div>
+                  )) : <div className="py-8 text-center text-slate-400 text-xs bg-stone-50 rounded-lg border border-dashed border-stone-200">아직 코멘트가 없습니다.</div>}
+                </div>
+              </div>
+            </InfoSection>
+          )}
           </div>
         </div>
       );
@@ -1622,6 +1664,7 @@
       const [employees, setEmployees] = useState([]);
       const [customers, setCustomers] = useState([]);
       const [memos, setMemos] = useState([]);
+      const [comments, setComments] = useState([]);
 
       const [currentView, setCurrentView] = useState('list'); 
       const [selectedProperty, setSelectedProperty] = useState(null);
@@ -1648,11 +1691,12 @@
       const fetchCloudData = async () => {
         setIsFetchingData(true);
         try {
-          const [propsRes, usersRes, custsRes, memosRes] = await Promise.all([
+          const [propsRes, usersRes, custsRes, memosRes, commentsRes] = await Promise.all([
             supabase.from('crm_properties').select('*'),
             supabase.from('crm_users').select('*'),
             supabase.from('crm_customers').select('*'),
-            supabase.from('crm_memos').select('*')
+            supabase.from('crm_memos').select('*'),
+            supabase.from('crm_comments').select('*')
           ]);
           
           if (propsRes.data) {
@@ -1663,6 +1707,7 @@
           if (usersRes.data) setEmployees(usersRes.data);
           if (custsRes.data) setCustomers(custsRes.data);
           if (memosRes.data) setMemos(memosRes.data);
+          if (commentsRes.data) setComments(commentsRes.data);
         } catch (err) {
           console.warn("데이터 로드 실패:", err.message);
         } finally {
@@ -1721,6 +1766,13 @@
           (p.address || '').toLowerCase().includes(searchTerm.toLowerCase())
         );
       }, [myProperties, searchTerm]);
+
+      const filteredSharedProperties = useMemo(() => {
+        const q = searchTerm.toLowerCase();
+        return properties.filter(p => p.is_shared === true).filter(p =>
+          (p.name || '').toLowerCase().includes(q) || (p.address || '').toLowerCase().includes(q)
+        );
+      }, [properties, searchTerm]);
 
       const filteredEmployees = useMemo(() => {
         return employees.filter(e =>
@@ -1789,8 +1841,10 @@
 
       const handleSaveProperty = async (prop) => {
         try {
+          const existing = properties.find(p => p.id === prop.id);
           const finalProp = { 
             ...prop, 
+            ...(existing && existing.is_shared !== undefined ? { is_shared: existing.is_shared } : {}),
             id: prop.id || `P-${Date.now()}`,
             user_id: prop.user_id || currentUser?.loginId?.toLowerCase() || 'unknown', 
             registrant: prop.registrant || currentUser?.name || '등록자',
@@ -1839,6 +1893,35 @@
         handleSupabaseError(error, 'crm_properties');
       };
 
+      const SHARE_SQL_HINT = '공유 기능을 쓰려면 Supabase에 공유용 설정(SQL)을 먼저 한 번 실행해야 합니다.';
+
+      const handleToggleShare = async (prop) => {
+        const next = { ...prop, is_shared: !prop.is_shared };
+        setProperties(prev => prev.map(p => p.id === prop.id ? next : p));
+        setSelectedProperty(next);
+        const { error } = await supabase.from('crm_properties').update({ is_shared: next.is_shared }).eq('id', prop.id);
+        if (error) {
+          setProperties(prev => prev.map(p => p.id === prop.id ? prop : p));
+          setSelectedProperty(prop);
+          if (error.code === '42501') handleSupabaseError(error, 'crm_properties');
+          else alert(SHARE_SQL_HINT + '\n\n(원인: ' + error.message + ')');
+        }
+      };
+
+      const handleAddComment = async (propertyId, content) => {
+        const c = {
+          id: `CM-${Date.now()}`, property_id: propertyId, user_id: currentUser.loginId, author: currentUser.name,
+          content, date: new Date().toLocaleString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+        };
+        setComments(prev => [c, ...prev]);
+        const { error } = await supabase.from('crm_comments').insert([c]);
+        if (error) {
+          setComments(prev => prev.filter(x => x.id !== c.id));
+          if (error.code === '42501') handleSupabaseError(error, 'crm_comments');
+          else alert(SHARE_SQL_HINT + '\n\n(원인: ' + error.message + ')');
+        }
+      };
+
       const changeTab = (tab) => {
         setActiveTab(tab); setSearchTerm(''); setIsMobileMenuOpen(false); 
       };
@@ -1881,6 +1964,7 @@
               <p className="px-5 pb-2 text-[10px] tracking-[0.25em] text-slate-500 uppercase">Menu</p>
               <SidebarItem icon={<CalendarIcon />} label="개인 캘린더" active={activeTab === 'calendar'} onClick={() => changeTab('calendar')} />
               <SidebarItem icon={<List />} label="내 물건 관리" active={activeTab === 'properties'} onClick={() => { changeTab('properties'); setCurrentView('list'); }} />
+              <SidebarItem icon={<ShareIcon />} label="공동 물건" active={activeTab === 'shared'} onClick={() => { changeTab('shared'); setCurrentView('list'); setSelectedProperty(null); }} />
               <SidebarItem icon={<Users />} label="고객 관리(매수자)" active={activeTab === 'customers'} onClick={() => { changeTab('customers'); setCurrentCustomerView('list'); }} />
               <SidebarItem icon={<UserCircle />} label="사원 목록" active={activeTab === 'employees'} onClick={() => { changeTab('employees'); setCurrentEmployeeView('list'); }} />
 
@@ -1921,11 +2005,12 @@
             <header className="bg-white/80 backdrop-blur border-b border-stone-200 flex flex-col sm:flex-row items-start sm:items-center justify-between px-5 py-4 md:px-10 gap-4 z-10 shrink-0 no-print">
               <div>
                 <p className="text-[10px] tracking-[0.3em] text-gold-600 uppercase font-semibold mb-1">
-                  {activeTab === 'properties' && currentView === 'report' ? 'Report' : activeTab === 'properties' ? 'Portfolio' : activeTab === 'employees' ? 'Team' : activeTab === 'customers' ? 'Clients' : 'Schedule'}
+                  {(activeTab === 'properties' || activeTab === 'shared') && currentView === 'report' ? 'Report' : activeTab === 'properties' ? 'Portfolio' : activeTab === 'shared' ? 'Shared' : activeTab === 'employees' ? 'Team' : activeTab === 'customers' ? 'Clients' : 'Schedule'}
                 </p>
                 <h2 className="text-xl md:text-2xl font-semibold tracking-tight text-ink-900 flex items-center gap-2">
-                  {activeTab === 'properties' && currentView === 'report' ? '프리미엄 컨설팅 리포트 출력' : 
+                  {(activeTab === 'properties' || activeTab === 'shared') && currentView === 'report' ? '프리미엄 컨설팅 리포트 출력' : 
                    activeTab === 'properties' ? '내 물건 관리' : 
+                   activeTab === 'shared' ? '공동 물건' : 
                    activeTab === 'employees' ? '사원 목록' :
                    activeTab === 'customers' ? '고객 관리(매수자)' :
                    activeTab === 'calendar' ? '개인 캘린더' : '관리 메뉴'}
@@ -1971,6 +2056,9 @@
                       onReport={() => setCurrentView('report')} 
                       currentUser={currentUser}
                       onUpdate={handleUpdateProperty}
+                      onToggleShare={handleToggleShare}
+                      comments={comments.filter(c => selectedProperty && c.property_id === selectedProperty.id)}
+                      onAddComment={handleAddComment}
                     />
                   )}
                   {currentView === 'report' && (
@@ -1987,6 +2075,25 @@
                       onSave={handleSaveProperty} 
                       currentUser={currentUser}
                     />
+                  )}
+                </>
+              )}
+              {activeTab === 'shared' && (
+                <>
+                  {currentView === 'list' && <PropertyListView properties={filteredSharedProperties} showRegistrant onViewDetail={(p) => { setSelectedProperty(p); setCurrentView('detail'); }} />}
+                  {currentView === 'detail' && (
+                    <PropertyDetailView
+                      property={selectedProperty}
+                      readOnly
+                      onBack={() => { setCurrentView('list'); setSelectedProperty(null); }}
+                      onReport={() => setCurrentView('report')}
+                      currentUser={currentUser}
+                      comments={comments.filter(c => selectedProperty && c.property_id === selectedProperty.id)}
+                      onAddComment={handleAddComment}
+                    />
+                  )}
+                  {currentView === 'report' && (
+                    <PropertyReportView property={selectedProperty} onBack={() => setCurrentView('detail')} currentUser={currentUser} />
                   )}
                 </>
               )}
