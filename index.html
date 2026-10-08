@@ -126,6 +126,10 @@
       return addr.replace(/\s{2,}/g, ' ').trim();
     };
 
+    // 금액 입력칸: 화면에는 콤마(1,800,000), 저장 값은 숫자만
+    const fmtMoneyInput = (v) => { const t = String(v === undefined || v === null ? '' : v).replace(/,/g, ''); if (t === '') return ''; const [i, d] = t.split('.'); return (Number(i) || 0).toLocaleString('ko-KR') + (d !== undefined ? '.' + d : ''); };
+    const cleanMoneyInput = (t) => t.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1');
+
     const getExactPyeong = (sqm) => ((Number(sqm) || 0) * 0.3025).toFixed(2);
 
     // ───────── PDF 매물 소개서 읽기 ─────────
@@ -355,7 +359,7 @@
     
     function SpecRow({ icon, label, value }) { return <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border-b border-slate-100 hover:bg-slate-50 transition-colors gap-1 sm:gap-4 h-full w-full"><div className="flex items-center gap-3 text-slate-500 text-sm shrink-0">{React.cloneElement(icon, { className: 'w-4 h-4 text-slate-400' })} {label}</div><div className="font-semibold text-slate-800 text-sm sm:text-right break-all sm:break-normal">{value}</div></div>; }
     
-    function FloorMoneyInput({ label, value, onChange }) { return <div className="flex-1 w-full min-w-[120px]"><div className="flex items-center border border-slate-300 rounded-lg bg-white focus-within:border-blue-500 focus-within:ring-1 overflow-hidden shadow-sm transition-all"><span className="bg-slate-100 text-xs font-bold text-slate-600 px-2 py-3 sm:py-2 border-r border-slate-200 whitespace-nowrap">{label}</span><input type="number" value={value || ''} onChange={onChange} className="w-full py-3 sm:py-2 px-2 text-right text-sm font-bold outline-none bg-transparent" placeholder="0" /><span className="text-xs font-bold text-slate-500 pr-2 pl-1 whitespace-nowrap">만원</span></div><span className="text-[11px] text-blue-600 font-bold text-right block pr-1 min-h-[16px] mt-0.5">{formatKoreanCurrency(value)}</span></div>; }
+    function FloorMoneyInput({ label, value, onChange }) { return <div className="flex-1 w-full min-w-[120px]"><div className="flex items-center border border-slate-300 rounded-lg bg-white focus-within:border-blue-500 focus-within:ring-1 overflow-hidden shadow-sm transition-all"><span className="bg-slate-100 text-xs font-bold text-slate-600 px-2 py-3 sm:py-2 border-r border-slate-200 whitespace-nowrap">{label}</span><input type="text" inputMode="decimal" value={fmtMoneyInput(value || '')} onChange={(e) => onChange({ target: { value: cleanMoneyInput(e.target.value) } })} className="w-full py-3 sm:py-2 px-2 text-right text-sm font-bold outline-none bg-transparent" placeholder="0" /><span className="text-xs font-bold text-slate-500 pr-2 pl-1 whitespace-nowrap">만원</span></div><span className="text-[11px] text-blue-600 font-bold text-right block pr-1 min-h-[16px] mt-0.5">{formatKoreanCurrency(value)}</span></div>; }
     function FloorTextInput({ value, onChange, onBlur, autoFocus }) { return <div className="w-full sm:w-20 shrink-0"><div className="flex items-center border border-slate-300 rounded-lg bg-white focus-within:border-blue-500 focus-within:ring-1 overflow-hidden shadow-sm transition-all"><span className="bg-slate-100 text-xs font-bold text-slate-600 px-2 py-3 sm:py-2 border-r border-slate-200 whitespace-nowrap sm:hidden md:inline-block">층수</span><input type="text" value={value || ''} onChange={onChange} onBlur={onBlur} autoFocus={autoFocus} className="w-full py-3 sm:py-2 px-2 text-center text-sm font-bold outline-none bg-transparent" placeholder="1층" /></div><span className="text-sm text-transparent block min-h-[16px] mt-0.5 hidden sm:block">.</span></div>; }
     function CompanyTextInput({ value, onChange }) { return <div className="flex-1 min-w-[140px]"><div className="flex items-center border border-slate-300 rounded-lg bg-white focus-within:border-blue-500 focus-within:ring-1 overflow-hidden shadow-sm transition-all"><span className="bg-slate-100 text-xs font-bold text-slate-600 px-2 py-3 sm:py-2 border-r border-slate-200 whitespace-nowrap">업체명</span><input type="text" value={value || ''} onChange={onChange} className="w-full py-3 sm:py-2 px-2 text-sm font-bold outline-none bg-transparent" placeholder="상호명/비고" /></div><span className="text-sm text-transparent block min-h-[16px] mt-0.5 hidden sm:block">.</span></div>; }
     function FloorMoneyInputReadOnly({ label, value }) { return <div className="flex-1 w-full min-w-[120px]"><div className="flex items-center border border-blue-200 rounded-lg bg-white overflow-hidden shadow-sm transition-all"><span className="bg-blue-100 text-xs font-bold text-blue-800 px-2 py-3 sm:py-2 border-r border-blue-200 whitespace-nowrap">{label}</span><div className="w-full py-3 sm:py-2 px-2 text-right text-sm font-extrabold text-slate-900 bg-transparent truncate">{value.toLocaleString()}</div><span className="text-xs font-bold text-slate-500 pr-2 pl-1 whitespace-nowrap">만원</span></div><span className="text-[11px] text-blue-600 font-bold text-right block pr-1 min-h-[16px] mt-0.5">{formatKoreanCurrency(value)}</span></div>; }
@@ -806,7 +810,7 @@
       const allChecked = visibleIds.length > 0 && checkedIds.length === visibleIds.length;
       const toggleOne = (id) => setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
       const toggleAll = () => setSelectedIds(allChecked ? [] : visibleIds);
-      const colCount = 14 + (showRegistrant ? 1 : 0) + (selectable ? 1 : 0);
+      const colCount = 13 + (showRegistrant ? 1 : 0) + (selectable ? 1 : 0);
       const counts = { '전체': properties.length };
       ['보류', '매매', '완료'].forEach(st => { counts[st] = properties.filter(p => (p.status || '보류') === st).length; });
       const TYPE_BADGE = { '매매': 'bg-sky-600 text-white', '전세': 'bg-emerald-600 text-white', '월세': 'bg-red-600 text-white', '연세': 'bg-purple-600 text-white' };
@@ -881,7 +885,6 @@
               <thead>
                 <tr>
                   {selectable && <th className={th + " text-center w-10"}><input type="checkbox" checked={allChecked} onChange={toggleAll} title="전체 선택" className="w-4 h-4 accent-ink-900 cursor-pointer" /></th>}
-                  <th className={th + " text-center w-12"}>No</th>
                   <th className={th + " text-center"}>상태</th>
                   <th className={th}>종류</th>
                   <th className={th}>물건명</th>
@@ -902,7 +905,6 @@
                 {filteredAndSortedProperties.length > 0 ? filteredAndSortedProperties.map((prop, idx) => (
                   <tr key={prop.id} onClick={() => onViewDetail(prop)} className="h-11 border-b border-stone-100 hover:bg-gold-100/70 cursor-pointer transition-colors">
                     {selectable && <td className="px-2.5 text-center" onClick={(e) => e.stopPropagation()}><input type="checkbox" checked={checkedIds.includes(prop.id)} onChange={() => toggleOne(prop.id)} className="w-4 h-4 accent-ink-900 cursor-pointer" /></td>}
-                    <td className="px-2.5 text-center text-slate-400 text-xs">{idx + 1}</td>
                     <td className="px-2.5 text-center"><span className={`px-2 py-0.5 rounded text-[11px] font-bold ${STATUS_BADGE_COLORS[prop.status || '보류']}`}>{prop.status || '보류'}</span></td>
                     <td className="px-2.5 text-slate-700">{prop.type}</td>
                     <td className="px-2.5 max-w-[190px]"><span className="flex items-center gap-1.5"><span className="font-semibold text-blue-600 hover:underline truncate" title={prop.name}>{prop.name}</span>{prop.is_shared && !showRegistrant && <span className="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-bold bg-gold-100 text-gold-700">공유</span>}</span></td>
@@ -1029,7 +1031,6 @@
                   <span className={`px-2.5 py-1 rounded text-xs font-bold ${STATUS_BADGE_COLORS[property.status || '보류']}`}>{property.status || '보류'}</span>
                   <span className={`px-2.5 py-1 rounded text-xs font-bold ${TYPE_BADGE[property.transactionType] || 'bg-slate-500 text-white'}`}>{property.transactionType}</span>
                   <span className="px-2.5 py-1 rounded text-xs font-medium bg-stone-100 text-slate-600 border border-stone-200">{property.type}</span>
-                  <span className="px-2.5 py-1 rounded text-xs font-medium bg-ink-900 text-gold-200">No. {property.id}</span>
                   {property.is_shared && <span className="px-2.5 py-1 rounded text-xs font-bold bg-gold-400 text-ink-900 flex items-center gap-1"><ShareIcon className="w-3 h-3" /> 공유중</span>}
                 </div>
                 <div className="flex flex-wrap items-center gap-3 mb-2">
@@ -1102,8 +1103,7 @@
                 <InfoGrid rows={[
                   ['등록자', property.registrant || '-'],
                   ['등록자 연락처', property.registrantPhone || '-'],
-                  ['등록일', property.date || '-'],
-                  ['매물번호', property.id]
+                  ['등록일', property.date || '-']
                 ]} />
               </InfoSection>
             </div>
@@ -1479,16 +1479,16 @@
                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-4 sm:gap-y-6">
                    <FormGroup label="용도지역"><input type="text" name="zoning" value={formData.zoning || ''} onChange={handleChange} className="form-input w-full p-2.5 sm:p-3 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base" placeholder="예: 일반상업지역" /></FormGroup>
                    <FormGroup label="대지면적 (㎡)">
-                      <div className="relative"><input type="number" name="landArea" value={formData.landArea || ''} onChange={handleChange} className="form-input w-full p-2.5 sm:p-3 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base" placeholder="면적 입력 (건폐/용적률 자동계산)" />{formData.landArea && (<span className="absolute -bottom-5 sm:-bottom-6 left-1 text-[10px] sm:text-xs text-blue-600 font-bold">{getExactPyeong(formData.landArea)}평</span>)}</div>
+                      <div className="relative"><input type="number" name="landArea" value={formData.landArea || ''} onChange={handleChange} className="form-input w-full p-2.5 sm:p-3 pr-20 sm:pr-24 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base" placeholder="면적 입력 (건폐/용적률 자동계산)" />{formData.landArea && (<span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs sm:text-sm text-blue-600 font-bold pointer-events-none">{getExactPyeong(formData.landArea)}평</span>)}</div>
                    </FormGroup>
                    <FormGroup label="연면적 (㎡)">
-                      <div className="relative"><input type="number" name="totalFloorArea" value={formData.totalFloorArea || ''} onChange={handleChange} className="form-input w-full p-2.5 sm:p-3 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base" placeholder="예: 1500" />{formData.totalFloorArea && (<span className="absolute -bottom-5 sm:-bottom-6 left-1 text-[10px] sm:text-xs text-blue-600 font-bold">{getExactPyeong(formData.totalFloorArea)}평</span>)}</div>
+                      <div className="relative"><input type="number" name="totalFloorArea" value={formData.totalFloorArea || ''} onChange={handleChange} className="form-input w-full p-2.5 sm:p-3 pr-20 sm:pr-24 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base" placeholder="예: 1500" />{formData.totalFloorArea && (<span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs sm:text-sm text-blue-600 font-bold pointer-events-none">{getExactPyeong(formData.totalFloorArea)}평</span>)}</div>
                    </FormGroup>
                    <FormGroup label="지상층연면적 (㎡)">
-                      <div className="relative"><input type="number" name="groundFloorArea" value={formData.groundFloorArea || ''} onChange={handleChange} className="form-input w-full p-2.5 sm:p-3 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base" placeholder="입력시 용적률 자동계산" />{formData.groundFloorArea && (<span className="absolute -bottom-5 sm:-bottom-6 left-1 text-[10px] sm:text-xs text-blue-600 font-bold">{getExactPyeong(formData.groundFloorArea)}평</span>)}</div>
+                      <div className="relative"><input type="number" name="groundFloorArea" value={formData.groundFloorArea || ''} onChange={handleChange} className="form-input w-full p-2.5 sm:p-3 pr-20 sm:pr-24 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base" placeholder="입력시 용적률 자동계산" />{formData.groundFloorArea && (<span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs sm:text-sm text-blue-600 font-bold pointer-events-none">{getExactPyeong(formData.groundFloorArea)}평</span>)}</div>
                    </FormGroup>
                    <FormGroup label="건축면적 (㎡)">
-                      <div className="relative"><input type="number" name="buildingArea" value={formData.buildingArea || ''} onChange={handleChange} className="form-input w-full p-2.5 sm:p-3 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base" placeholder="입력시 건폐율 자동계산" />{formData.buildingArea && (<span className="absolute -bottom-5 sm:-bottom-6 left-1 text-[10px] sm:text-xs text-blue-600 font-bold">{getExactPyeong(formData.buildingArea)}평</span>)}</div>
+                      <div className="relative"><input type="number" name="buildingArea" value={formData.buildingArea || ''} onChange={handleChange} className="form-input w-full p-2.5 sm:p-3 pr-20 sm:pr-24 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base" placeholder="입력시 건폐율 자동계산" />{formData.buildingArea && (<span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs sm:text-sm text-blue-600 font-bold pointer-events-none">{getExactPyeong(formData.buildingArea)}평</span>)}</div>
                    </FormGroup>
                    <div className="grid grid-cols-2 gap-4">
                      <FormGroup label="건폐율 (%)"><div className="relative"><input type="number" name="buildingCoverage" value={formData.buildingCoverage || ''} onChange={handleChange} className="form-input w-full p-2.5 sm:p-3 pr-6 sm:pr-8 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base" placeholder="수동입력 가능" /><span className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 text-slate-500 font-bold text-xs sm:text-base">%</span></div></FormGroup>
@@ -1513,7 +1513,7 @@
               <div className="max-w-xl">
                 <FormGroup label="매매가 (단위: 만원)">
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-4">
-                    <input type="number" name="sale" value={formData.sale || ''} onChange={handleChange} className="flex-[1.5] p-3 sm:p-4 border border-slate-300 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-right text-lg sm:text-xl font-bold" placeholder="예: 50000" />
+                    <input type="text" inputMode="decimal" name="sale" value={fmtMoneyInput(formData.sale || '')} onChange={(e) => setFormData(prev => ({ ...prev, sale: cleanMoneyInput(e.target.value) }))} className="flex-[1.5] p-3 sm:p-4 border border-slate-300 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-right text-lg sm:text-xl font-bold" placeholder="예: 50000" />
                     <div className="flex-1 text-right text-base sm:text-lg font-extrabold text-blue-600 bg-blue-50 py-3 sm:py-4 px-4 rounded-xl border border-blue-100 truncate shadow-sm">{formatKoreanCurrency(formData.sale) || '0원'}</div>
                   </div>
                 </FormGroup>
@@ -1763,7 +1763,7 @@
         const firstDay = new Date(year, month, 1).getDay();
         const days = [];
         
-        for (let i = 0; i < firstDay; i++) days.push(<div key={`empty-${i}`} className="bg-slate-50 border border-slate-100 rounded-lg"></div>);
+        for (let i = 0; i < firstDay; i++) days.push(<div key={`empty-${i}`} onClick={() => { if (editingDate) { setEditingDate(null); setNewMemo(''); } }} className="bg-slate-50 border border-slate-100 rounded-lg"></div>);
         for (let d = 1; d <= daysInMonth; d++) {
           const dayStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
           const isToday = new Date().toDateString() === new Date(year, month, d).toDateString();
@@ -1774,7 +1774,7 @@
           const completedCount = properties.filter(p => p.user_id === currentUser.loginId && p.date === dayStr && p.status === '완료').length;
 
           days.push(
-            <div key={d} onClick={(e) => { if(!editingDate) handleAddMemo(e, dayStr) }} className={`group relative min-h-[100px] md:min-h-[130px] p-1 md:p-2 border border-slate-100 rounded-lg cursor-pointer hover:border-blue-300 transition-colors ${isToday ? 'bg-blue-50/30 border-blue-200' : 'bg-white'}`}>
+            <div key={d} onClick={(e) => { if (!editingDate) handleAddMemo(e, dayStr); else if (editingDate !== dayStr) { setEditingDate(null); setNewMemo(''); } }} className={`group relative min-h-[100px] md:min-h-[130px] p-1 md:p-2 border border-slate-100 rounded-lg cursor-pointer hover:border-blue-300 transition-colors ${isToday ? 'bg-blue-50/30 border-blue-200' : 'bg-white'}`}>
               <div className="flex justify-between items-start mb-1">
                 <div className={`text-xs md:text-sm font-semibold ${dayColor} ${isToday ? 'font-extrabold underline' : ''}`}>{d}</div>
                 <button type="button" onClick={(e) => handleAddMemo(e, dayStr)} className="w-5 h-5 rounded-full hover:bg-slate-100 text-slate-300 hover:text-blue-600 flex items-center justify-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all"><Plus className="w-3 h-3" /></button>
