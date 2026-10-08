@@ -173,30 +173,33 @@
         const n = s.match(/^\d+(?:\.\d+)?$/); return n ? Number(n[0]) : null;
       };
       const LABELS = [
-        ['address', /^소재지$/], ['station', /^주변역$/], ['road', /^도로(조건|상황)$/],
+        ['address', /^(소재지|물건주소)$/], ['location', /^물건위치$/], ['structure', /^구조$/], ['usage', /^사용용도$/], ['rentStatus', /^임대현황$/], ['station', /^주변역$/], ['road', /^도로(조건|상황|현황)$/],
         ['landArea', /^대지면적$/], ['landArea2', /^면적$/], ['zoning', /^(용도)?지역$/], ['publicPrice', /^공시지가$/],
         ['completion', /^(준공|사용승인)/], ['totalFloorArea', /^연면적$/], ['buildingArea', /^건축면적$/],
-        ['floors', /^(층수|규모)$/], ['ratios', /^건폐율.*용적[률율]$/], ['coverage', /^건폐율$/], ['far', /^용적[률율]$/],
+        ['floors', /^(층수|(건축)?규모)$/], ['ratios', /^건폐율.*용적[률율]$/], ['coverage', /^건폐율$/], ['far', /^용적[률율]$/],
         ['mainUse', /^주용도/], ['parking', /^주차(장|대수)?$/], ['elevator', /^승강기$/], ['heating', /^냉난방$/],
         ['deposit', /^보증금$/], ['rent', /^(월)?임대료$/], ['maint', /^관리비$/], ['yield', /^(년)?수익[률율]$/], ['bond', /^채권최고액$/],
-        ['buildingPerPy', /^건물가/], ['landPerPy', /^토지가/], ['perPy', /^평단가$/], ['monthIncome', /^월수익$/], ['maintExpense', /^관리비지출$/], ['sale', /^매매가$/]
+        ['buildingPerPy', /^건물가/], ['landPerPy', /^토지가/], ['perPy', /^평단가$/], ['monthIncome', /^월수익$/], ['maintExpense', /^관리비지출$/], ['sale', /^매매(가|금액)$/]
       ];
       const labelOf = (s) => { const n = norm(s); const f = LABELS.find(([, re]) => re.test(n)); return f ? f[0] : null; };
       const joinSpaced = (t) => /^(?:[가-힣]\s)+[가-힣]$/.test(t || '') ? t.replace(/\s+/g, '') : (t || '').trim();   // "사 무 소"→"사무소", "롯데 리아"는 그대로
 
+      const featureNotes = [];
       const raw = {}; const notes = []; const floorsOut = []; let coverName = '', markName = ''; let addrLabel = null;
       const allLines = [];
       const ADDR_RE = /[가-힣]+(?:구|군|시)\s+[가-힣0-9]+(?:동|읍|면|리|가)\s*\d+(?:-\d+)?(?:번지)?|[가-힣]+(?:구|군|시)\s+[가-힣0-9]+(?:로|길)\s*\d+(?:-\d+)?/;
       pages.forEach((pg, pi) => {
-        const lines = pdfGroupLines(pg.items); allLines.push(lines);
+        const lines = pdfGroupLines(pg.items.filter(it => it.s.trim() !== '내용작성')); allLines.push(lines);
 
         if (pi === 0 && lines.length) {
           // (a) 표지: 글자가 거의 없는 첫 장에서 주소 줄 앞의 글자 = 물건명
           if (!lines.some(l => l.cells.some(c => labelOf(c.s)))) {
             const texts = lines.map(l => l.cells.map(c => c.s).join(' ').trim()).filter(Boolean);
             const idx = texts.findIndex(t => /번지|\d+-\d+/.test(t));
-            if (idx > 0) coverName = texts.slice(0, idx).join(' ').trim();
-            else if (idx === 0) { const m = texts[0].match(/^(.*?\d+(?:-\d+)?(?:번지)?)\s+(\S.*)$/); if (m) coverName = m[2].trim(); }
+            if (idx >= 0) {
+              const m = texts[idx].match(/^(.*?\d+(?:-\d+)?(?:번지)?)\s+(\S.*)$/);
+              if (m) coverName = m[2].trim(); else if (idx > 0) coverName = texts.slice(0, idx).join(' ').trim();
+            }
           }
           // (b) '◎ 이름' 형태의 제목
           lines.forEach(l => l.cells.forEach(c => { if (!markName && /^◎\s*\S/.test(c.s)) markName = c.s.replace(/^◎\s*/, '').trim(); }));
@@ -218,6 +221,15 @@
           if (/^\d{1,2}\.\s+[가-힣]/.test(c.s) && c.s.length > 6) notes.push(c.s.replace(/^\d+\.\s*/, '').trim());
           else if (c.s.startsWith('■') && c.s.replace(/\s/g, '').length > 14) notes.push(c.s.replace(/^■\s*/, '').trim());
         }));
+        if (lines.some(l => l.cells.some(c => /건물의\s*특징|^◆\s*특징$/.test(c.s)))) {
+          let curNote = null;
+          lines.forEach(l => l.cells.forEach(c => {
+            const t = c.s.trim();
+            if (!t || /^\d{1,3}$/.test(t) || /건물의\s*특징|^◆\s*특징$|^THANKS/.test(t)) return;
+            const m = t.match(/^\d{1,2}\.\s*(.+)$/);
+            if (m) { curNote = { t: m[1] }; featureNotes.push(curNote); } else if (curNote) curNote.t += ' ' + t;
+          }));
+        }
         pending.forEach(pd => {
           if (!['address', 'zoning'].includes(pd.key) || raw[pd.key].length) return;
           const cand = lines.filter(l => !l.cells.some(c => labelOf(c.s)) && Math.abs(l.y - pd.y) <= 20 && l.cells.some(c => c.x >= pd.x2 - 2 && !c.s.startsWith('▶')))
@@ -226,7 +238,7 @@
         });
 
         // 층별 현황 표 (머리글 예: 층 | 임차인현황/업종/업체명 | (건축)면적 | 보증금 | (월)임대료 | 관리비 | 비고/임대만기)
-        const headName = (n) => /^층$/.test(n) ? 'floor' : /^(임차인현황|업종|업체명|임차인)$/.test(n) ? 'tenant' : /^(건축)?면적/.test(n) ? 'area' : /^보증금/.test(n) ? 'deposit' : /임대료/.test(n) ? 'rent' : /^관리비/.test(n) ? 'maint' : /^(비고|임대만기)$/.test(n) ? 'note' : null;
+        const headName = (n) => /^(층|B\/F)$/i.test(n) ? 'floor' : /^(임차인현황|업종|업체명|임차인|용도)$/.test(n) ? 'tenant' : /^(건축)?면적/.test(n) ? 'area' : /^보증금/.test(n) ? 'deposit' : /임대료/.test(n) ? 'rent' : /^관리비/.test(n) ? 'maint' : /^(비고|임대만기|계약기간)$/.test(n) ? 'note' : null;
         const hi = lines.findIndex(l => l.cells.some(c => headName(norm(c.s)) === 'floor') && l.cells.some(c => headName(norm(c.s)) === 'tenant') && l.cells.some(c => headName(norm(c.s)) === 'note'));
         if (hi >= 0) {
           const hy = lines[hi].y;
@@ -234,24 +246,35 @@
           lines.forEach(l => { if (Math.abs(l.y - hy) <= 16) l.cells.forEach(c => { const n = norm(c.s); headTexts.push(n); const h = headName(n); if (h) cols.push({ name: h, cx: (c.x + c.x2) / 2 }); }); });
           const won = headTexts.some(t => /\(원\)/.test(t)) && !headTexts.some(t => /\(만원\)/.test(t));   // 금액 단위가 '원'이면 만원으로 바꾼다
           const colOf = (cx) => { let best = cols[0], d = 1e9; cols.forEach(c => { const dd = Math.abs(c.cx - cx); if (dd < d) { d = dd; best = c; } }); return best ? best.name : 'note'; };
-          const isFloor = (t) => /^(B\d+|-?\d+F?|지하\d+층?|\d+층|\d+\/\d+|옥상|옥탑|PH)$/i.test(t.replace(/\s+/g, ''));
-          const pageRows = []; const orphans = [];
+          const isFloor = (t) => /^(B\d+F?|-?\d+F?|지하\d+층?|\d+층|\d+\/\d+|옥상|옥탑|PH)$/i.test(t.replace(/\s+/g, ''));
+          const pageRows = []; const orphans = []; const marks = [];
+          const dataCols = ['tenant', 'deposit', 'rent', 'maint'];
           lines.forEach(l => {
             if (l.y <= hy + 16) return;
+            if (l.cells.some(c => /^(합계|계|총계)$/.test(c.s.replace(/\s+/g, '')))) return;
             const fc = l.cells.find(c => isFloor(c.s) && colOf((c.x + c.x2) / 2) === 'floor');
-            if (fc) {
+            const hasOther = l.cells.some(c => c !== fc && colOf((c.x + c.x2) / 2) !== 'note');
+            if (fc && !hasOther) { marks.push({ f: fc.s.replace(/\s+/g, ''), y: l.y }); return; }   // 위아래 칸이 합쳐진 층 칸(값 없이 층만 있는 줄)
+            const hasData = l.cells.some(c => c !== fc && dataCols.includes(colOf((c.x + c.x2) / 2)));
+            if (fc || hasData) {
               const row = {}; const frags = [];
               l.cells.forEach(c => { if (c === fc) return; const k = colOf((c.x + c.x2) / 2); if (k === 'note') frags.push({ y: l.y, t: c.s }); else row[k] = (row[k] ? row[k] + ' ' : '') + c.s; });
-              const item = { f: fc.s.replace(/\s+/g, ''), row, y: l.y, frags, won }; pageRows.push(item); floorsOut.push(item);
+              pageRows.push({ f: fc ? fc.s.replace(/\s+/g, '') : null, row, y: l.y, frags, won });
             } else if (l.cells.length && l.cells.every(c => !c.s.startsWith('※') && colOf((c.x + c.x2) / 2) === 'note')) {
               orphans.push({ y: l.y, t: l.cells.map(c => c.s).join(' ') });
             }
           });
+          // 층이 없는 행(합쳐진 층 칸 아래의 둘째 줄 등)은 가장 가까운 층 칸에 붙인다
+          const floorSrc = [...marks, ...pageRows.filter(r => r.f).map(r => ({ f: r.f, y: r.y }))];
+          pageRows.forEach(r => { if (!r.f && floorSrc.length) { let best = floorSrc[0], d = 1e9; floorSrc.forEach(m => { const dd = Math.abs(m.y - r.y) + (m.y > r.y ? 0.01 : 0); if (dd < d) { d = dd; best = m; } }); r.f = best.f; } });
           orphans.forEach(o => { let best = null, d = 1e9; pageRows.forEach(r => { const dd = Math.abs(r.y - o.y); if (dd < d) { d = dd; best = r; } }); if (best && d < 20) best.frags.push({ y: o.y, t: o.t }); });
           pageRows.forEach(r => { r.row.note = r.frags.sort((x, y) => x.y - y.y).map(x => x.t).join(' '); });
+          const isEmpty = (r) => !(r.row.tenant || r.row.deposit || r.row.rent || r.row.maint);
+          pageRows.filter(r => r.f && !(isEmpty(r) && pageRows.some(o => o !== r && o.f === r.f && !isEmpty(o)))).forEach(r => floorsOut.push(r));
         }
       });
 
+      featureNotes.forEach(n => notes.push(n.t.replace(/(\s[내용작성])+$/,'').trim()));
       const join = (k) => (raw[k] || []).join(' ').trim();
       const fields = {}; const filled = []; const skipped = [];
       const put = (key, val, label) => { if (val !== null && val !== undefined && val !== '' && !Number.isNaN(val)) { fields[key] = val; filled.push(label); } };
@@ -279,7 +302,9 @@
       if (rt) { cov = Number(rt[1]); far = Number(rt[2]); }
       else { const a = join('coverage').match(/[\d.]+/), b = join('far').match(/[\d.]+/); cov = a ? Number(a[0]) : null; far = b ? Number(b[0]) : null; }
       put('buildingCoverage', cov > 0 ? cov : null, '건폐율'); put('floorAreaRatio', far > 0 ? far : null, '용적률');
-      const pk = join('parking').match(/(\d+)\s*대/); put('parking', pk && Number(pk[1]) > 0 ? Number(pk[1]) : null, '주차대수');
+      const pkAll = [...join('parking').matchAll(/(\d+)\s*대/g)].map(m => Number(m[1]));
+      const pkVal = pkAll.length > 1 && !/[()]/.test(join('parking')) ? pkAll.reduce((a, b) => a + b, 0) : pkAll[0];
+      put('parking', pkVal > 0 ? pkVal : null, '주차대수');
       const el = join('elevator').match(/(\d+)\s*대/); put('elevators', el && Number(el[1]) > 0 ? Number(el[1]) : null, '엘리베이터');
       const sale = parseMan(join('sale'));
       if (sale > 0) { put('sale', sale, '매매가'); fields.transactionType = '매매'; }
@@ -294,13 +319,14 @@
       if (!name && fields.address) name = fields.address.split(/\s+/).slice(-2).join(' ');
       put('name', name, '물건명');
 
-      const floors = floorsOut.map(({ f, row, won }, i) => {
+      let floors = floorsOut.map(({ f, row, won }, i) => {
         const u = f.toUpperCase(); let m;
-        const label = (m = u.match(/^B(\d+)$/)) ? `지하${m[1]}층` : (m = u.match(/^-(\d+)F?$/)) ? `지하${m[1]}층` : (m = u.match(/^(\d+)F?$/)) ? `${m[1]}층` : (m = u.match(/^지하(\d+)층?$/)) ? `지하${m[1]}층` : /^\d+\/\d+$/.test(u) ? `${u}층` : f;
+        const label = (m = u.match(/^B(\d+)F?$/)) ? `지하${m[1]}층` : (m = u.match(/^-(\d+)F?$/)) ? `지하${m[1]}층` : (m = u.match(/^(\d+)F?$/)) ? `${m[1]}층` : (m = u.match(/^지하(\d+)층?$/)) ? `지하${m[1]}층` : /^\d+\/\d+$/.test(u) ? `${u}층` : f;
         const tenant = joinSpaced(row.tenant), note = joinSpaced(row.note);
         const num = (v) => { let n = v ? parseMan(v) : null; if (n !== null && won) n = Math.round(n / 10000 * 100) / 100; return n === null ? '' : n; };
         return { id: Date.now() + i, floor: label, companyName: [tenant, note].filter(Boolean).join(' · '), deposit: num(row.deposit), rent: num(row.rent), maintenance: num(row.maint) };
       });
+      floors = floors.filter(f => f.companyName || f.deposit !== '' || f.rent !== '' || f.maintenance !== '' || !floors.some(o => o !== f && o.floor === f.floor && (o.companyName || o.deposit !== '' || o.rent !== '' || o.maintenance !== '')));
       if (floors.length) filled.push(`층별 현황 ${floors.length}건`);
       if (floors.length && floors.every(f => f.deposit === '' && f.rent === '')) {
         const parts = [['보증금', 'deposit'], ['임대료', 'rent'], ['관리비', 'maint']].filter(([, k]) => parseMan(join(k)) > 0).map(([n, k]) => `${n} ${join(k)}`);
