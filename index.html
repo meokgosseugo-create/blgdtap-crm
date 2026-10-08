@@ -157,60 +157,87 @@
       });
     }
 
-    function parsePropertyPdf(pages) {
+    function parsePropertyPdf(pages, opts) {
+      opts = opts || {};
       const norm = (t) => t.replace(/[\s·ㆍ:：]/g, '');
-      const toNum = (t) => { const m = String(t).replace(/,/g, '').match(/-?\d+(?:\.\d+)?/); return m ? Number(m[0]) : null; };
+      // 금액 → 만원 단위 숫자. "180억원"→1,800,000 / "5억 3,500만원"→53,500 / "3,110만원"→3,110 / "1,000,000 만원"→1,000,000 / 숫자만 있으면 만원으로 본다
+      const parseMan = (t) => {
+        const s = String(t || '').replace(/,/g, '').replace(/\s+/g, '');
+        const eok = s.match(/(\d+(?:\.\d+)?)억/), man = s.match(/(\d+(?:\.\d+)?)만/);
+        if (eok || man) return (eok ? Number(eok[1]) * 10000 : 0) + (man ? Number(man[1]) : 0);
+        if (/원\/|원$/.test(s) && !/만원$/.test(s)) return null;      // "109,322,806 원/평" 같은 원 단위 값은 건너뜀
+        const n = s.match(/^\d+(?:\.\d+)?$/); return n ? Number(n[0]) : null;
+      };
       const LABELS = [
-        ['address', /^소재지$/], ['landArea', /^대지면적$/], ['zoning', /^지역$/], ['road', /^도로조건$/], ['publicPrice', /^공시지가$/],
-        ['completion', /^준공/], ['totalFloorArea', /^연면적$/], ['buildingArea', /^건축면적$/], ['floors', /^층수$/], ['ratios', /^건폐율/],
-        ['mainUse', /^주용도/], ['parking', /^주차장$/], ['elevator', /^승강기$/], ['heating', /^냉난방$/],
-        ['deposit', /^보증금$/], ['rent', /^임대료$/], ['maint', /^관리비$/], ['yield', /^년수익률$/], ['bond', /^채권최고액$/],
-        ['buildingPerPy', /^건물가/], ['landPerPy', /^토지가/], ['sale', /^매매가$/]
+        ['address', /^소재지$/], ['station', /^주변역$/], ['road', /^도로(조건|상황)$/],
+        ['landArea', /^대지면적$/], ['zoning', /^(용도)?지역$/], ['publicPrice', /^공시지가$/],
+        ['completion', /^(준공|사용승인)/], ['totalFloorArea', /^연면적$/], ['buildingArea', /^건축면적$/],
+        ['floors', /^층수$/], ['ratios', /^건폐율.*용적[률율]$/], ['coverage', /^건폐율$/], ['far', /^용적[률율]$/],
+        ['mainUse', /^주용도/], ['parking', /^주차(장)?$/], ['elevator', /^승강기$/], ['heating', /^냉난방$/],
+        ['deposit', /^보증금$/], ['rent', /^(월)?임대료$/], ['maint', /^관리비$/], ['yield', /^(년)?수익[률율]$/], ['bond', /^채권최고액$/],
+        ['buildingPerPy', /^건물가/], ['landPerPy', /^토지가/], ['perPy', /^평단가$/], ['monthIncome', /^월수익$/], ['maintExpense', /^관리비지출$/], ['sale', /^매매가$/]
       ];
       const labelOf = (s) => { const n = norm(s); const f = LABELS.find(([, re]) => re.test(n)); return f ? f[0] : null; };
+      const joinSpaced = (t) => /^(?:[가-힣]\s)+[가-힣]$/.test(t || '') ? t.replace(/\s+/g, '') : (t || '').trim();   // "사 무 소"→"사무소", "롯데 리아"는 그대로
 
-      const raw = {}; const notes = []; const floorsOut = []; let coverName = '';
+      const raw = {}; const notes = []; const floorsOut = []; let coverName = '', markName = '';
       pages.forEach((pg, pi) => {
         const lines = pdfGroupLines(pg.items);
 
-        // 표지(첫 장): 주소 줄 앞의 글자를 물건명으로
         if (pi === 0 && lines.length) {
-          const texts = lines.map(l => l.cells.map(c => c.s).join(' ').trim()).filter(Boolean);
-          const idx = texts.findIndex(t => /번지|\d+-\d+/.test(t));
-          if (idx > 0) coverName = texts.slice(0, idx).join(' ').trim();
+          // (a) 표지: 글자가 거의 없는 첫 장에서 주소 줄 앞의 글자 = 물건명
+          if (!lines.some(l => l.cells.some(c => labelOf(c.s)))) {
+            const texts = lines.map(l => l.cells.map(c => c.s).join(' ').trim()).filter(Boolean);
+            const idx = texts.findIndex(t => /번지|\d+-\d+/.test(t));
+            if (idx > 0) coverName = texts.slice(0, idx).join(' ').trim();
+          }
+          // (b) '◎ 이름' 형태의 제목
+          lines.forEach(l => l.cells.forEach(c => { if (!markName && /^◎\s*\S/.test(c.s)) markName = c.s.replace(/^◎\s*/, '').trim(); }));
         }
 
         // 이름 칸 → 값 칸
+        const pending = [];
         lines.forEach(line => {
-          let cur = null; let curLeft = true;
+          let cur = null;
           line.cells.forEach(c => {
             const key = labelOf(c.s);
-            if (key) { cur = key; curLeft = c.x < pg.width * 0.5; if (!(key in raw)) raw[key] = []; else cur = '__dup__'; return; }
+            if (key) { cur = key; if (!(key in raw)) { raw[key] = []; pending.push({ key, y: line.y, x2: c.x2 }); } else cur = '__dup__'; return; }
             if (c.s.startsWith('▶')) return;                         // 참고 문장은 값이 아님
-            if (curLeft && c.x > pg.width * 0.55) return;            // 왼쪽 표의 이름 칸이 오른쪽 표의 글자를 가져가지 않게
             if (cur && cur !== '__dup__') raw[cur].push(c.s);
           });
           line.cells.forEach(c => { if (c.s.startsWith('▶')) notes.push(c.s.replace(/^▶\s*/, '').trim()); });
         });
+        pending.forEach(pd => {
+          if (!['address', 'zoning'].includes(pd.key) || raw[pd.key].length) return;
+          const cand = lines.filter(l => !l.cells.some(c => labelOf(c.s)) && Math.abs(l.y - pd.y) <= 14 && l.cells.some(c => c.x >= pd.x2 - 2 && !c.s.startsWith('▶')))
+            .sort((a, b) => Math.abs(a.y - pd.y) - Math.abs(b.y - pd.y))[0];
+          if (cand) raw[pd.key] = cand.cells.filter(c => c.x >= pd.x2 - 2 && !c.s.startsWith('▶')).map(c => c.s);
+        });
 
-        // 층별 현황 표
-        const hi = lines.findIndex(l => l.cells.some(c => norm(c.s) === '임차인현황') && l.cells.some(c => norm(c.s) === '비고'));
+        // 층별 현황 표 (머리글: 층 | 임차인현황/업종 | (면적) | 보증금 | (월)임대료 | 관리비 | 비고)
+        const TENANT = ['임차인현황', '업종', '임차인'];
+        const hi = lines.findIndex(l => l.cells.some(c => norm(c.s) === '층') && l.cells.some(c => TENANT.includes(norm(c.s))) && l.cells.some(c => norm(c.s) === '비고'));
         if (hi >= 0) {
           const hy = lines[hi].y;
-          const head = [];
-          lines.forEach(l => { if (Math.abs(l.y - hy) <= 16) l.cells.forEach(c => { const n = norm(c.s); if (['층', '임차인현황', '면적', '보증금', '임대료', '관리비', '비고'].includes(n)) head.push({ n, cx: (c.x + c.x2) / 2 }); }); });
-          head.sort((a, b) => a.cx - b.cx);
-          let areaSeen = 0;
-          const cols = head.map(h => ({ cx: h.cx, name: h.n === '층' ? 'floor' : h.n === '임차인현황' ? 'tenant' : h.n === '면적' ? (areaSeen++ === 0 ? 'areaM2' : 'areaPy') : h.n === '보증금' ? 'deposit' : h.n === '임대료' ? 'rent' : h.n === '관리비' ? 'maint' : 'note' }));
+          const HEAD = { 층: 'floor', 임차인현황: 'tenant', 업종: 'tenant', 임차인: 'tenant', 면적: 'area', 건축면적: 'area', 보증금: 'deposit', 임대료: 'rent', 월임대료: 'rent', 관리비: 'maint', 비고: 'note' };
+          const cols = [];
+          lines.forEach(l => { if (Math.abs(l.y - hy) <= 16) l.cells.forEach(c => { const n = norm(c.s); if (HEAD[n]) cols.push({ name: HEAD[n], cx: (c.x + c.x2) / 2 }); }); });
           const colOf = (cx) => { let best = cols[0], d = 1e9; cols.forEach(c => { const dd = Math.abs(c.cx - cx); if (dd < d) { d = dd; best = c; } }); return best ? best.name : 'note'; };
+          const isFloor = (t) => /^(B\d+|-?\d+F?|지하\d+층?|\d+층|옥탑|PH)$/i.test(t.replace(/\s+/g, ''));
+          const pageRows = []; const orphans = [];
           lines.forEach(l => {
             if (l.y <= hy + 16) return;
-            const f = l.cells[0] && l.cells[0].s.replace(/\s+/g, '');
-            if (!f || !/^(B\d+|\d+F|지하\d+층?|\d+층|옥탑|PH)$/i.test(f)) return;
-            const row = {};
-            l.cells.slice(1).forEach(c => { const k = colOf((c.x + c.x2) / 2); row[k] = (row[k] ? row[k] + ' ' : '') + c.s; });
-            floorsOut.push({ f, row });
+            const first = l.cells[0];
+            if (first && isFloor(first.s) && colOf((first.x + first.x2) / 2) === 'floor') {
+              const row = {}; const frags = [];
+              l.cells.slice(1).forEach(c => { const k = colOf((c.x + c.x2) / 2); if (k === 'note') frags.push({ y: l.y, t: c.s }); else row[k] = (row[k] ? row[k] + ' ' : '') + c.s; });
+              const item = { f: first.s.replace(/\s+/g, ''), row, y: l.y, frags }; pageRows.push(item); floorsOut.push(item);
+            } else if (l.cells.length && l.cells.every(c => !c.s.startsWith('※') && colOf((c.x + c.x2) / 2) === 'note')) {
+              orphans.push({ y: l.y, t: l.cells.map(c => c.s).join(' ') });
+            }
           });
+          orphans.forEach(o => { let best = null, d = 1e9; pageRows.forEach(r => { const dd = Math.abs(r.y - o.y); if (dd < d) { d = dd; best = r; } }); if (best && d < 20) best.frags.push({ y: o.y, t: o.t }); });
+          pageRows.forEach(r => { r.row.note = r.frags.sort((a, b) => a.y - b.y).map(x => x.t).join(' '); });
         }
       });
 
@@ -222,38 +249,48 @@
       put('address', join('address'), '소재지');
       put('landArea', m2('landArea'), '대지면적');
       put('zoning', join('zoning'), '용도지역');
-      const comp = join('completion').match(/\d{4}[-.]\d{1,2}[-.]\d{1,2}|\d{4}/); put('completionYear', comp ? comp[0] : '', '준공(사용승인)');
+      const cm = join('completion'); let comp = null;
+      const m8 = cm.match(/\b(\d{4})(\d{2})(\d{2})\b/);
+      if (m8) comp = `${m8[1]}-${m8[2]}-${m8[3]}`; else { const m = cm.match(/\d{4}[-.]\d{1,2}[-.]\d{1,2}|\d{4}/); comp = m ? m[0] : null; }
+      put('completionYear', comp, '준공(사용승인)');
       put('totalFloorArea', m2('totalFloorArea'), '연면적');
       put('buildingArea', m2('buildingArea'), '건축면적');
-      const fl = join('floors').match(/지하\s*(\d+)\s*지상\s*(\d+)/);
+      const fl = join('floors').match(/지하\s*(\d+)\s*층?\s*\/?\s*지상\s*(\d+)/);
       if (fl) { put('floorUnderground', Number(fl[1]), '지하 층수'); put('floorGround', Number(fl[2]), '지상 층수'); }
+      let cov = null, far = null;
       const rt = join('ratios').match(/([\d.]+)\s*%\s*([\d.]+)\s*%/);
-      if (rt) { put('buildingCoverage', Number(rt[1]), '건폐율'); put('floorAreaRatio', Number(rt[2]), '용적률'); }
+      if (rt) { cov = Number(rt[1]); far = Number(rt[2]); }
+      else { const a = join('coverage').match(/[\d.]+/), b = join('far').match(/[\d.]+/); cov = a ? Number(a[0]) : null; far = b ? Number(b[0]) : null; }
+      put('buildingCoverage', cov, '건폐율'); put('floorAreaRatio', far, '용적률');
       const pk = join('parking').match(/(\d+)\s*대/); put('parking', pk ? Number(pk[1]) : null, '주차대수');
       const el = join('elevator').match(/(\d+)\s*대/); put('elevators', el ? Number(el[1]) : null, '엘리베이터');
-      const saleM = join('sale').match(/[\d,]+(?:\.\d+)?/); const sale = saleM ? toNum(saleM[0]) : null;
+      const sale = parseMan(join('sale'));
       if (sale > 0) { put('sale', sale, '매매가'); fields.transactionType = '매매'; }
+      else {
+        const rentV = parseMan(join('rent')), depV = parseMan(join('deposit'));
+        if (rentV > 0) fields.transactionType = '월세'; else if (depV > 0) fields.transactionType = '전세';
+      }
 
-      let name = coverName;
-      if (!name && fields.address) { const t = fields.address.split(/\s+/); name = t.slice(-2).join(' '); }
+      // 물건명: 표지 → ◎제목 → 인쇄된 파일 제목의 마지막 조각 → 주소의 동·번지
+      let name = coverName || markName;
+      if (!name && opts.title) { const m = String(opts.title).match(/_([^_]+)$/); if (m) name = m[1].trim(); }
+      if (!name && fields.address) name = fields.address.split(/\s+/).slice(-2).join(' ');
       put('name', name, '물건명');
 
       const floors = floorsOut.map(({ f, row }, i) => {
-        const u = f.toUpperCase();
-        const label = /^B\d+$/.test(u) ? `지하${u.slice(1)}층` : /^\d+F$/.test(u) ? `${u.slice(0, -1)}층` : f;
-        const tenant = (row.tenant || '').replace(/\s+/g, '');
-        const note = (row.note || '').replace(/\s+/g, (m) => m).replace(/(?<=[가-힣])\s+(?=[가-힣])/g, '').trim();
-        const num = (v) => { const n = v ? toNum(v) : null; return n === null ? '' : n; };
+        const u = f.toUpperCase(); let m;
+        const label = (m = u.match(/^B(\d+)$/)) ? `지하${m[1]}층` : (m = u.match(/^-(\d+)F?$/)) ? `지하${m[1]}층` : (m = u.match(/^(\d+)F?$/)) ? `${m[1]}층` : (m = u.match(/^지하(\d+)층?$/)) ? `지하${m[1]}층` : f;
+        const tenant = joinSpaced(row.tenant), note = joinSpaced(row.note);
+        const num = (v) => { const n = v ? parseMan(v) : null; return n === null ? '' : n; };
         return { id: Date.now() + i, floor: label, companyName: [tenant, note].filter(Boolean).join(' · '), deposit: num(row.deposit), rent: num(row.rent), maintenance: num(row.maint) };
       });
-      if (floors.length) filled.push(`층별 현황 ${floors.length}개 층`);
+      if (floors.length) filled.push(`층별 현황 ${floors.length}건`);
 
-      const has = (k) => k in raw;
-      if (has('road')) skipped.push('도로조건'); if (has('publicPrice')) skipped.push('공시지가');
-      if (has('mainUse')) skipped.push('주용도/구조'); if (has('heating')) skipped.push('냉난방');
-      if (floorsOut.some(x => x.row.areaM2)) skipped.push('층별 면적');
-      const nonNum = ['deposit', 'rent', 'maint'].filter(k => has(k) && join(k) && toNum(join(k)) === null);
-      if (nonNum.length) skipped.push('보증금/임대료/관리비(숫자가 아닌 값)');
+      const SKIP = { station: '주변역', road: '도로조건', publicPrice: '공시지가', mainUse: '주용도/구조', heating: '냉난방', perPy: '평단가', buildingPerPy: '건물가/평', landPerPy: '토지가/평', monthIncome: '월수익', maintExpense: '관리비지출', yield: '수익률', bond: '채권최고액' };
+      const meaningful = (k) => join(k).replace(/만원|원|%|㎡|평/g, '').trim() !== '';
+      Object.keys(SKIP).forEach(k => { if (meaningful(k)) skipped.push(SKIP[k]); });
+      if (floorsOut.some(x => x.row.area)) skipped.push('층별 면적');
+      if (!floorsOut.length) ['deposit', 'rent', 'maint'].forEach(k => { if (join(k) && parseMan(join(k)) === null) skipped.push({ deposit: '보증금', rent: '임대료', maint: '관리비' }[k] + '(숫자가 아닌 값)'); });
       return { fields, floors, notes, filled, skipped };
     }
 
@@ -1156,6 +1193,7 @@
         try {
           window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
           const doc = await window.pdfjsLib.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
+          const meta = await doc.getMetadata().catch(() => null);
           const pages = [];
           for (let i = 1; i <= doc.numPages; i++) {
             const page = await doc.getPage(i);
@@ -1163,7 +1201,7 @@
             const tc = await page.getTextContent();
             pages.push({ width: vp.width, items: tc.items.filter(t => t.str && t.str.trim()).map(t => ({ s: t.str, x: t.transform[4], y: vp.height - t.transform[5], w: t.width })) });
           }
-          const r = parsePropertyPdf(pages);
+          const r = parsePropertyPdf(pages, { title: meta && meta.info && meta.info.Title });
           if (r.filled.length === 0) {
             setPdfInfo({ error: '이 PDF에서 물건 정보를 찾지 못했어요. 사진이나 스캔한 PDF이거나, 지원하지 않는 형식일 수 있어요.' });
           } else {
@@ -1402,7 +1440,7 @@
                   <div className="mt-4 p-4 bg-white border border-gold-200 rounded-xl text-sm text-slate-700 space-y-1.5">
                     <p className="font-bold text-slate-800">✓ {pdfInfo.fileName}에서 {pdfInfo.filled.length}개 항목을 채웠어요. 내용을 확인한 뒤 저장해 주세요.</p>
                     <p><span className="font-semibold">채운 항목:</span> {pdfInfo.filled.join(', ')}</p>
-                    {pdfInfo.skipped.length > 0 && <p className="text-slate-500"><span className="font-semibold">넣지 않은 항목(물건카드에 칸이 없거나 숫자가 아님):</span> {pdfInfo.skipped.join(', ')}</p>}
+                    {pdfInfo.skipped.length > 0 && <p className="text-slate-500"><span className="font-semibold">넣지 않은 항목(카드에 칸이 없거나 자동 계산돼요):</span> {pdfInfo.skipped.join(', ')}</p>}
                     {pdfInfo.hasNotes && <p className="text-slate-500">PDF의 참고사항은 맨 아래 <b>작업 일지</b> 입력칸에 넣어 두었어요. 필요 없으면 지우고 저장하세요.</p>}
                   </div>
                 )}
