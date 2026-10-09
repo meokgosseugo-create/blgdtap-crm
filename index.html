@@ -550,9 +550,15 @@
          window.scrollTo(0, 0);
          document.body.appendChild(holder);
 
+         let fixStyle = null;
          await new Promise(resolve => setTimeout(resolve, 60));
          try {
             // 쪽마다 따로(1122×793) 찍어서 PDF에 한 장씩 붙인다
+            // 글씨 위치를 재는 작은 그림(1×1)이 Tailwind 기본 설정(img를 블록으로) 때문에 잘못 재져서 글씨가 아래로 처진다.
+            // 찍는 동안만 그 작은 그림을 원래대로(한 줄 안에) 돌려놓는다.
+            fixStyle = document.createElement('style');
+            fixStyle.textContent = 'img[width="1"][height="1"] { display: inline !important; vertical-align: baseline !important; }';
+            document.head.appendChild(fixStyle);
             const { jsPDF } = window.jspdf;
             const pdf = new jsPDF({ unit: 'px', format: [1122, 793], orientation: 'landscape', hotfixes: ['px_scaling'] });
             const pageEls = container.querySelectorAll('.report-page');
@@ -561,7 +567,21 @@
                   scale: 2, useCORS: true, backgroundColor: '#ffffff',
                   width: 1122, height: 793,
                   scrollX: 0, scrollY: 0, windowWidth: 1122, windowHeight: 793,
-                  onclone: (doc) => { doc.querySelectorAll('input, textarea').forEach(el => { el.placeholder = ''; }); }
+                  onclone: (doc) => {
+                     doc.querySelectorAll('input, textarea').forEach(el => { el.placeholder = ''; });
+                     // 입력칸의 글씨는 위 보정 후 위로 올라가 보이므로, 같은 모양의 일반 글씨 칸으로 바꿔서 찍는다.
+                     const win = doc.defaultView;
+                     doc.querySelectorAll('.report-page input').forEach(inp => {
+                        if (inp.type === 'file') return;
+                        const cs = win.getComputedStyle(inp);
+                        const d = doc.createElement('div');
+                        d.textContent = inp.value;
+                        const pt = parseFloat(cs.paddingTop) || 0, pb = parseFloat(cs.paddingBottom) || 0;
+                        const inner = Math.max(0, inp.clientHeight - pt - pb);
+                        d.style.cssText = `box-sizing:${cs.boxSizing};width:${cs.width};height:${cs.height};padding:${cs.padding};font:${cs.font};letter-spacing:${cs.letterSpacing};color:${cs.color};text-align:${cs.textAlign};background:${cs.backgroundColor};line-height:${inner}px;white-space:nowrap;overflow:hidden;border-radius:${cs.borderRadius};`;
+                        inp.parentNode.replaceChild(d, inp);
+                     });
+                  }
                });
                if (i > 0) pdf.addPage([1122, 793], 'landscape');
                pdf.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, 1122, 793);
@@ -577,6 +597,7 @@
             console.error("PDF 생성 에러:", error);
             alert("PDF 생성 중 오류가 발생했습니다.");
          } finally {
+            if (fixStyle) fixStyle.remove();
             holder.remove();
             window.scrollTo(savedScroll[0], savedScroll[1]);
             setIsGeneratingPdf(false); 
