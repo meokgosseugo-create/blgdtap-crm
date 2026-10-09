@@ -173,7 +173,7 @@
         const n = s.match(/^\d+(?:\.\d+)?$/); return n ? Number(n[0]) : null;
       };
       const LABELS = [
-        ['address', /^(소재지|물건주소)$/], ['location', /^물건위치$/], ['structure', /^구조$/], ['usage', /^사용용도$/], ['rentStatus', /^임대현황$/], ['station', /^주변역$/], ['road', /^도로(조건|상황|현황)$/],
+        ['address', /^(소재지|물건주소)$/], ['location', /^물건위치$/], ['structure', /^구조$/], ['usage', /^사용용도$/], ['rentStatus', /^임대현황$/], ['expRent', /^예상임대료$/], ['station', /^주변역$/], ['road', /^도로(조건|상황|현황)$/],
         ['landArea', /^대지면적$/], ['landArea2', /^면적$/], ['zoning', /^(용도)?지역$/], ['publicPrice', /^공시지가$/],
         ['completion', /^(준공|사용승인)/], ['totalFloorArea', /^연면적$/], ['buildingArea', /^건축면적$/],
         ['floors', /^(층수|(건축)?규모)$/], ['ratios', /^건폐율.*용적[률율]$/], ['coverage', /^건폐율$/], ['far', /^용적[률율]$/],
@@ -212,10 +212,10 @@
           line.cells.forEach(c => {
             const key = labelOf(c.s);
             if (key) { cur = key; if (!(key in raw)) { raw[key] = []; pending.push({ key, y: line.y, x2: c.x2 }); if (key === 'address') addrLabel = { pi, y: line.y }; } else cur = '__dup__'; return; }
-            if (c.s.startsWith('▶')) return;                         // 참고 문장은 값이 아님
+            if (/^[▶▪]/.test(c.s)) return;                         // 참고 문장은 값이 아님
             if (cur && cur !== '__dup__') raw[cur].push(c.s);
           });
-          line.cells.forEach(c => { if (c.s.startsWith('▶')) notes.push(c.s.replace(/^▶\s*/, '').trim()); });
+          line.cells.forEach(c => { if (/^[▶▪]/.test(c.s)) notes.push(c.s.replace(/^[▶▪]\s*/, '').trim()); });
         });
         if (lines.some(l => l.cells.some(c => labelOf(c.s)))) lines.forEach(l => l.cells.forEach(c => {
           if (/^\d{1,2}\.\s+[가-힣]/.test(c.s) && c.s.length > 6) notes.push(c.s.replace(/^\d+\.\s*/, '').trim());
@@ -232,9 +232,9 @@
         }
         pending.forEach(pd => {
           if (!['address', 'zoning'].includes(pd.key) || raw[pd.key].length) return;
-          const cand = lines.filter(l => !l.cells.some(c => labelOf(c.s)) && Math.abs(l.y - pd.y) <= 20 && l.cells.some(c => c.x >= pd.x2 - 2 && !c.s.startsWith('▶')))
+          const cand = lines.filter(l => !l.cells.some(c => labelOf(c.s)) && Math.abs(l.y - pd.y) <= 20 && l.cells.some(c => c.x >= pd.x2 - 2 && !/^[▶▪]/.test(c.s)))
             .sort((a, b) => Math.abs(a.y - pd.y) - Math.abs(b.y - pd.y))[0];
-          if (cand) raw[pd.key] = cand.cells.filter(c => c.x >= pd.x2 - 2 && !c.s.startsWith('▶')).map(c => c.s);
+          if (cand) raw[pd.key] = cand.cells.filter(c => c.x >= pd.x2 - 2 && !/^[▶▪]/.test(c.s)).map(c => c.s);
         });
 
         // 층별 현황 표 (머리글 예: 층 | 임차인현황/업종/업체명 | (건축)면적 | 보증금 | (월)임대료 | 관리비 | 비고/임대만기)
@@ -276,13 +276,14 @@
 
       featureNotes.forEach(n => notes.push(n.t.replace(/(\s[내용작성])+$/,'').trim()));
       const join = (k) => (raw[k] || []).join(' ').trim();
+      if (join('expRent')) notes.unshift('예상 임대료: ' + join('expRent'));
       const fields = {}; const filled = []; const skipped = [];
       const put = (key, val, label) => { if (val !== null && val !== undefined && val !== '' && !Number.isNaN(val)) { fields[key] = val; filled.push(label); } };
       const m2 = (k) => { const m = join(k).replace(/,/g, '').match(/(\d+(?:\.\d+)?)\s*㎡/); return m ? Number(m[1]) : null; };
 
       let addrText = join('address');
       if (!ADDR_RE.test(addrText) && addrLabel) {
-        const cand = allLines[addrLabel.pi].flatMap(l => l.cells.map(c => ({ s: c.s, y: l.y }))).filter(c => ADDR_RE.test(c.s) && !c.s.startsWith('▶') && c.s.length <= 60)
+        const cand = allLines[addrLabel.pi].flatMap(l => l.cells.map(c => ({ s: c.s, y: l.y }))).filter(c => ADDR_RE.test(c.s) && !/^[▶▪]/.test(c.s) && c.s.length <= 60)
           .sort((a, b) => Math.abs(a.y - addrLabel.y) - Math.abs(b.y - addrLabel.y))[0];
         if (cand) addrText = cand.s;
       }
@@ -291,7 +292,8 @@
       put('zoning', join('zoning'), '용도지역');
       const cm = join('completion'); let comp = null;
       const m8 = cm.match(/\b(\d{4})(\d{2})(\d{2})\b/); const mk = cm.match(/(\d{4})\s*년\s*(\d{1,2})\s*월\s*(\d{1,2})\s*일/);
-      if (mk) comp = `${mk[1]}-${String(mk[2]).padStart(2, '0')}-${String(mk[3]).padStart(2, '0')}`; else if (m8) comp = `${m8[1]}-${m8[2]}-${m8[3]}`; else { const m = cm.match(/\d{4}[-.]\d{1,2}[-.]\d{1,2}|\d{4}/); comp = m ? m[0] : null; }
+      const my = cm.match(/(\d{4})\s*년\s*(\d{1,2})\s*월/);
+      if (mk) comp = `${mk[1]}-${String(mk[2]).padStart(2, '0')}-${String(mk[3]).padStart(2, '0')}`; else if (m8) comp = `${m8[1]}-${m8[2]}-${m8[3]}`; else if (my) comp = `${my[1]}-${String(my[2]).padStart(2, '0')}${/예정/.test(cm) ? ' (준공예정)' : ''}`; else { const m = cm.match(/\d{4}[-.]\d{1,2}[-.]\d{1,2}|\d{4}/); comp = m ? m[0] : null; }
       put('completionYear', comp, '준공(사용승인)');
       put('totalFloorArea', m2('totalFloorArea'), '연면적');
       put('buildingArea', m2('buildingArea'), '건축면적');
