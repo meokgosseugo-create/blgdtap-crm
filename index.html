@@ -701,34 +701,41 @@
           <div id="premium-report-container" className="flex flex-col gap-8 p-8 items-center origin-top print:p-0 print:gap-0">
              
              {/* 1장: 표지 */}
-             <div className="report-page w-[1122px] h-[793px] bg-[#0F172A] shadow-2xl relative overflow-hidden flex flex-col shrink-0">
-                {images.main && <img src={images.main} crossOrigin="anonymous" className="absolute inset-0 w-full h-full object-cover" />}
-                <div className="absolute inset-0 bg-[#1c355e]/60 pointer-events-none z-10"></div>
-                <div className="absolute inset-0 bg-gradient-to-t from-[#0F172A] via-[#0F172A]/40 to-transparent pointer-events-none z-10"></div>
-                
-                <div className="relative z-40 px-24 pt-14 pointer-events-none">
-                   <input type="text" value={customFields.headline} onChange={e => handleCustomFieldChange('headline', e.target.value)} placeholder={ph("맨 위 한 줄 입력 (예: 급매물 – 23년 매입가 68억, 79억에서 대폭 조정)")} className="pointer-events-auto bg-transparent outline-none text-[#ffb4b4] font-black text-[26px] w-full placeholder:text-white/30 hover:bg-white/10 focus:bg-white/10 rounded px-1 -ml-1" />
+             <div className="report-page w-[1122px] h-[793px] bg-[#eef2fb] shadow-2xl relative overflow-hidden shrink-0">
+                {/* 장식: 흐릿한 동그라미 */}
+                <div className="absolute -left-16 bottom-10 w-[260px] h-[260px] rounded-full bg-gradient-to-br from-white to-[#dfe6f6]"></div>
+                <div className="absolute left-[470px] top-[60px] w-[56px] h-[56px] rounded-full bg-gradient-to-br from-[#c9d6f7] to-white"></div>
+                <div className="absolute right-[-50px] top-[-50px] w-[260px] h-[260px] rounded-full bg-gradient-to-br from-white to-[#dfe6f6]"></div>
+                <div className="absolute left-[520px] top-[560px] w-[26px] h-[26px] rounded-full bg-[#c9d6f7]"></div>
+                {/* 캡슐 사진 두 개 */}
+                <div className="absolute left-[610px] top-[34px] w-[270px] h-[380px] rounded-[135px] overflow-hidden bg-gradient-to-b from-[#3158e8] to-[#1f3fc0] shadow-xl">
+                   {images.main && <img src={images.main} crossOrigin="anonymous" className="absolute inset-0 w-full h-full object-cover" style={{ objectPosition: '50% 20%' }} />}
+                   <div className="absolute inset-0 bg-gradient-to-b from-[#2f55e6]/65 to-[#1b34a8]/70"></div>
                 </div>
-                <div className="relative z-40 flex-1 flex flex-col justify-center pl-24 pr-12 w-2/3 pointer-events-none">
-                   <div className="w-16 h-1.5 bg-[#D4AF37] mb-8 shadow-lg"></div>
-                   <h2 className="text-[#D4AF37] font-bold tracking-[0.4em] text-lg mb-3 uppercase drop-shadow-md">Premium Real Estate</h2>
-                   <h1 className="text-white font-black text-6xl leading-[1.2] mb-6 drop-shadow-2xl">{property.name}</h1>
-                   <p className="text-slate-200 text-xl font-light flex items-center gap-3 drop-shadow-md"><MapPin className="w-5 h-5 text-[#D4AF37]"/> {property.address}</p>
+                <div className="absolute left-[810px] top-[190px] w-[262px] h-[570px] rounded-[131px] overflow-hidden bg-gradient-to-b from-[#16205c] to-[#0b1233] shadow-2xl">
+                   {images.main && <img src={images.main} crossOrigin="anonymous" className="absolute inset-0 w-full h-full object-cover" style={{ objectPosition: '50% 60%' }} />}
+                   <div className="absolute inset-0 bg-gradient-to-t from-[#0b1233]/70 via-[#1a2f9c]/25 to-transparent"></div>
                 </div>
-                
-                <div className="relative z-40 h-28 bg-[#0F172A]/80 backdrop-blur-md border-t border-white/10 flex items-center justify-between px-24 pointer-events-none">
-                   <div className="pointer-events-auto">
-                      <p className="text-slate-400 text-xs tracking-widest uppercase mb-1 ml-1">Consultant</p>
-                      <div className="flex items-center text-white font-bold text-xl">
-                         <input type="text" value={consultantInfo.name} onChange={e => setConsultantInfo({...consultantInfo, name: e.target.value})} className="bg-transparent outline-none w-[100px] px-1 hover:bg-white/10 focus:bg-white/10 rounded transition-colors" title="클릭하여 이름 변경" />
-                         <span className="text-slate-500 mx-1">|</span>
-                         <input type="text" value={consultantInfo.phone} onChange={e => setConsultantInfo({...consultantInfo, phone: e.target.value})} className="bg-transparent outline-none w-[180px] px-1 hover:bg-white/10 focus:bg-white/10 rounded transition-colors" title="클릭하여 연락처 변경" />
-                      </div>
+                {/* 글자 */}
+                <div className="relative z-40 pl-20 pt-16 w-[560px] pointer-events-none">
+                   <input type="text" value={customFields.headline} onChange={e => handleCustomFieldChange('headline', e.target.value)} placeholder={ph("맨 위 한 줄 입력 (예: 급매물 – 23년 매입가 68억, 79억에서 대폭 조정)")} className="pointer-events-auto bg-transparent outline-none text-[#d93636] font-black text-[22px] w-full placeholder:text-slate-300 hover:bg-white/60 focus:bg-white/60 rounded px-1 -ml-1" />
+                </div>
+                <div className="absolute z-40 left-20 top-[250px] w-[540px] pointer-events-none">
+                   <p className="text-[#2f55e6] font-bold tracking-[0.35em] text-sm mb-4 uppercase">Premium Real Estate</p>
+                   <h1 className="text-[#2340c8] font-black text-[68px] leading-[1.12] mb-5 break-keep">{property.name}</h1>
+                   <p className="text-slate-500 text-xl font-medium flex items-center gap-2"><MapPin className="w-5 h-5 text-[#2f55e6]"/> {property.address}</p>
+                </div>
+                <div className="absolute z-40 left-20 bottom-14 pointer-events-none">
+                   <p className="text-slate-400 text-xs tracking-widest uppercase mb-1 ml-1">Consultant</p>
+                   <div className="flex items-center text-[#1a2f9c] font-bold text-xl pointer-events-auto">
+                      <input type="text" value={consultantInfo.name} onChange={e => setConsultantInfo({...consultantInfo, name: e.target.value})} className="bg-transparent outline-none w-[110px] px-1 hover:bg-white/70 focus:bg-white/70 rounded transition-colors" title="클릭하여 이름 수정" />
+                      <span className="text-slate-300 mx-2">|</span>
+                      <input type="text" value={consultantInfo.phone} onChange={e => setConsultantInfo({...consultantInfo, phone: e.target.value})} className="bg-transparent outline-none w-[190px] px-1 hover:bg-white/70 focus:bg-white/70 rounded transition-colors" title="클릭하여 연락처 수정" />
                    </div>
-                   <div className="text-right">
-                      <p className="text-slate-400 text-xs tracking-widest uppercase mb-1">Target Price</p>
-                      <p className="text-[#D4AF37] font-extrabold text-3xl">{formatKoreanCurrency(property.price?.sale)}</p>
-                   </div>
+                </div>
+                <div className="absolute z-40 left-20 bottom-[128px] pointer-events-none">
+                   <p className="text-slate-400 text-xs tracking-widest uppercase mb-1 ml-1">Target Price</p>
+                   <p className="text-[#d93636] font-black text-4xl ml-1">{formatKoreanCurrency(property.price?.sale)}</p>
                 </div>
              </div>
 
@@ -739,7 +746,7 @@
                    <span className="text-[#D4AF37] font-bold tracking-widest text-sm">{property.name}</span>
                 </div>
                 <div className="px-6 pt-3">
-                   <input type="text" value={customFields.summary} onChange={e => handleCustomFieldChange('summary', e.target.value)} placeholder={ph("한 줄 요약 입력 (예: 급매, 역 도보 6분, 23년 준공, 6m 도로 접, 수익률 3.4%)")} className="w-full bg-[#1c355e] text-white font-bold text-[18px] h-[42px] py-0 px-4 outline-none rounded-md placeholder:text-white/40 placeholder:font-medium text-center" />
+                   <input type="text" value={customFields.summary} onChange={e => handleCustomFieldChange('summary', e.target.value)} placeholder={ph("한 줄 요약 입력 (예: 급매, 역 도보 6분, 23년 준공, 6m 도로 접, 수익률 3.4%)")} className="w-full bg-[#1c355e] text-[#ffe14d] font-bold text-[18px] h-[42px] py-0 px-4 outline-none rounded-md placeholder:text-white/40 placeholder:font-medium text-center" />
                 </div>
                 <div className="flex-1 flex px-6 pt-3 pb-[58px] gap-5 overflow-hidden min-h-0">
                    <div className="w-[47%] h-full relative">
@@ -767,11 +774,13 @@
                       <div className="mt-auto">
                          <div className="flex items-center gap-3">
                             <div className="bg-[#1c355e] text-white font-black text-[26px] px-5 h-[54px] flex items-center whitespace-nowrap">매매금액</div>
-                            <div className="bg-[#fff2cc] text-red-600 font-black text-[40px] px-5 h-[54px] flex items-center flex-1 justify-center whitespace-nowrap">{formatKoreanCurrency(property.price?.sale)}</div>
+                            <div className="bg-[#e6ecf5] border border-[#1c355e]/40 h-[54px] flex items-center flex-1 justify-center gap-3 px-3 whitespace-nowrap">
+                               <span className="text-red-600 font-black text-[38px]">{formatKoreanCurrency(property.price?.sale)}</span>
+                               {Number(property.landArea) > 0 && Number(property.price?.sale) > 0 && <span className="text-red-600 font-bold text-[15px]">(평당 {formatKoreanMoneyFull(Math.round(Number(property.price.sale) / (Number(property.landArea) * 0.3025)))})</span>}
+                            </div>
                          </div>
-                         {Number(property.landArea) > 0 && Number(property.price?.sale) > 0 && <div className="text-right text-red-600 font-bold text-[14px] mt-1">(대지 평당 {formatKoreanMoneyFull(Math.round(Number(property.price.sale) / (Number(property.landArea) * 0.3025)))})</div>}
-                         <div className="flex gap-3 mt-1.5">
-                            <div className="w-[60%] flex flex-col gap-1.5">
+                         <div className="flex gap-3 mt-2">
+                            <div className="w-[56%] flex flex-col gap-1.5">
                                {[['보증금', floorTotals.deposit], ['임대료', floorTotals.rent], ['관리비', floorTotals.maintenance]].map(([label, v]) => (
                                  <div key={label} className="flex items-center h-[32px]">
                                     <div className="w-[34%] h-full bg-[#1c355e] text-white font-bold text-[15px] flex items-center justify-center">{label}</div>
@@ -779,8 +788,8 @@
                                  </div>
                                ))}
                             </div>
-                            <div className="w-[40%] flex items-center">
-                               <textarea value={customFields.saleNote} onChange={e=>handleCustomFieldChange('saleNote', e.target.value)} rows={4} className="w-full h-full resize-none text-center text-red-600 font-bold text-[16px] leading-[22px] bg-transparent outline-none hover:bg-red-50 placeholder:text-slate-300 placeholder:font-medium" placeholder={ph("매매 조건 메모 (예: 매각 후 2년간 2개층 리스백 조건)")}></textarea>
+                            <div className="flex-1 h-[102px]">
+                               <textarea value={customFields.saleNote} onChange={e=>handleCustomFieldChange('saleNote', e.target.value)} className="w-full h-full resize-none text-center text-red-600 font-bold text-[16px] leading-[22px] bg-[#fff] border-2 border-[#1c355e]/40 outline-none px-2 py-2 hover:bg-red-50/40 placeholder:text-slate-300 placeholder:font-medium" placeholder={ph("물건 특이사항을 직접 입력 (예: 매각 후 2년간 2개층 리스백 조건)")}></textarea>
                             </div>
                          </div>
                       </div>
