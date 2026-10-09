@@ -128,6 +128,13 @@
     };
 
     // 금액 입력칸: 화면에는 콤마(1,800,000), 저장 값은 숫자만
+    // 만원 단위 숫자를 "3,333억 3,333만원"처럼 빠짐없이 보여 준다
+    const formatKoreanMoneyFull = (val) => {
+      const n = Math.round(Number(String(val === undefined || val === null ? '' : val).replace(/,/g, '')));
+      if (!n || isNaN(n)) return '0원';
+      const eok = Math.floor(n / 10000), man = n % 10000;
+      return [eok ? `${eok.toLocaleString('ko-KR')}억` : '', man ? `${man.toLocaleString('ko-KR')}만원` : ''].filter(Boolean).join(' ');
+    };
     const fmtMoneyInput = (v) => { const t = String(v === undefined || v === null ? '' : v).replace(/,/g, ''); if (t === '') return ''; const [i, d] = t.split('.'); return (Number(i) || 0).toLocaleString('ko-KR') + (d !== undefined ? '.' + d : ''); };
     const cleanMoneyInput = (t) => t.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1');
 
@@ -1734,20 +1741,37 @@
     }
 
     function CustomerListView({ customers }) {
+      const [minEok, setMinEok] = useState('');
+      const [maxEok, setMaxEok] = useState('');
+      const shown = customers.filter(c => {
+        const budget = Number(c.budget) || 0;
+        if (minEok !== '' && budget < Number(minEok) * 10000) return false;
+        if (maxEok !== '' && budget > Number(maxEok) * 10000) return false;
+        return true;
+      });
+      const filtering = minEok !== '' || maxEok !== '';
       return (
         <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden w-full">
-          <div className="p-4 md:p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50/50">
-            <h3 className="font-semibold text-ink-800 flex items-center gap-2 text-sm md:text-base"><Users className="w-5 h-5 text-blue-600" /> 등록된 매수자 <span className="text-blue-600 bg-blue-100 px-2 py-0.5 rounded-full text-xs">{customers.length}</span></h3>
+          <div className="p-4 md:p-5 border-b border-slate-200 flex flex-wrap justify-between items-center gap-3 bg-slate-50/50">
+            <h3 className="font-semibold text-ink-800 flex items-center gap-2 text-sm md:text-base"><Users className="w-5 h-5 text-blue-600" /> 등록된 매수자 <span className="text-blue-600 bg-blue-100 px-2 py-0.5 rounded-full text-xs">{filtering ? `${shown.length} / ${customers.length}` : customers.length}</span></h3>
+            <div className="flex flex-wrap items-center gap-2 text-xs md:text-sm">
+              <span className="font-bold text-slate-700">금액(억)</span>
+              <input type="text" inputMode="decimal" value={minEok} onChange={(e) => setMinEok(cleanMoneyInput(e.target.value))} placeholder="최소" className="w-20 h-9 px-3 border border-slate-300 rounded-lg outline-none focus:border-blue-500 text-right bg-white" />
+              <span className="text-slate-400">~</span>
+              <input type="text" inputMode="decimal" value={maxEok} onChange={(e) => setMaxEok(cleanMoneyInput(e.target.value))} placeholder="최대" className="w-20 h-9 px-3 border border-slate-300 rounded-lg outline-none focus:border-blue-500 text-right bg-white" />
+              <button type="button" onClick={() => { setMinEok(''); setMaxEok(''); }} className="h-9 px-3 rounded-lg border border-slate-300 bg-white font-bold text-slate-600 hover:bg-slate-50">초기화</button>
+            </div>
           </div>
           <div className="overflow-x-auto w-full">
-            <table className="w-full text-left border-collapse whitespace-nowrap min-w-[600px]">
+            <table className="w-full text-left border-collapse min-w-[720px]">
               <thead>
-                <tr className="bg-slate-50 border-b border-slate-200 text-[11px] md:text-xs uppercase tracking-wider text-slate-500"><th className="p-3 md:p-4 font-medium">이름</th><th className="p-3 md:p-4 font-medium">전화번호</th><th className="p-3 md:p-4 font-medium text-right">투자금액(만원)</th><th className="p-3 md:p-4 font-medium">희망 지역</th><th className="p-3 md:p-4 font-medium">구매사유</th></tr>
+                <tr className="bg-slate-50 border-b border-slate-200 text-[11px] md:text-xs uppercase tracking-wider text-slate-500"><th className="p-3 md:p-4 font-medium whitespace-nowrap">이름</th><th className="p-3 md:p-4 font-medium whitespace-nowrap">전화번호</th><th className="p-3 md:p-4 font-medium text-right whitespace-nowrap">투자금액</th><th className="p-3 md:p-4 font-medium whitespace-nowrap">희망 지역</th><th className="p-3 md:p-4 font-medium">구매사유</th></tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-xs md:text-sm">
-                {customers.map(cust => (
-                  <tr key={cust.id} className="hover:bg-blue-50/50 transition-colors"><td className="p-3 md:p-4 font-bold text-ink-800">{cust.name}</td><td className="p-3 md:p-4 text-slate-600">{cust.phone}</td><td className="p-3 md:p-4 text-right font-bold text-red-600">{formatKoreanCurrency(cust.budget)}</td><td className="p-3 md:p-4 text-slate-600">{cust.region}</td><td className="p-3 md:p-4 text-slate-600 truncate max-w-[150px] md:max-w-[200px]">{cust.reason}</td></tr>
+                {shown.map(cust => (
+                  <tr key={cust.id} className="hover:bg-blue-50/50 transition-colors align-top"><td className="p-3 md:p-4 font-bold text-ink-800 whitespace-nowrap">{cust.name}</td><td className="p-3 md:p-4 text-slate-600 whitespace-nowrap">{cust.phone}</td><td className="p-3 md:p-4 text-right font-bold text-red-600 whitespace-nowrap">{formatKoreanMoneyFull(cust.budget)}</td><td className="p-3 md:p-4 text-slate-600 whitespace-nowrap">{cust.region}</td><td className="p-3 md:p-4 text-slate-600 whitespace-pre-line min-w-[260px]">{cust.reason}</td></tr>
                 ))}
+                {shown.length === 0 && <tr><td colSpan={5} className="p-8 text-center text-slate-400">조건에 맞는 매수자가 없습니다.</td></tr>}
               </tbody>
             </table>
           </div>
@@ -1773,21 +1797,27 @@
       };
 
       return (
-        <div className="max-w-2xl mx-auto pb-10">
+        <div className="max-w-3xl mx-auto pb-10">
           <div className="flex justify-between items-center mb-6"><h2 className="text-xl md:text-2xl font-bold text-ink-800">신규 손님 등록</h2><button type="button" onClick={onBack} className="text-slate-500 hover:text-ink-800 text-sm font-medium bg-slate-200 px-3 py-1.5 rounded-lg">취소 및 돌아가기</button></div>
           <form onSubmit={handleSubmit} className="space-y-6 bg-white p-5 md:p-6 rounded-3xl shadow-sm border border-slate-200">
             <h3 className="text-base md:text-lg font-bold text-ink-800 mb-4 md:mb-5 pb-2 md:pb-3 border-b border-slate-100 flex items-center gap-2"><Users className="w-4 h-4 md:w-5 md:h-5 text-blue-500" /> 손님(매수자) 정보</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4"><FormGroup label="이름"><input type="text" name="name" onChange={handleChange} className="form-input w-full p-2.5 md:p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm md:text-base" placeholder="김투자" /></FormGroup><FormGroup label="전화번호"><input type="tel" name="phone" onChange={handleChange} className="form-input w-full p-2.5 md:p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm md:text-base" placeholder="010-0000-0000" /></FormGroup></div>
-            <FormGroup label="금액 (단위: 만원)">
-              <div className="flex items-center gap-2">
-                <input type="number" name="budget" onChange={handleChange} className="form-input flex-1 p-2.5 md:p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-right text-sm md:text-base font-bold" placeholder="예: 50000" />
-                <div className="w-32 sm:w-40 text-right text-sm sm:text-base font-bold text-blue-600 bg-blue-50 py-2.5 sm:py-3 px-3 rounded-lg border border-blue-100 truncate shadow-sm">
-                  {formatKoreanCurrency(formData.budget) || '0원'}
-                </div>
+            <div className="grid grid-cols-1 sm:grid-cols-6 gap-4">
+              <div className="sm:col-span-2"><FormGroup label="이름"><input type="text" name="name" onChange={handleChange} className="form-input w-full p-2.5 md:p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm md:text-base" placeholder="김투자" /></FormGroup></div>
+              <div className="sm:col-span-4"><FormGroup label="전화번호"><input type="tel" name="phone" onChange={handleChange} className="form-input w-full p-2.5 md:p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm md:text-base" placeholder="010-0000-0000" /></FormGroup></div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-6 gap-4">
+              <div className="sm:col-span-4">
+                <FormGroup label="금액 (단위: 만원)">
+                  <div className="flex items-center border rounded-lg bg-white focus-within:ring-2 focus-within:ring-blue-500 overflow-hidden">
+                    <input type="text" inputMode="decimal" name="budget" value={fmtMoneyInput(formData.budget)} onChange={(e) => setFormData({ ...formData, budget: cleanMoneyInput(e.target.value) })} className="w-full min-w-0 p-2.5 md:p-3 text-right text-sm md:text-base font-bold outline-none bg-transparent" placeholder="예: 50,000" />
+                    <span className="text-xs font-bold text-slate-500 pr-3 pl-1 whitespace-nowrap">만원</span>
+                  </div>
+                  <span className="text-sm font-bold text-blue-600 text-right block min-h-[20px]">{formData.budget ? formatKoreanMoneyFull(formData.budget) : ''}</span>
+                </FormGroup>
               </div>
-            </FormGroup>
-            <FormGroup label="지역"><input type="text" name="region" onChange={handleChange} className="form-input w-full p-2.5 md:p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm md:text-base" placeholder="예: 성남시 분당구 일대" /></FormGroup>
-            <FormGroup label="구매사유"><textarea name="reason" onChange={handleChange} rows={3} className="form-input w-full p-2.5 md:p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none resize-none text-sm md:text-base" placeholder="예: 사옥 이전, 임대수익 목적 등" /></FormGroup>
+              <div className="sm:col-span-2"><FormGroup label="지역"><input type="text" name="region" onChange={handleChange} className="form-input w-full p-2.5 md:p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm md:text-base" placeholder="예: 분당구 일대" /></FormGroup></div>
+            </div>
+            <FormGroup label="구매사유"><textarea name="reason" onChange={handleChange} rows={7} className="form-input w-full p-2.5 md:p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none resize-y text-sm md:text-base" placeholder="예: 사옥 이전, 임대수익 목적 등 (길게 적어도 돼요)" /></FormGroup>
             <div className="flex pt-4"><button type="submit" disabled={isSubmitting} className={`w-full py-3.5 bg-blue-600 text-white rounded-3xl font-bold text-base shadow-sm hover:bg-blue-700 ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}>{isSubmitting ? '처리 중...' : '손님 등록'}</button></div>
           </form>
         </div>
