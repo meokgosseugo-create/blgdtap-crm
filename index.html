@@ -355,8 +355,8 @@
     const STATUS_FORM_COLORS = { '보류': 'bg-amber-100 text-amber-800', '매매': 'bg-emerald-100 text-emerald-800', '완료': 'bg-sky-100 text-sky-800' };
     const STATUS_BADGE_COLORS = { '보류': 'bg-amber-100 text-amber-800', '매매': 'bg-emerald-100 text-emerald-800', '완료': 'bg-sky-100 text-sky-800' };
 
-    const SVG_PATHS = {"calendar": "<rect width=\"18\" height=\"18\" x=\"3\" y=\"4\" rx=\"2\"/><path d=\"M16 2v4M8 2v4M3 10h18\"/>", "building2": "<path d=\"M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z\"/><path d=\"M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2\"/><path d=\"M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2\"/><path d=\"M10 6h4M10 10h4M10 14h4M10 18h4\"/>", "building": "<rect width=\"16\" height=\"20\" x=\"4\" y=\"2\" rx=\"2\"/><path d=\"M9 22v-4h6v4M8 6h.01M16 6h.01M12 6h.01M12 10h.01M12 14h.01M16 10h.01M16 14h.01M8 10h.01M8 14h.01\"/>", "share": "<circle cx=\"18\" cy=\"5\" r=\"3\"/><circle cx=\"6\" cy=\"12\" r=\"3\"/><circle cx=\"18\" cy=\"19\" r=\"3\"/><path d=\"m8.59 13.51 6.83 3.98M15.41 6.51l-6.82 3.98\"/>", "users": "<path d=\"M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2\"/><circle cx=\"9\" cy=\"7\" r=\"4\"/><path d=\"M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75\"/>", "usercircle": "<circle cx=\"12\" cy=\"12\" r=\"10\"/><circle cx=\"12\" cy=\"10\" r=\"3\"/><path d=\"M7 20.662V19a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v1.662\"/>", "logout": "<path d=\"M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9\"/>", "store": "<path d=\"m2 7 4.41-4.41A2 2 0 0 1 7.83 2h8.34a2 2 0 0 1 1.42.59L22 7\"/><path d=\"M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8\"/><path d=\"M15 22v-4a2 2 0 0 0-2-2h-2a2 2 0 0 0-2 2v4\"/><path d=\"M2 7h20\"/>", "briefcase": "<rect width=\"20\" height=\"14\" x=\"2\" y=\"7\" rx=\"2\"/><path d=\"M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16\"/>", "home": "<path d=\"M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8\"/><path d=\"M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z\"/>", "door": "<path d=\"M18 20V6a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v14\"/><path d=\"M2 20h20\"/><path d=\"M14 12v.01\"/>"};
-    const FA2SVG = { 'fa-calendar-alt': 'calendar', 'fa-building': 'building2', 'fa-share-alt': 'share', 'fa-users': 'users', 'fa-user-circle': 'usercircle' };
+    const SVG_PATHS = {"calendar": "<rect width=\"18\" height=\"18\" x=\"3\" y=\"4\" rx=\"2\"/><path d=\"M16 2v4M8 2v4M3 10h18\"/>", "building2": "<path d=\"M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z\"/><path d=\"M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2\"/><path d=\"M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2\"/><path d=\"M10 6h4M10 10h4M10 14h4M10 18h4\"/>", "building": "<rect width=\"16\" height=\"20\" x=\"4\" y=\"2\" rx=\"2\"/><path d=\"M9 22v-4h6v4M8 6h.01M16 6h.01M12 6h.01M12 10h.01M12 14h.01M16 10h.01M16 14h.01M8 10h.01M8 14h.01\"/>", "share": "<circle cx=\"18\" cy=\"5\" r=\"3\"/><circle cx=\"6\" cy=\"12\" r=\"3\"/><circle cx=\"18\" cy=\"19\" r=\"3\"/><path d=\"m8.59 13.51 6.83 3.98M15.41 6.51l-6.82 3.98\"/>", "users": "<path d=\"M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2\"/><circle cx=\"9\" cy=\"7\" r=\"4\"/><path d=\"M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75\"/>", "usersround": "<path d=\"M18 21a8 8 0 0 0-16 0\"/><circle cx=\"10\" cy=\"8\" r=\"5\"/><path d=\"M22 20c0-3.37-2-6.5-4-8a5 5 0 0 0-.45-8.3\"/>", "usercircle": "<circle cx=\"12\" cy=\"12\" r=\"10\"/><circle cx=\"12\" cy=\"10\" r=\"3\"/><path d=\"M7 20.662V19a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v1.662\"/>", "logout": "<path d=\"M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9\"/>", "store": "<path d=\"m2 7 4.41-4.41A2 2 0 0 1 7.83 2h8.34a2 2 0 0 1 1.42.59L22 7\"/><path d=\"M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8\"/><path d=\"M15 22v-4a2 2 0 0 0-2-2h-2a2 2 0 0 0-2 2v4\"/><path d=\"M2 7h20\"/>", "briefcase": "<rect width=\"20\" height=\"14\" x=\"2\" y=\"7\" rx=\"2\"/><path d=\"M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16\"/>", "home": "<path d=\"M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8\"/><path d=\"M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z\"/>", "door": "<path d=\"M18 20V6a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v14\"/><path d=\"M2 20h20\"/><path d=\"M14 12v.01\"/>"};
+    const FA2SVG = { 'fa-calendar-alt': 'calendar', 'fa-building': 'building2', 'fa-share-alt': 'share', 'fa-users': 'users', 'fa-user-circle': 'usercircle', 'fa-user-friends': 'usersround' };
     const SvgIcon = ({ k, className }) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className={className} dangerouslySetInnerHTML={{ __html: SVG_PATHS[k] }} />;
     const TYPE_ICON = { '빌딩': 'building2', '상가': 'store', '오피스텔': 'briefcase', '아파트': 'building', '빌라': 'home', '원룸': 'door', '투룸': 'door', '쓰리룸+': 'door' };
     const TypeIcon = ({ type }) => <span className="inline-flex w-6 h-6 rounded-lg bg-gold-50 text-gold-500 items-center justify-center shrink-0"><SvgIcon k={TYPE_ICON[type] || 'building2'} className="w-3.5 h-3.5" /></span>;
@@ -386,6 +386,7 @@
     const Trash2 = (p) => <Icon name="fa-trash-alt" {...p} />;
     const TrendingUp = (p) => <Icon name="fa-chart-line" {...p} />;
     const UserCircle = (p) => <Icon name="fa-user-circle" {...p} />;
+    const UserFriends = (p) => <Icon name="fa-user-friends" {...p} />;
     const Briefcase = (p) => <Icon name="fa-briefcase" {...p} />;
     const CalendarIcon = (p) => <Icon name="fa-calendar-alt" {...p} />;
     const ChevronLeft = (p) => <Icon name="fa-chevron-left" {...p} />;
@@ -1740,20 +1741,23 @@
       );
     }
 
-    function CustomerListView({ customers }) {
+    function CustomerListView({ customers, shared, onToggleShare }) {
       const [minEok, setMinEok] = useState('');
       const [maxEok, setMaxEok] = useState('');
       const shown = customers.filter(c => {
         const budget = Number(c.budget) || 0;
-        if (minEok !== '' && budget < Number(minEok) * 10000) return false;
-        if (maxEok !== '' && budget > Number(maxEok) * 10000) return false;
+        if (minEok !== '' && budget < Number(minEok)) return false;
+        if (maxEok !== '' && budget > Number(maxEok)) return false;
         return true;
       });
       const filtering = minEok !== '' || maxEok !== '';
+      const money = (v) => formatKoreanMoneyFull((Number(v) || 0) * 10000);
+      const th = "p-3 md:p-4 font-medium whitespace-nowrap";
+      const td = "p-3 md:p-4 text-slate-600 whitespace-nowrap";
       return (
         <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden w-full">
           <div className="p-4 md:p-5 border-b border-slate-200 flex flex-wrap justify-between items-center gap-3 bg-slate-50/50">
-            <h3 className="font-semibold text-ink-800 flex items-center gap-2 text-sm md:text-base"><Users className="w-5 h-5 text-blue-600" /> 등록된 매수자 <span className="text-blue-600 bg-blue-100 px-2 py-0.5 rounded-full text-xs">{filtering ? `${shown.length} / ${customers.length}` : customers.length}</span></h3>
+            <h3 className="font-semibold text-ink-800 flex items-center gap-2 text-sm md:text-base"><Users className="w-5 h-5 text-blue-600" /> {shared ? '공동 매수자' : '등록된 매수자'} <span className="text-blue-600 bg-blue-100 px-2 py-0.5 rounded-full text-xs">{filtering ? `${shown.length} / ${customers.length}` : customers.length}</span></h3>
             <div className="flex flex-wrap items-center gap-2 text-xs md:text-sm">
               <span className="font-bold text-slate-700">금액(억)</span>
               <input type="text" inputMode="decimal" value={minEok} onChange={(e) => setMinEok(cleanMoneyInput(e.target.value))} placeholder="최소" className="w-20 h-9 px-3 border border-slate-300 rounded-lg outline-none focus:border-blue-500 text-right bg-white" />
@@ -1762,16 +1766,29 @@
               <button type="button" onClick={() => { setMinEok(''); setMaxEok(''); }} className="h-9 px-3 rounded-lg border border-slate-300 bg-white font-bold text-slate-600 hover:bg-slate-50">초기화</button>
             </div>
           </div>
+          {shared && <div className="px-4 md:px-5 py-2.5 bg-blue-50 text-blue-800 text-xs md:text-sm font-semibold border-b border-blue-100">모든 직원이 볼 수 있는 매수자예요. 이름과 전화번호는 공개되지 않아요.</div>}
           <div className="overflow-x-auto w-full">
             <table className="w-full text-left border-collapse min-w-[720px]">
               <thead>
-                <tr className="bg-slate-50 border-b border-slate-200 text-[11px] md:text-xs uppercase tracking-wider text-slate-500"><th className="p-3 md:p-4 font-medium whitespace-nowrap">이름</th><th className="p-3 md:p-4 font-medium whitespace-nowrap">전화번호</th><th className="p-3 md:p-4 font-medium text-right whitespace-nowrap">투자금액</th><th className="p-3 md:p-4 font-medium whitespace-nowrap">희망 지역</th><th className="p-3 md:p-4 font-medium">구매사유</th></tr>
+                <tr className="bg-slate-50 border-b border-slate-200 text-[11px] md:text-xs uppercase tracking-wider text-slate-500">
+                  {!shared && <th className={th}>이름</th>}{!shared && <th className={th}>전화번호</th>}
+                  <th className={th + " text-right"}>투자금액</th><th className={th}>희망 지역</th><th className="p-3 md:p-4 font-medium">구매사유</th>
+                  {shared && <th className={th}>등록자</th>}{shared && <th className={th}>등록일</th>}
+                  {!shared && <th className={th + " text-center"}>공유</th>}
+                </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-xs md:text-sm">
                 {shown.map(cust => (
-                  <tr key={cust.id} className="hover:bg-blue-50/50 transition-colors align-top"><td className="p-3 md:p-4 font-bold text-ink-800 whitespace-nowrap">{cust.name}</td><td className="p-3 md:p-4 text-slate-600 whitespace-nowrap">{cust.phone}</td><td className="p-3 md:p-4 text-right font-bold text-red-600 whitespace-nowrap">{formatKoreanMoneyFull(cust.budget)}</td><td className="p-3 md:p-4 text-slate-600 whitespace-nowrap">{cust.region}</td><td className="p-3 md:p-4 text-slate-600 whitespace-pre-line min-w-[260px]">{cust.reason}</td></tr>
+                  <tr key={cust.id} className="hover:bg-blue-50/50 transition-colors align-top">
+                    {!shared && <td className="p-3 md:p-4 font-bold text-ink-800 whitespace-nowrap">{cust.name}</td>}{!shared && <td className={td}>{cust.phone}</td>}
+                    <td className="p-3 md:p-4 text-right font-bold text-red-600 whitespace-nowrap">{money(cust.budget)}</td>
+                    <td className={td}>{cust.region}</td>
+                    <td className="p-3 md:p-4 text-slate-600 whitespace-pre-line min-w-[260px]">{cust.reason}</td>
+                    {shared && <td className={td}>{cust.registrant}</td>}{shared && <td className={td}>{cust.date}</td>}
+                    {!shared && <td className="p-3 md:p-4 text-center"><button type="button" onClick={() => onToggleShare && onToggleShare(cust.id)} title="공동 매수자에 올리거나 내리기" className={`px-3 py-1 rounded-full text-xs font-bold border transition-colors ${cust.is_shared ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-500 border-slate-300'}`}>{cust.is_shared ? '공유 중' : '비공개'}</button></td>}
+                  </tr>
                 ))}
-                {shown.length === 0 && <tr><td colSpan={5} className="p-8 text-center text-slate-400">조건에 맞는 매수자가 없습니다.</td></tr>}
+                {shown.length === 0 && <tr><td colSpan={6} className="p-8 text-center text-slate-400">{shared ? '공유된 매수자가 없습니다.' : '조건에 맞는 매수자가 없습니다.'}</td></tr>}
               </tbody>
             </table>
           </div>
@@ -1780,7 +1797,7 @@
     }
 
     function CustomerFormView({ onBack, onSave }) {
-      const [formData, setFormData] = useState({ name: '', phone: '', budget: '', region: '', reason: '' });
+      const [formData, setFormData] = useState({ name: '', phone: '', budget: '', region: '', reason: '', is_shared: true });
       const [isSubmitting, setIsSubmitting] = useState(false);
 
       const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -1792,7 +1809,7 @@
         if (!formData.budget) return alert("투자금액을 입력해주세요.");
 
         setIsSubmitting(true);
-        await onSave(formData);
+        await onSave({ ...formData, budget: Number(formData.budget) || 0 });
         setIsSubmitting(false);
       };
 
@@ -1807,17 +1824,26 @@
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-6 gap-4">
               <div className="sm:col-span-4">
-                <FormGroup label="금액 (단위: 만원)">
+                <FormGroup label="금액 (단위: 억)">
                   <div className="flex items-center border rounded-lg bg-white focus-within:ring-2 focus-within:ring-blue-500 overflow-hidden">
-                    <input type="text" inputMode="decimal" name="budget" value={fmtMoneyInput(formData.budget)} onChange={(e) => setFormData({ ...formData, budget: cleanMoneyInput(e.target.value) })} className="w-full min-w-0 p-2.5 md:p-3 text-right text-sm md:text-base font-bold outline-none bg-transparent" placeholder="예: 50,000" />
-                    <span className="text-xs font-bold text-slate-500 pr-3 pl-1 whitespace-nowrap">만원</span>
+                    <input type="text" inputMode="decimal" name="budget" value={fmtMoneyInput(formData.budget)} onChange={(e) => setFormData({ ...formData, budget: cleanMoneyInput(e.target.value) })} className="w-full min-w-0 p-2.5 md:p-3 text-right text-sm md:text-base font-bold outline-none bg-transparent" placeholder="예: 30 또는 12.5" />
+                    <span className="text-xs font-bold text-slate-500 pr-3 pl-1 whitespace-nowrap">억</span>
                   </div>
-                  <span className="text-sm font-bold text-blue-600 text-right block min-h-[20px]">{formData.budget ? formatKoreanMoneyFull(formData.budget) : ''}</span>
+                  <span className="text-sm font-bold text-blue-600 text-right block min-h-[20px]">{formData.budget ? formatKoreanMoneyFull((Number(formData.budget) || 0) * 10000) : ''}</span>
                 </FormGroup>
               </div>
               <div className="sm:col-span-2"><FormGroup label="지역"><input type="text" name="region" onChange={handleChange} className="form-input w-full p-2.5 md:p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm md:text-base" placeholder="예: 분당구 일대" /></FormGroup></div>
             </div>
             <FormGroup label="구매사유"><textarea name="reason" onChange={handleChange} rows={7} className="form-input w-full p-2.5 md:p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none resize-y text-sm md:text-base" placeholder="예: 사옥 이전, 임대수익 목적 등 (길게 적어도 돼요)" /></FormGroup>
+            <div className="flex items-center justify-between gap-3 p-4 rounded-2xl bg-blue-50 border border-blue-100">
+              <div>
+                <p className="font-bold text-slate-800 text-sm md:text-base">공동 매수자로 공유</p>
+                <p className="text-xs md:text-sm text-slate-500 mt-0.5">켜 두면 직원 모두가 금액·지역·구매사유를 볼 수 있어요. 이름과 전화번호는 공개되지 않아요.</p>
+              </div>
+              <button type="button" role="switch" aria-checked={formData.is_shared} onClick={() => setFormData({ ...formData, is_shared: !formData.is_shared })} className={`shrink-0 w-14 h-8 rounded-full p-1 transition-colors ${formData.is_shared ? 'bg-blue-600' : 'bg-slate-300'}`}>
+                <span className={`block w-6 h-6 rounded-full bg-white shadow transition-transform ${formData.is_shared ? 'translate-x-6' : ''}`}></span>
+              </button>
+            </div>
             <div className="flex pt-4"><button type="submit" disabled={isSubmitting} className={`w-full py-3.5 bg-blue-600 text-white rounded-3xl font-bold text-base shadow-sm hover:bg-blue-700 ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}>{isSubmitting ? '처리 중...' : '손님 등록'}</button></div>
           </form>
         </div>
@@ -2021,6 +2047,7 @@
       const [properties, setProperties] = useState([]);
       const [employees, setEmployees] = useState([]);
       const [customers, setCustomers] = useState([]);
+      const [sharedCustomers, setSharedCustomers] = useState([]);
       const [memos, setMemos] = useState([]);
       const [comments, setComments] = useState([]);
 
@@ -2051,12 +2078,13 @@
       const fetchCloudData = async () => {
         setIsFetchingData(true);
         try {
-          const [propsRes, usersRes, custsRes, memosRes, commentsRes] = await Promise.all([
+          const [propsRes, usersRes, custsRes, memosRes, commentsRes, sharedCustRes] = await Promise.all([
             supabase.from('crm_properties').select('*'),
             supabase.from('crm_users').select('*'),
             supabase.from('crm_customers').select('*'),
             supabase.from('crm_memos').select('*'),
-            supabase.from('crm_comments').select('*')
+            supabase.from('crm_comments').select('*'),
+            supabase.from('crm_shared_customers').select('*')
           ]);
           
           if (propsRes.data) {
@@ -2068,6 +2096,8 @@
           if (custsRes.data) setCustomers(custsRes.data);
           if (memosRes.data) setMemos(memosRes.data);
           if (commentsRes.data) setComments(commentsRes.data);
+          if (sharedCustRes.data) setSharedCustomers(sharedCustRes.data);
+          else if (sharedCustRes.error) console.warn('공동 매수자를 불러오지 못했어요:', sharedCustRes.error.message);
         } catch (err) {
           console.warn("데이터 로드 실패:", err.message);
         } finally {
@@ -2170,6 +2200,11 @@
           (e.loginId || '').toLowerCase().includes(searchTerm.toLowerCase()))
         );
       }, [employees, currentUser, searchTerm]);
+
+      const filteredSharedCustomers = useMemo(() => {
+        const q = searchTerm.toLowerCase();
+        return sharedCustomers.filter(c => !q || (c.region || '').toLowerCase().includes(q) || (c.reason || '').toLowerCase().includes(q) || (c.registrant || '').toLowerCase().includes(q));
+      }, [sharedCustomers, searchTerm]);
 
       const filteredCustomers = useMemo(() => {
         return customers.filter(c =>
@@ -2319,6 +2354,34 @@
         }
       };
 
+      const handleSaveCustomer = async (newCust) => {
+        const cust = { ...newCust, id: `C-${Date.now()}`, date: new Date().toISOString().split('T')[0], user_id: currentUser.loginId, registrant: currentUser.name };
+        setCustomers(prev => [cust, ...prev]);
+        if (cust.is_shared) setSharedCustomers(prev => [{ id: cust.id, budget: cust.budget, region: cust.region, reason: cust.reason, registrant: cust.registrant, date: cust.date }, ...prev]);
+        setCurrentCustomerView('list');
+        const { error } = await supabase.from('crm_customers').insert([cust]);
+        if (error) {
+          setCustomers(prev => prev.filter(x => x.id !== cust.id));
+          setSharedCustomers(prev => prev.filter(x => x.id !== cust.id));
+          if (error.code === '42501') handleSupabaseError(error, 'crm_customers');
+          else alert('매수자를 저장하지 못했어요. Supabase에서 supabase/customers.sql 내용을 실행했는지 확인해 주세요.\n\n(원인: ' + error.message + ')');
+        }
+      };
+
+      const handleToggleCustomerShare = async (id) => {
+        const cust = customers.find(x => x.id === id);
+        if (!cust) return;
+        const next = !cust.is_shared;
+        setCustomers(prev => prev.map(x => x.id === id ? { ...x, is_shared: next } : x));
+        setSharedCustomers(prev => next ? [{ id: cust.id, budget: cust.budget, region: cust.region, reason: cust.reason, registrant: cust.registrant, date: cust.date }, ...prev.filter(x => x.id !== id)] : prev.filter(x => x.id !== id));
+        const { error } = await supabase.from('crm_customers').update({ is_shared: next }).eq('id', id);
+        if (error) {
+          setCustomers(prev => prev.map(x => x.id === id ? { ...x, is_shared: !next } : x));
+          setSharedCustomers(prev => !next ? [{ id: cust.id, budget: cust.budget, region: cust.region, reason: cust.reason, registrant: cust.registrant, date: cust.date }, ...prev.filter(x => x.id !== id)] : prev.filter(x => x.id !== id));
+          alert('공유 설정을 바꾸지 못했어요.\n\n(원인: ' + error.message + ')');
+        }
+      };
+
       const handleDeleteComment = async (id) => {
         const old = comments.find(x => x.id === id);
         setComments(prev => prev.filter(x => x.id !== id));
@@ -2363,7 +2426,7 @@
                 <SvgIcon k={ic} className="w-6 h-6" />{label}
               </button>
             ))}
-            <button onClick={() => setIsMobileMenuOpen(true)} className={`flex-1 flex flex-col items-center gap-1 pt-2.5 pb-2 text-[11px] font-semibold ${activeTab === 'employees' ? 'text-gold-400' : 'text-slate-400'}`}>
+            <button onClick={() => setIsMobileMenuOpen(true)} className={`flex-1 flex flex-col items-center gap-1 pt-2.5 pb-2 text-[11px] font-semibold ${(activeTab === 'employees' || activeTab === 'sharedCustomers') ? 'text-gold-400' : 'text-slate-400'}`}>
               <SvgIcon k="usercircle" className="w-6 h-6" />더보기
             </button>
           </nav>
@@ -2387,6 +2450,7 @@
               <SidebarItem icon={<CalendarIcon />} label="개인 캘린더" active={activeTab === 'calendar'} onClick={() => changeTab('calendar')} collapsed={sidebarCollapsed} />
               <SidebarItem icon={<Building2 />} label="내 물건 관리" active={activeTab === 'properties'} onClick={() => { changeTab('properties'); setCurrentView('list'); }} collapsed={sidebarCollapsed} />
               <SidebarItem icon={<ShareIcon />} label="공동 물건" active={activeTab === 'shared'} onClick={() => { changeTab('shared'); setCurrentView('list'); setSelectedProperty(null); }} collapsed={sidebarCollapsed} />
+              <SidebarItem icon={<UserFriends />} label="공동 매수자" active={activeTab === 'sharedCustomers'} onClick={() => changeTab('sharedCustomers')} collapsed={sidebarCollapsed} />
               <SidebarItem icon={<Users />} label="고객 관리(매수자)" active={activeTab === 'customers'} onClick={() => { changeTab('customers'); setCurrentCustomerView('list'); }} collapsed={sidebarCollapsed} />
               <SidebarItem icon={<UserCircle />} label="사원 목록" active={activeTab === 'employees'} onClick={() => { changeTab('employees'); setCurrentEmployeeView('list'); }} collapsed={sidebarCollapsed} />
 
@@ -2427,7 +2491,7 @@
             <header className="bg-white/80 backdrop-blur border-b border-stone-200 flex flex-col sm:flex-row items-start sm:items-center justify-between px-5 py-4 md:px-10 gap-4 z-10 shrink-0 no-print">
               <div>
                 <p className="text-[10px] tracking-[0.3em] text-gold-600 uppercase font-semibold mb-1">
-                  {(activeTab === 'properties' || activeTab === 'shared') && currentView === 'report' ? 'Report' : activeTab === 'properties' ? 'Portfolio' : activeTab === 'shared' ? 'Shared' : activeTab === 'employees' ? 'Team' : activeTab === 'customers' ? 'Clients' : 'Schedule'}
+                  {(activeTab === 'properties' || activeTab === 'shared') && currentView === 'report' ? 'Report' : activeTab === 'properties' ? 'Portfolio' : activeTab === 'shared' ? 'Shared' : activeTab === 'employees' ? 'Team' : activeTab === 'customers' ? 'Clients' : activeTab === 'sharedCustomers' ? 'Shared Clients' : 'Schedule'}
                 </p>
                 <h2 className="text-xl md:text-2xl font-semibold tracking-tight text-ink-900 flex items-center gap-2">
                   {(activeTab === 'properties' || activeTab === 'shared') && currentView === 'report' ? '프리미엄 컨설팅 리포트 출력' : 
@@ -2435,6 +2499,7 @@
                    activeTab === 'shared' ? '공동 물건' : 
                    activeTab === 'employees' ? '사원 목록' :
                    activeTab === 'customers' ? '고객 관리(매수자)' :
+                   activeTab === 'sharedCustomers' ? '공동 매수자' :
                    activeTab === 'calendar' ? '개인 캘린더' : '관리 메뉴'}
                    <button onClick={fetchCloudData} className={`ml-1 p-2 rounded-full text-slate-400 hover:text-gold-600 hover:bg-gold-50 transition-colors ${isFetchingData ? 'animate-spin opacity-50' : ''}`} title="최신 데이터 불러오기">
                      <Sync className="w-4 h-4" />
@@ -2548,23 +2613,16 @@
               )}
               {activeTab === 'customers' && (
                 <>
-                  {currentCustomerView === 'list' && <CustomerListView customers={filteredCustomers} />}
+                  {currentCustomerView === 'list' && <CustomerListView customers={filteredCustomers} onToggleShare={handleToggleCustomerShare} />}
                   {currentCustomerView === 'form' && (
                     <CustomerFormView 
                       onBack={() => setCurrentCustomerView('list')} 
-                      onSave={async (newCust) => {
-                        const cust = { ...newCust, id: `C-${Date.now()}`, date: new Date().toISOString().split('T')[0] };
-                        
-                        setCustomers(prev => [cust, ...prev]);
-                        setCurrentCustomerView('list');
-
-                        const { error } = await supabase.from('crm_customers').insert([cust]);
-                        handleSupabaseError(error, 'crm_customers');
-                      }} 
+                      onSave={handleSaveCustomer} 
                     />
                   )}
                 </>
               )}
+              {activeTab === 'sharedCustomers' && <CustomerListView customers={filteredSharedCustomers} shared />}
               {activeTab === 'calendar' && (
                 <CalendarView 
                   currentUser={currentUser}
