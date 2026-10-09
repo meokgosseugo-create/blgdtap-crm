@@ -530,7 +530,23 @@
          setIsGeneratingPdf(true);
          await new Promise(resolve => setTimeout(resolve, 150)); // UI 렌더링 및 안정화 대기
 
-         const container = document.getElementById('premium-report-container');
+         // 화면의 사이드바·스크롤 위치와 상관없이 찍히도록, 보고서를 (0,0)에 고정한 복사본을 만들어 그것을 찍는다.
+         const live = document.getElementById('premium-report-container');
+         const container = live.cloneNode(true);
+         const liveFields = live.querySelectorAll('input, textarea, select');
+         container.querySelectorAll('input, textarea, select').forEach((f, i) => {
+            const src = liveFields[i]; if (!src) return;
+            if (f.tagName === 'TEXTAREA') f.textContent = src.value; else f.setAttribute('value', src.value);
+            f.value = src.value;
+         });
+         container.id = 'pdf-capture-root';
+         container.style.cssText = 'width:1122px;margin:0;padding:0;gap:0;transform:none;background:#fff;';
+         const holder = document.createElement('div');
+         holder.style.cssText = 'position:absolute;left:0;top:0;width:1122px;';
+         holder.appendChild(container);
+         const savedScroll = [window.scrollX, window.scrollY];
+         window.scrollTo(0, 0);
+         document.body.appendChild(holder);
 
          const opt = {
             margin: 0,
@@ -546,7 +562,7 @@
                     // 🚨 [빈 페이지 및 왼쪽 쏠림 완벽 해결]
                     // 실제 라이브 화면의 CSS를 절대 조작하지 않고, 캡처를 위해 복제된(Clone) DOM의 스타일만 수정합니다.
                     // 이렇게 하면 Vercel, GitHub 등 배포 환경에서 겪는 엄격한 overflow 차단 현상을 우회할 수 있습니다.
-                    const el = clonedDoc.getElementById('premium-report-container');
+                    const el = clonedDoc.getElementById('pdf-capture-root');
                     if (el) {
                         el.style.width = '1122px';
                         el.style.margin = '0';
@@ -576,11 +592,6 @@
             jsPDF: { unit: 'px', format: [1122, 793], orientation: 'landscape', hotfixes: ["px_scaling"] }
          };
          
-         // 화면용 쪽 사이 간격(32px)과 바깥 여백이 그대로 찍히면 PDF 쪽이 점점 밀리고 빈 쪽이 생긴다.
-         // 찍는 동안만 없애고, 끝나면 되돌린다.
-         const saved = { gap: container.style.gap, padding: container.style.padding };
-         container.style.gap = '0px';
-         container.style.padding = '0px';
          await new Promise(resolve => setTimeout(resolve, 60));
          try {
             const pdfBlob = await html2pdf().set(opt).from(container).output('blob');
@@ -594,8 +605,8 @@
             console.error("PDF 생성 에러:", error);
             alert("PDF 생성 중 오류가 발생했습니다.");
          } finally {
-            container.style.gap = saved.gap;
-            container.style.padding = saved.padding;
+            holder.remove();
+            window.scrollTo(savedScroll[0], savedScroll[1]);
             setIsGeneratingPdf(false); 
          }
       };
