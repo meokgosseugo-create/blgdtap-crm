@@ -40,6 +40,8 @@
 
   <!-- 고화질 PDF 변환 엔진 -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
   <style>
     @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
@@ -548,53 +550,23 @@
          window.scrollTo(0, 0);
          document.body.appendChild(holder);
 
-         const opt = {
-            margin: 0,
-            filename: `${property.name}_투자제안서.pdf`,
-            image: { type: 'jpeg', quality: 1.0 },
-            html2canvas: { 
-                scale: 2, 
-                useCORS: true, 
-                scrollY: 0, 
-                scrollX: 0,
-                windowWidth: 1122,
-                onclone: (clonedDoc) => {
-                    // 🚨 [빈 페이지 및 왼쪽 쏠림 완벽 해결]
-                    // 실제 라이브 화면의 CSS를 절대 조작하지 않고, 캡처를 위해 복제된(Clone) DOM의 스타일만 수정합니다.
-                    // 이렇게 하면 Vercel, GitHub 등 배포 환경에서 겪는 엄격한 overflow 차단 현상을 우회할 수 있습니다.
-                    const el = clonedDoc.getElementById('pdf-capture-root');
-                    if (el) {
-                        el.style.width = '1122px';
-                        el.style.margin = '0';
-                        el.style.padding = '0';
-                        el.style.position = 'relative'; // absolute 쏠림 방지
-                        el.querySelectorAll('input, textarea').forEach(i => { i.placeholder = ''; });   // 비어 있는 칸의 안내 글씨는 PDF에 찍지 않는다
-
-                        // 상위 부모들의 화면 가림(overflow) 속성을 복제된 DOM 내에서만 완전 해제
-                        let parent = el.parentElement;
-                        while (parent && parent !== clonedDoc.body) {
-                            parent.style.overflow = 'visible';
-                            parent.style.position = 'static';
-                            parent.style.transform = 'none';
-                            parent = parent.parentElement;
-                        }
-
-                        // 내부 용지 규격 고정
-                        const pages = el.querySelectorAll('.report-page');
-                        pages.forEach((p) => {
-                            p.style.width = '1122px';
-                            p.style.height = '793px';
-                            p.style.margin = '0';
-                        });
-                    }
-                }
-            },
-            jsPDF: { unit: 'px', format: [1122, 793], orientation: 'landscape', hotfixes: ["px_scaling"] }
-         };
-         
          await new Promise(resolve => setTimeout(resolve, 60));
          try {
-            const pdfBlob = await html2pdf().set(opt).from(container).output('blob');
+            // 쪽마다 따로(1122×793) 찍어서 PDF에 한 장씩 붙인다
+            const { jsPDF } = window.jspdf;
+            const pdf = new jsPDF({ unit: 'px', format: [1122, 793], orientation: 'landscape', hotfixes: ['px_scaling'] });
+            const pageEls = container.querySelectorAll('.report-page');
+            for (let i = 0; i < pageEls.length; i++) {
+               const canvas = await window.html2canvas(pageEls[i], {
+                  scale: 2, useCORS: true, backgroundColor: '#ffffff',
+                  width: 1122, height: 793,
+                  scrollX: 0, scrollY: 0, windowWidth: 1122, windowHeight: 793,
+                  onclone: (doc) => { doc.querySelectorAll('input, textarea').forEach(el => { el.placeholder = ''; }); }
+               });
+               if (i > 0) pdf.addPage([1122, 793], 'landscape');
+               pdf.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, 1122, 793);
+            }
+            const pdfBlob = pdf.output('blob');
             const blobUrl = URL.createObjectURL(pdfBlob);
             // 미리보기 창 없이 바로 내려받는다
             const a = document.createElement('a');
