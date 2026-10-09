@@ -1,4 +1,4 @@
--- 고객(매수자) 저장 표 + 공동 매수자(이름·전화번호 숨김) 설정. 한 번만 실행하면 됩니다. (여러 번 실행해도 안전)
+-- 고객(매수자) 저장 표 + 공유 매수자(이름·전화번호 숨김) 설정. 한 번만 실행하면 됩니다. (여러 번 실행해도 안전)
 -- 오류: Could not find the table 'public.crm_customers' in the schema cache
 
 -- 1) 표 만들기 (이미 있으면 건드리지 않음)
@@ -34,7 +34,7 @@ create policy "crm_customers_update" on public.crm_customers for update to authe
 create policy "crm_customers_delete" on public.crm_customers for delete to authenticated
   using (lower(user_id) = lower(replace(auth.jwt() ->> 'email', '@crm.local', '')));
 
--- 4) 공동 매수자: 공유를 켠 매수자의 금액·지역·구매사유만 모두에게 보여 주는 통로 (이름·전화번호 없음)
+-- 4) 공유 매수자: 공유를 켠 매수자의 금액·지역·구매사유만 모두에게 보여 주는 통로 (이름·전화번호 없음)
 drop view if exists public.crm_shared_customers;
 create view public.crm_shared_customers as
   select id, budget, region, reason, registrant, date

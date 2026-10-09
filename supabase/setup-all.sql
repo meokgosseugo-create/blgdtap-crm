@@ -5,7 +5,7 @@
 -- 1) 매물 저장 오류 해결: 앱이 저장하는 항목 중 표에 없는 칸을 추가합니다.
 --    (예: "Could not find the 'groundfloorarea' column ...")
 --    이미 있는 칸은 건드리지 않습니다.
--- 2) 공동 물건(공유) 기능에 필요한 칸과 코멘트 표를 만듭니다.
+-- 2) 공유 물건(공유) 기능에 필요한 칸과 코멘트 표를 만듭니다.
 -- ============================================================
 
 -- 1) 매물 표(crm_properties)에 없는 칸 추가
@@ -39,7 +39,7 @@ alter table public.crm_properties
   add column if not exists images            jsonb,
   add column if not exists is_shared         boolean not null default false;
 
--- 2) 공유 코멘트 표 (공동 물건 카드에 직원들이 남기는 코멘트)
+-- 2) 공유 코멘트 표 (공유 물건 카드에 직원들이 남기는 코멘트)
 create table if not exists public.crm_comments (
   id          text primary key,
   property_id text not null,

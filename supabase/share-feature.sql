@@ -1,5 +1,5 @@
 -- ============================================================
--- 공동 물건(공유) 기능용 Supabase 설정 — 한 번만 실행하면 됩니다.
+-- 공유 물건(공유) 기능용 Supabase 설정 — 한 번만 실행하면 됩니다.
 -- 실행 위치: Supabase 대시보드 → SQL Editor → New query → 아래 전체 붙여넣기 → Run
 -- 여러 번 실행해도 안전합니다. (이미 있으면 건너뜀)
 -- ============================================================
@@ -8,7 +8,7 @@
 alter table public.crm_properties
   add column if not exists is_shared boolean not null default false;
 
--- 2) 공유 코멘트 표 (공동 물건 카드에 직원들이 남기는 코멘트)
+-- 2) 공유 코멘트 표 (공유 물건 카드에 직원들이 남기는 코멘트)
 create table if not exists public.crm_comments (
   id          text primary key,
   property_id text not null,
