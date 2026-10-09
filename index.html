@@ -390,11 +390,11 @@
     const Sparkles = (p) => <Icon name="fa-sparkles" {...p} />;
     const ShareIcon = (p) => <Icon name="fa-share-alt" {...p} />;
 
-    function SidebarItem({ icon, label, active, onClick }) {
+    function SidebarItem({ icon, label, active, onClick, collapsed }) {
       return (
-        <button onClick={onClick} className={`group relative w-full flex items-center gap-3 pl-5 pr-4 py-3 rounded-xl text-[14px] tracking-tight transition-all ${active ? 'bg-white/[0.07] text-white font-semibold' : 'text-slate-400 font-medium hover:text-white hover:bg-white/[0.04]'}`}>
+        <button onClick={onClick} title={collapsed ? label : undefined} className={`group relative w-full flex items-center gap-3 pl-5 pr-4 py-3 ${collapsed ? 'md:justify-center md:gap-0 md:px-0' : ''} rounded-xl text-[14px] tracking-tight transition-all ${active ? 'bg-white/[0.07] text-white font-semibold' : 'text-slate-400 font-medium hover:text-white hover:bg-white/[0.04]'}`}>
           {active && <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[3px] rounded-r-full bg-gold-400"></span>}
-          {React.cloneElement(icon, { className: `w-5 h-5 ${active ? 'text-gold-300' : 'text-slate-500 group-hover:text-slate-300'}` })} {label}
+          {React.cloneElement(icon, { className: `w-5 h-5 ${active ? 'text-gold-300' : 'text-slate-500 group-hover:text-slate-300'}` })} <span className={collapsed ? 'md:hidden' : ''}>{label}</span>
         </button>
       );
     }
@@ -1985,6 +1985,8 @@
 
       const [searchTerm, setSearchTerm] = useState('');
       const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+      const [sidebarCollapsed, setSidebarCollapsed] = useState(() => { try { return localStorage.getItem('sidebarCollapsed') === '1'; } catch (e) { return false; } });
+      const toggleSidebar = () => setSidebarCollapsed(v => { const n = !v; try { localStorage.setItem('sidebarCollapsed', n ? '1' : '0'); } catch (e) {} return n; });
       const [rlsError, setRlsError] = useState(false);
 
       const handleSupabaseError = (error, tableName) => {
@@ -2309,39 +2311,40 @@
 
           {isMobileMenuOpen && <div id="sidebar-overlay" className="md:hidden fixed inset-0 bg-black/50 z-40"></div>}
 
-          <aside className={`${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 fixed md:static inset-y-0 left-0 z-50 w-64 bg-ink-900 text-white flex flex-col shadow-2xl md:shadow-none transition-transform duration-300 ease-in-out no-print`}>
-            <div className="px-7 pt-9 pb-2 hidden md:block">
+          <aside className={`${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 fixed md:static md:relative inset-y-0 left-0 z-50 w-64 ${sidebarCollapsed ? 'md:w-[76px]' : 'md:w-64'} bg-ink-900 text-white flex flex-col shadow-2xl md:shadow-none transition-transform md:transition-[width] duration-300 ease-in-out no-print`}>
+            <button type="button" onClick={toggleSidebar} title={sidebarCollapsed ? '메뉴 펼치기' : '메뉴 접기'} className="hidden md:flex absolute -right-3 top-10 w-6 h-6 rounded-full bg-white text-ink-900 border border-stone-300 shadow items-center justify-center text-sm font-bold leading-none z-50 hover:bg-gold-50">{sidebarCollapsed ? '›' : '‹'}</button>
+            <div className={`${sidebarCollapsed ? 'md:px-0 md:flex md:justify-center' : ''} px-7 pt-9 pb-2 hidden md:block`}>
               <div className="flex items-center gap-3.5">
                 <div className="w-11 h-11 rounded-xl border border-gold-400/40 bg-gold-400/10 flex items-center justify-center shrink-0">
                   <Building2 className="w-5 h-5 text-gold-300" />
                 </div>
-                <div>
+                <div className={sidebarCollapsed ? 'md:hidden' : ''}>
                   <h1 className="text-xl font-semibold tracking-wide leading-none">빌딩탭</h1>
                   <p className="text-[10px] tracking-[0.3em] text-gold-300/80 mt-2 uppercase">Building Tab</p>
                 </div>
               </div>
-              <div className="mt-8 h-px bg-gradient-to-r from-gold-400/50 via-white/10 to-transparent"></div>
+              <div className={`${sidebarCollapsed ? "md:hidden" : ""} mt-8 h-px bg-gradient-to-r from-gold-400/50 via-white/10 to-transparent`}></div>
             </div>
 
-            <nav className="flex-1 px-4 py-6 space-y-1.5 overflow-y-auto">
-              <p className="px-5 pb-2 text-[10px] tracking-[0.25em] text-slate-500 uppercase">Menu</p>
-              <SidebarItem icon={<CalendarIcon />} label="개인 캘린더" active={activeTab === 'calendar'} onClick={() => changeTab('calendar')} />
-              <SidebarItem icon={<List />} label="내 물건 관리" active={activeTab === 'properties'} onClick={() => { changeTab('properties'); setCurrentView('list'); }} />
-              <SidebarItem icon={<ShareIcon />} label="공동 물건" active={activeTab === 'shared'} onClick={() => { changeTab('shared'); setCurrentView('list'); setSelectedProperty(null); }} />
-              <SidebarItem icon={<Users />} label="고객 관리(매수자)" active={activeTab === 'customers'} onClick={() => { changeTab('customers'); setCurrentCustomerView('list'); }} />
-              <SidebarItem icon={<UserCircle />} label="사원 목록" active={activeTab === 'employees'} onClick={() => { changeTab('employees'); setCurrentEmployeeView('list'); }} />
+            <nav className={`flex-1 px-4 ${sidebarCollapsed ? "md:px-3" : ""} py-6 space-y-1.5 overflow-y-auto`}>
+              <p className={`${sidebarCollapsed ? "md:hidden" : ""} px-5 pb-2 text-[10px] tracking-[0.25em] text-slate-500 uppercase`}>Menu</p>
+              <SidebarItem icon={<CalendarIcon />} label="개인 캘린더" active={activeTab === 'calendar'} onClick={() => changeTab('calendar')} collapsed={sidebarCollapsed} />
+              <SidebarItem icon={<List />} label="내 물건 관리" active={activeTab === 'properties'} onClick={() => { changeTab('properties'); setCurrentView('list'); }} collapsed={sidebarCollapsed} />
+              <SidebarItem icon={<ShareIcon />} label="공동 물건" active={activeTab === 'shared'} onClick={() => { changeTab('shared'); setCurrentView('list'); setSelectedProperty(null); }} collapsed={sidebarCollapsed} />
+              <SidebarItem icon={<Users />} label="고객 관리(매수자)" active={activeTab === 'customers'} onClick={() => { changeTab('customers'); setCurrentCustomerView('list'); }} collapsed={sidebarCollapsed} />
+              <SidebarItem icon={<UserCircle />} label="사원 목록" active={activeTab === 'employees'} onClick={() => { changeTab('employees'); setCurrentEmployeeView('list'); }} collapsed={sidebarCollapsed} />
 
               <div className="pt-5 mt-5 border-t border-white/10">
-                <SidebarItem icon={<Lock />} label="로그아웃" active={false} onClick={handleLogout} />
+                <SidebarItem icon={<Lock />} label="로그아웃" active={false} onClick={handleLogout} collapsed={sidebarCollapsed} />
               </div>
             </nav>
 
-            <div className="m-4 p-4 rounded-2xl bg-white/[0.04] border border-white/10">
-              <div className="flex items-center gap-3">
+            <div className={`m-4 p-4 ${sidebarCollapsed ? "md:m-2 md:p-2" : ""} rounded-2xl bg-white/[0.04] border border-white/10`}>
+              <div className={`flex items-center gap-3 ${sidebarCollapsed ? "md:justify-center md:gap-0" : ""}`}>
                 <div className="w-10 h-10 rounded-full bg-gradient-to-br from-gold-300 to-gold-500 text-ink-900 flex items-center justify-center font-bold shrink-0">
                   {currentUser ? currentUser.name.charAt(0) : 'U'}
                 </div>
-                <div className="truncate">
+                <div className={`truncate ${sidebarCollapsed ? "md:hidden" : ""}`}>
                   <p className="text-sm font-semibold truncate">{currentUser ? currentUser.name : '사용자'} 님</p>
                   <p className="text-xs text-slate-400 truncate mt-0.5">{currentUser ? currentUser.department : '사원'}</p>
                 </div>
