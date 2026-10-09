@@ -1816,6 +1816,18 @@
       );
     }
 
+    // 마스터(전체 관리자) 아이디: 이 아이디로 로그인한 사람만 '사원 목록'을 볼 수 있다
+    const MASTER_IDS = ['wony0205'];
+    // 전화번호: 숫자만 받아서 010-0000-0000 모양으로 맞추고, 번호를 끝까지 넣었는지 검사한다
+    const formatPhone = (v) => {
+      const d = String(v || '').replace(/\D/g, '').slice(0, 11);
+      if (d.length < 4) return d;
+      if (d.length < 8) return d.slice(0, 3) + '-' + d.slice(3);
+      return d.slice(0, 3) + '-' + d.slice(3, d.length - 4) + '-' + d.slice(-4);
+    };
+    const isValidPhone = (v) => /^01[016789]\d{7,8}$/.test(String(v || '').replace(/\D/g, ''));
+    const PHONE_MSG = '전화번호를 끝까지 정확히 입력해주세요. (예: 010-1234-5678)';
+
     function EmployeeListView({ employees }) {
       return (
         <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden w-full">
@@ -1848,7 +1860,7 @@
         e.preventDefault();
         if (!formData.name) return alert("이름을 입력해주세요.");
         if (!formData.department) return alert("소속을 입력해주세요.");
-        if (!formData.phone) return alert("전화번호를 입력해주세요.");
+        if (!isValidPhone(formData.phone)) return alert(PHONE_MSG);
         if (!formData.loginId) return alert("아이디를 입력해주세요.");
         if (!formData.password) return alert("비밀번호를 입력해주세요.");
 
@@ -1866,7 +1878,7 @@
           <form onSubmit={handleSubmit} className="space-y-6 bg-white p-5 md:p-6 rounded-3xl shadow-sm border border-slate-200">
             <h3 className="text-base md:text-lg font-bold text-ink-800 mb-4 md:mb-5 pb-2 md:pb-3 border-b border-slate-100 flex items-center gap-2"><Briefcase className="w-4 h-4 md:w-5 md:h-5 text-blue-500" /> 사원 정보</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4"><FormGroup label="이름"><input type="text" name="name" onChange={handleChange} className="form-input w-full p-2.5 md:p-3 border border-slate-300 rounded-3xl focus:ring-2 focus:ring-blue-500 outline-none text-sm md:text-base" placeholder="홍길동" /></FormGroup><FormGroup label="소속"><input type="text" name="department" onChange={handleChange} className="form-input w-full p-2.5 md:p-3 border border-slate-300 rounded-3xl focus:ring-2 focus:ring-blue-500 outline-none text-sm md:text-base" placeholder="예: 영업1팀" /></FormGroup></div>
-            <FormGroup label="전화번호"><input type="tel" name="phone" onChange={handleChange} className="form-input w-full p-2.5 md:p-3 border border-slate-300 rounded-3xl focus:ring-2 focus:ring-blue-500 outline-none text-sm md:text-base" placeholder="010-0000-0000" /></FormGroup>
+            <FormGroup label="전화번호"><input type="tel" name="phone" value={formData.phone} inputMode="numeric" maxLength={13} onChange={(e) => setFormData({ ...formData, phone: formatPhone(e.target.value) })} className="form-input w-full p-2.5 md:p-3 border border-slate-300 rounded-3xl focus:ring-2 focus:ring-blue-500 outline-none text-sm md:text-base" placeholder="010-0000-0000" /></FormGroup>
             <h3 className="text-base md:text-lg font-bold text-ink-800 mb-4 md:mb-5 pb-2 md:pb-3 pt-2 md:pt-4 border-b border-slate-100 flex items-center gap-2"><Lock className="w-4 h-4 md:w-5 md:h-5 text-blue-500" /> 접속 계정 정보</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4"><FormGroup label="아이디"><input type="text" name="loginId" onChange={handleChange} className="form-input w-full p-2.5 md:p-3 border border-slate-300 rounded-3xl focus:ring-2 focus:ring-blue-500 outline-none text-sm md:text-base" placeholder="아이디 입력" /></FormGroup><FormGroup label="비밀번호"><input type="password" name="password" onChange={handleChange} className="form-input w-full p-2.5 md:p-3 border border-slate-300 rounded-3xl focus:ring-2 focus:ring-blue-500 outline-none text-sm md:text-base" placeholder="비밀번호 입력" /></FormGroup></div>
             <div className="flex pt-4"><button type="submit" disabled={isSubmitting} className={`w-full py-3.5 bg-blue-600 text-white rounded-3xl font-bold flex items-center justify-center gap-2 hover:bg-blue-700 shadow-sm text-base ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}><Save className="w-5 h-5" /> {isSubmitting ? '처리 중...' : '사원 등록'}</button></div>
@@ -1960,6 +1972,7 @@
       const submit = async (e) => {
         e.preventDefault();
         if (!form.name.trim()) return alert('이름을 입력해주세요.');
+        if (!isValidPhone(form.phone)) return alert(PHONE_MSG);
         setSaving(true);
         await onSave({ name: form.name.trim(), department: form.department.trim(), phone: form.phone.trim() });
         setSaving(false);
@@ -1974,7 +1987,7 @@
             <FormGroup label="아이디"><div className="p-2.5 md:p-3 rounded-lg bg-slate-50 border text-sm text-slate-500">{user.loginId}</div></FormGroup>
             <FormGroup label="이름"><input type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={input} /></FormGroup>
             <FormGroup label="소속"><input type="text" value={form.department} onChange={(e) => setForm({ ...form, department: e.target.value })} className={input} placeholder="예: 영업1팀" /></FormGroup>
-            <FormGroup label="전화번호"><input type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className={input} placeholder="010-0000-0000" /></FormGroup>
+            <FormGroup label="전화번호"><input type="tel" value={form.phone} inputMode="numeric" maxLength={13} onChange={(e) => setForm({ ...form, phone: formatPhone(e.target.value) })} className={input} placeholder="010-0000-0000" /></FormGroup>
             <div className="flex gap-3 pt-2">
               <button type="button" onClick={onClose} className="flex-1 px-4 py-2.5 bg-slate-100 rounded-3xl text-slate-700 font-bold hover:bg-slate-200 transition-colors">취소</button>
               <button type="submit" disabled={saving} className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-3xl font-bold hover:bg-blue-700 transition-colors disabled:opacity-50">{saving ? '저장 중...' : '저장'}</button>
@@ -2268,7 +2281,7 @@
         if (!formData.password) return alert("비밀번호를 입력해주세요.");
         if (!isLoginMode) {
            if (!formData.name) return alert("이름을 입력해주세요.");
-           if (!formData.phone) return alert("전화번호를 입력해주세요.");
+           if (!isValidPhone(formData.phone)) return alert(PHONE_MSG);
         }
 
         setErrorMsg('');
@@ -2324,7 +2337,7 @@
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[13px] font-semibold text-slate-600">연락처</label>
-                    <div className="relative"><Phone className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" /><input type="tel" name="phone" value={formData.phone} onChange={handleChange} placeholder="010-0000-0000" className="w-full pl-12 pr-4 py-3.5 border border-stone-200 rounded-3xl outline-none bg-stone-50 focus:bg-white focus:border-gold-400 focus:ring-2 focus:ring-gold-400/30 transition-all" /></div>
+                    <div className="relative"><Phone className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" /><input type="tel" name="phone" value={formData.phone} inputMode="numeric" maxLength={13} onChange={(e) => setFormData({ ...formData, phone: formatPhone(e.target.value) })} placeholder="010-0000-0000" className="w-full pl-12 pr-4 py-3.5 border border-stone-200 rounded-3xl outline-none bg-stone-50 focus:bg-white focus:border-gold-400 focus:ring-2 focus:ring-gold-400/30 transition-all" /></div>
                   </div>
                 </div>
               )}
@@ -2341,6 +2354,7 @@
     function App() {
       const [isAuthenticated, setIsAuthenticated] = useState(false);
       const [currentUser, setCurrentUser] = useState(null);
+      const isMaster = !!currentUser && MASTER_IDS.includes(String(currentUser.loginId || '').toLowerCase());
       const [isAuthLoading, setIsAuthLoading] = useState(true);
       const [isFetchingData, setIsFetchingData] = useState(false);
       const [hasFetched, setHasFetched] = useState(false);
@@ -2776,7 +2790,9 @@
         handleSupabaseError(error, 'crm_properties');
       };
 
+      useEffect(() => { if (currentUser && !isMaster && activeTab === 'employees') setActiveTab('calendar'); }, [currentUser, isMaster, activeTab]);
       const changeTab = (tab) => {
+        if (tab === 'employees' && !isMaster) return;
         setActiveTab(tab); setSearchTerm(''); setIsMobileMenuOpen(false); 
       };
 
@@ -2831,7 +2847,7 @@
               <SidebarItem icon={<ShareIcon />} label="공유 물건" badge={unreadProps} active={activeTab === 'shared'} onClick={() => { changeTab('shared'); setCurrentView('list'); setSelectedProperty(null); }} collapsed={sidebarCollapsed} />
               <SidebarItem icon={<UserFriends />} label="공유 매수자" badge={unreadCusts} active={activeTab === 'sharedCustomers'} onClick={() => { changeTab('sharedCustomers'); setCurrentCustomerView('list'); setSelectedCustomer(null); }} collapsed={sidebarCollapsed} />
               <SidebarItem icon={<Users />} label="고객 관리(매수자)" active={activeTab === 'customers'} onClick={() => { changeTab('customers'); setCurrentCustomerView('list'); setSelectedCustomer(null); }} collapsed={sidebarCollapsed} />
-              <SidebarItem icon={<UserCircle />} label="사원 목록" active={activeTab === 'employees'} onClick={() => { changeTab('employees'); setCurrentEmployeeView('list'); }} collapsed={sidebarCollapsed} />
+              {isMaster && <SidebarItem icon={<UserCircle />} label="사원 목록" active={activeTab === 'employees'} onClick={() => { changeTab('employees'); setCurrentEmployeeView('list'); }} collapsed={sidebarCollapsed} />}
 
               <div className="pt-5 mt-5 border-t border-stone-200">
                 <SidebarItem icon={<LogOutIcon />} label="로그아웃" active={false} onClick={handleLogout} collapsed={sidebarCollapsed} />
@@ -2896,7 +2912,7 @@
                     <Plus className="w-4 h-4" /> 신규 등록
                   </button>
                 )}
-                {activeTab === 'employees' && currentEmployeeView === 'list' && (
+                {isMaster && activeTab === 'employees' && currentEmployeeView === 'list' && (
                   <button className="bg-gold-400 hover:bg-gold-300 text-ink-900 px-5 py-2.5 sm:py-2.5 rounded-3xl text-sm font-bold transition-colors flex items-center justify-center gap-2 whitespace-nowrap shadow-sm w-full sm:w-auto" onClick={() => setCurrentEmployeeView('form')}>
                     <Plus className="w-4 h-4" /> 사원 추가
                   </button>
@@ -2965,7 +2981,7 @@
                   )}
                 </>
               )}
-              {activeTab === 'employees' && (
+              {isMaster && activeTab === 'employees' && (
                 <>
                   {currentEmployeeView === 'list' && <EmployeeListView employees={filteredEmployees} />}
                   {currentEmployeeView === 'form' && (
