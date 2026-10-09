@@ -408,11 +408,12 @@
     const Sparkles = (p) => <Icon name="fa-sparkles" {...p} />;
     const ShareIcon = (p) => <Icon name="fa-share-alt" {...p} />;
 
-    function SidebarItem({ icon, label, active, onClick, collapsed }) {
+    function SidebarItem({ icon, label, active, onClick, collapsed, badge }) {
       return (
         <button onClick={onClick} title={collapsed ? label : undefined} className={`group relative w-full flex items-center gap-3 pl-5 pr-4 py-3 ${collapsed ? 'md:justify-center md:gap-0 md:px-0' : ''} rounded-lg text-[14px] tracking-tight transition-all ${active ? 'bg-gold-400 text-white font-semibold shadow-sm' : 'text-slate-500 font-medium hover:text-ink-900 hover:bg-black/[0.04]'}`}>
           
           {React.cloneElement(icon, { className: `w-5 h-5 ${active ? 'text-white' : 'text-slate-400 group-hover:text-slate-600'}` })} <span className={collapsed ? 'md:hidden' : ''}>{label}</span>
+          {badge > 0 && <span className={`${collapsed ? 'md:absolute md:top-1 md:right-2 md:ml-0' : ''} ml-auto min-w-[20px] h-5 px-1.5 rounded-full bg-red-500 text-white text-[11px] font-bold flex items-center justify-center`}>{badge > 99 ? '99+' : badge}</span>}
         </button>
       );
     }
@@ -2045,6 +2046,7 @@
       const [currentUser, setCurrentUser] = useState(null);
       const [isAuthLoading, setIsAuthLoading] = useState(true);
       const [isFetchingData, setIsFetchingData] = useState(false);
+      const [hasFetched, setHasFetched] = useState(false);
 
       const [properties, setProperties] = useState([]);
       const [employees, setEmployees] = useState([]);
@@ -2104,6 +2106,7 @@
           console.warn("데이터 로드 실패:", err.message);
         } finally {
           setIsFetchingData(false);
+          setHasFetched(true);
         }
       };
 
@@ -2193,6 +2196,29 @@
           (p.name || '').toLowerCase().includes(q) || (p.address || '').toLowerCase().includes(q)
         );
       }, [properties, searchTerm]);
+
+      // 공동 물건·공동 매수자에 새로 올라온 것 알림 (이 컴퓨터에서 마지막으로 열어 본 뒤 올라온 것만 센다)
+      const [seenShared, setSeenShared] = useState({ props: null, custs: null });
+      const sharedPropIds = useMemo(() => properties.filter(p => p.is_shared === true && !(currentUser && p.user_id && p.user_id.toLowerCase() === currentUser.loginId.toLowerCase())).map(p => p.id), [properties, currentUser]);
+      const sharedCustIds = useMemo(() => { const mine = new Set(customers.map(c => c.id)); return sharedCustomers.filter(c => !mine.has(c.id)).map(c => c.id); }, [sharedCustomers, customers]);
+      const seenKey = currentUser ? 'crm_seen_' + currentUser.loginId : null;
+      useEffect(() => {
+        if (!seenKey) return;
+        try { const r = JSON.parse(localStorage.getItem(seenKey) || 'null'); setSeenShared(r && r.props && r.custs ? r : { props: null, custs: null }); } catch (e) { setSeenShared({ props: null, custs: null }); }
+      }, [seenKey]);
+      useEffect(() => {
+        if (!seenKey || !hasFetched) return;
+        setSeenShared(prev => {
+          const next = { ...prev };
+          if (prev.props === null || activeTab === 'shared') next.props = sharedPropIds;
+          if (prev.custs === null || activeTab === 'sharedCustomers') next.custs = sharedCustIds;
+          if (next.props === prev.props && next.custs === prev.custs) return prev;
+          try { localStorage.setItem(seenKey, JSON.stringify(next)); } catch (e) {}
+          return next;
+        });
+      }, [activeTab, sharedPropIds, sharedCustIds, hasFetched, seenKey]);
+      const unreadProps = seenShared.props ? sharedPropIds.filter(id => !seenShared.props.includes(id)).length : 0;
+      const unreadCusts = seenShared.custs ? sharedCustIds.filter(id => !seenShared.custs.includes(id)).length : 0;
 
       const filteredEmployees = useMemo(() => {
         return employees.filter(e =>
@@ -2425,11 +2451,11 @@
           <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-white border-t border-stone-200 flex pb-[env(safe-area-inset-bottom)]">
             {[['calendar', '캘린더', 'calendar', 'calendar'], ['properties', '내 물건', 'building2', 'properties'], ['shared', '공동 물건', 'share', 'shared'], ['customers', '고객', 'users', 'customers']].map(([k, label, ic]) => (
               <button key={k} onClick={() => { changeTab(k); if (k === 'properties' || k === 'shared') { setCurrentView('list'); setSelectedProperty(null); } if (k === 'customers') setCurrentCustomerView('list'); }} className={`flex-1 flex flex-col items-center gap-1 pt-2.5 pb-2 text-[11px] font-semibold ${activeTab === k ? 'text-gold-400' : 'text-slate-400'}`}>
-                <SvgIcon k={ic} className="w-6 h-6" />{label}
+                <span className="relative"><SvgIcon k={ic} className="w-6 h-6" />{k === 'shared' && unreadProps > 0 && <span className="absolute -top-1.5 -right-3 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">{unreadProps > 99 ? '99+' : unreadProps}</span>}</span>{label}
               </button>
             ))}
             <button onClick={() => setIsMobileMenuOpen(true)} className={`flex-1 flex flex-col items-center gap-1 pt-2.5 pb-2 text-[11px] font-semibold ${(activeTab === 'employees' || activeTab === 'sharedCustomers') ? 'text-gold-400' : 'text-slate-400'}`}>
-              <SvgIcon k="usercircle" className="w-6 h-6" />더보기
+              <span className="relative"><SvgIcon k="usercircle" className="w-6 h-6" />{unreadCusts > 0 && <span className="absolute -top-1.5 -right-3 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">{unreadCusts > 99 ? '99+' : unreadCusts}</span>}</span>더보기
             </button>
           </nav>
           {isMobileMenuOpen && <div id="sidebar-overlay" className="md:hidden fixed inset-0 bg-black/50 z-40"></div>}
@@ -2451,8 +2477,8 @@
               <p className={`${sidebarCollapsed ? "md:hidden" : ""} px-5 pb-2 text-[10px] tracking-[0.25em] text-slate-500 uppercase`}>Menu</p>
               <SidebarItem icon={<CalendarIcon />} label="개인 캘린더" active={activeTab === 'calendar'} onClick={() => changeTab('calendar')} collapsed={sidebarCollapsed} />
               <SidebarItem icon={<Building2 />} label="내 물건 관리" active={activeTab === 'properties'} onClick={() => { changeTab('properties'); setCurrentView('list'); }} collapsed={sidebarCollapsed} />
-              <SidebarItem icon={<ShareIcon />} label="공동 물건" active={activeTab === 'shared'} onClick={() => { changeTab('shared'); setCurrentView('list'); setSelectedProperty(null); }} collapsed={sidebarCollapsed} />
-              <SidebarItem icon={<UserFriends />} label="공동 매수자" active={activeTab === 'sharedCustomers'} onClick={() => changeTab('sharedCustomers')} collapsed={sidebarCollapsed} />
+              <SidebarItem icon={<ShareIcon />} label="공동 물건" badge={unreadProps} active={activeTab === 'shared'} onClick={() => { changeTab('shared'); setCurrentView('list'); setSelectedProperty(null); }} collapsed={sidebarCollapsed} />
+              <SidebarItem icon={<UserFriends />} label="공동 매수자" badge={unreadCusts} active={activeTab === 'sharedCustomers'} onClick={() => changeTab('sharedCustomers')} collapsed={sidebarCollapsed} />
               <SidebarItem icon={<Users />} label="고객 관리(매수자)" active={activeTab === 'customers'} onClick={() => { changeTab('customers'); setCurrentCustomerView('list'); }} collapsed={sidebarCollapsed} />
               <SidebarItem icon={<UserCircle />} label="사원 목록" active={activeTab === 'employees'} onClick={() => { changeTab('employees'); setCurrentEmployeeView('list'); }} collapsed={sidebarCollapsed} />
 
