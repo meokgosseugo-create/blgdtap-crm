@@ -528,6 +528,12 @@
             jsPDF: { unit: 'px', format: [1122, 793], orientation: 'landscape', hotfixes: ["px_scaling"] }
          };
          
+         // 화면용 쪽 사이 간격(32px)과 바깥 여백이 그대로 찍히면 PDF 쪽이 점점 밀리고 빈 쪽이 생긴다.
+         // 찍는 동안만 없애고, 끝나면 되돌린다.
+         const saved = { gap: container.style.gap, padding: container.style.padding };
+         container.style.gap = '0px';
+         container.style.padding = '0px';
+         await new Promise(resolve => setTimeout(resolve, 60));
          try {
             const pdfBlob = await html2pdf().set(opt).from(container).output('blob');
             const blobUrl = URL.createObjectURL(pdfBlob);
@@ -536,6 +542,8 @@
             console.error("PDF 생성 에러:", error);
             alert("PDF 생성 중 오류가 발생했습니다.");
          } finally {
+            container.style.gap = saved.gap;
+            container.style.padding = saved.padding;
             setIsGeneratingPdf(false); 
          }
       };
