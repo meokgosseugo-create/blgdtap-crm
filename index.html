@@ -53,9 +53,15 @@
 
     /* PDF 및 인쇄 최적화 (규격 고정) */
     @media print {
+      @page { size: 1122px 793px; margin: 0; }
       body { background-color: white !important; margin: 0; padding: 0; }
       .no-print { display: none !important; }
       #root, main { height: auto !important; overflow: visible !important; }
+      #root > div { display: block !important; height: auto !important; min-height: 0 !important; }
+      main { display: block !important; }
+      #main-scroll-area { overflow: visible !important; height: auto !important; padding: 0 !important; }
+      nav.fixed { display: none !important; }
+      input::placeholder, textarea::placeholder { color: transparent !important; }
       * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
       .report-page { page-break-after: always !important; page-break-inside: avoid !important; box-shadow: none !important; margin: 0 !important; border: none !important; }
     }
@@ -448,12 +454,18 @@
       });
 
       const [customFields, setCustomFields] = useState({
-        location: '클릭하여 입력 (예: 학동역 도보 3분)',
-        roadCond: '클릭하여 입력 (예: 6M*4M 코너)',
-        structure: '철근콘크리트구조',
-        usage: '제2종근린생활시설',
-        elevator: '無'
+        headline: '',          // 표지 맨 위 한 줄 (예: 급매물 – 23년 매입가 68억, 79억에서 대폭 조정)
+        summary: '',           // 개요 쪽 맨 위 요약 띠
+        location: '',
+        roadCond: '',
+        landPrice: '',
+        structure: '',
+        usage: '',
+        elevator: property?.elevators ? `${property.elevators}대` : '無',
+        saleNote: ''
       });
+      const [rentNotes, setRentNotes] = useState('');
+      const [photoPages, setPhotoPages] = useState(() => [{ id: 'pp-1', title: '건물 사진', photos: (property?.images || []).slice(0, 4) }]);
 
       const [images, setImages] = useState({
         main: property?.images?.[0] || null,
@@ -465,15 +477,44 @@
       const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
       const [pdfPreviewUrl, setPdfPreviewUrl] = useState(null);
 
-      const handleImageUpload = (e, key) => {
+      // 사진은 가로 1600px 안으로 줄여서 쓴다 (PDF가 너무 무거워지는 것을 막는다)
+      const fileToImage = (file) => new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onerror = () => resolve(null);
+        reader.onload = () => {
+          const img = new Image();
+          img.onerror = () => resolve(reader.result);
+          img.onload = () => {
+            const max = 1600, ratio = Math.min(1, max / Math.max(img.width, img.height));
+            if (ratio === 1 && file.size < 600000) return resolve(reader.result);
+            const c = document.createElement('canvas'); c.width = Math.round(img.width * ratio); c.height = Math.round(img.height * ratio);
+            c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+            resolve(c.toDataURL('image/jpeg', 0.85));
+          };
+          img.src = reader.result;
+        };
+        reader.readAsDataURL(file);
+      });
+
+      const handleImageUpload = async (e, key) => {
         const file = e.target.files[0];
-        if (file) {
-          const reader = new FileReader();
-          reader.onloadend = () => { setImages(prev => ({ ...prev, [key]: reader.result })); };
-          reader.readAsDataURL(file);
-        }
         e.target.value = '';
+        if (!file) return;
+        const data = await fileToImage(file);
+        if (data) setImages(prev => ({ ...prev, [key]: data }));
       };
+
+      const addPhotoPage = () => setPhotoPages(prev => [...prev, { id: 'pp-' + Date.now(), title: `${prev.length + 1}번째 사진`, photos: [] }]);
+      const removePhotoPage = (id) => { if (confirm('이 사진 쪽을 지울까요?')) setPhotoPages(prev => prev.filter(pg => pg.id !== id)); };
+      const setPhotoTitle = (id, title) => setPhotoPages(prev => prev.map(pg => pg.id === id ? { ...pg, title } : pg));
+      const addPhotos = async (id, fileList) => {
+        const files = [...fileList];
+        const room = 4 - (photoPages.find(pg => pg.id === id)?.photos.length || 0);
+        if (files.length > room) alert('한 쪽에는 사진을 4장까지 넣을 수 있어요. 남는 사진은 "사진 페이지 추가"로 새 쪽에 넣어 주세요.');
+        const imgs = (await Promise.all(files.slice(0, Math.max(room, 0)).map(fileToImage))).filter(Boolean);
+        setPhotoPages(prev => prev.map(pg => pg.id === id ? { ...pg, photos: [...pg.photos, ...imgs].slice(0, 4) } : pg));
+      };
+      const removePhoto = (id, idx) => setPhotoPages(prev => prev.map(pg => pg.id === id ? { ...pg, photos: pg.photos.filter((_, i) => i !== idx) } : pg));
 
       const handleCustomFieldChange = (key, value) => {
         setCustomFields(prev => ({ ...prev, [key]: value }));
@@ -505,6 +546,7 @@
                         el.style.margin = '0';
                         el.style.padding = '0';
                         el.style.position = 'relative'; // absolute 쏠림 방지
+                        el.querySelectorAll('input, textarea').forEach(i => { i.placeholder = ''; });   // 비어 있는 칸의 안내 글씨는 PDF에 찍지 않는다
 
                         // 상위 부모들의 화면 가림(overflow) 속성을 복제된 DOM 내에서만 완전 해제
                         let parent = el.parentElement;
@@ -556,6 +598,16 @@
         maintenance: acc.maintenance + (Number(curr.maintenance) || 0),
       }), { deposit: 0, rent: 0, maintenance: 0 });
 
+      const ph = (t) => (isGeneratingPdf ? '' : t);   // PDF를 찍는 동안에는 안내 글씨를 지운다
+      const ovRow = (label, value) => (
+        <div className="flex items-center border-b border-slate-300 h-[25px]">
+          <div className="w-[28%] text-center font-medium text-slate-700 border-r border-slate-300 whitespace-nowrap">{label}</div>
+          <div className="w-[72%] px-4 text-center font-bold text-ink-900 whitespace-nowrap">{value}</div>
+        </div>
+      );
+      const ovSection = (title) => <div className="bg-[#f2efe9] border-b-2 border-black h-[28px] flex items-center px-4 font-bold text-ink-800 text-[14px]">{title}</div>;
+      const fieldInput = "w-full h-[24px] py-0 text-[13px] text-center text-ink-900 bg-transparent outline-none font-bold hover:bg-blue-50 focus:bg-blue-50 placeholder:text-slate-300 placeholder:font-medium";
+
       const renderFooter = () => (
         <div className="absolute bottom-0 left-0 right-0 h-[50px] bg-slate-50 border-t border-slate-200 flex justify-between items-center px-10 shrink-0 z-50">
            <div className="flex items-center gap-2">
@@ -570,12 +622,12 @@
         </div>
       );
 
-      const renderImageUploader = (imageKey, icon, label, subLabel) => (
-        <div className="w-full h-full bg-slate-100 relative group overflow-hidden border border-slate-200 rounded-3xl">
+      const renderImageUploader = (imageKey, icon, label, subLabel) => (!images[imageKey] && isGeneratingPdf) ? <div className="w-full h-full"></div> : (
+        <div className={`w-full h-full bg-slate-100 relative group overflow-hidden border border-slate-200 rounded-3xl ${images[imageKey] ? "" : "print:bg-white print:border-0"}`}>
            {images[imageKey] ? (
              <img src={images[imageKey]} className="w-full h-full object-contain bg-white" />
            ) : (
-             <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400 p-6 text-center bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer">
+             <div className="print:hidden absolute inset-0 flex flex-col items-center justify-center text-slate-400 p-6 text-center bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer">
                 {icon}
                 <p className="text-sm font-bold text-slate-500 mb-1">{label}</p>
                 <p className="text-xs text-slate-400">{subLabel}</p>
@@ -586,7 +638,7 @@
       );
 
       return (
-        <div className="w-full mx-auto pb-20 no-print overflow-x-auto bg-slate-200">
+        <div className="w-full mx-auto pb-20 overflow-x-auto bg-slate-200 print:bg-white print:overflow-visible print:pb-0">
           
           {/* 💡 1. PDF 생성 로딩 화면 */}
           {isGeneratingPdf && (
@@ -624,9 +676,10 @@
              </div>
           )}
 
-          <div className="flex justify-between items-center bg-white p-4 rounded-3xl shadow-sm border border-slate-200 mb-6 sticky top-0 z-50 min-w-[1122px] mx-auto max-w-[1300px]">
+          <div className="no-print flex justify-between items-center bg-white p-4 rounded-3xl shadow-sm border border-slate-200 mb-6 sticky top-0 z-50 min-w-[1122px] mx-auto max-w-[1300px]">
              <button onClick={onBack} className="flex items-center gap-2 text-slate-500 hover:text-ink-800 font-bold px-4 py-2 rounded-lg hover:bg-slate-100 transition-colors"><ArrowLeft className="w-4 h-4"/> 뒤로가기</button>
              <div className="flex gap-3">
+                <button onClick={addPhotoPage} className="px-6 py-2.5 bg-white border border-slate-300 text-slate-700 font-bold rounded-lg shadow-sm hover:bg-slate-50 transition-colors">+ 사진 페이지 추가</button>
                 <button onClick={() => window.print()} className="px-6 py-2.5 bg-slate-800 text-white font-bold rounded-lg shadow-sm hover:bg-slate-900 transition-colors flex items-center gap-2"><i className="fas fa-print"></i> 종이 인쇄</button>
                 <button onClick={handleExportPDF} className="px-6 py-2.5 bg-blue-600 text-white font-bold rounded-lg shadow-sm hover:bg-blue-700 transition-colors flex items-center gap-2"><i className="fas fa-file-pdf"></i> PDF 미리보기 / 다운로드</button>
              </div>
@@ -636,12 +689,13 @@
              
              {/* 1장: 표지 */}
              <div className="report-page w-[1122px] h-[793px] bg-[#0F172A] shadow-2xl relative overflow-hidden flex flex-col shrink-0">
-                <img src={images.main || "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?q=80&w=2070&auto=format&fit=crop"} crossOrigin="anonymous" className="absolute inset-0 w-full h-full object-cover" />
+                {images.main && <img src={images.main} crossOrigin="anonymous" className="absolute inset-0 w-full h-full object-cover" />}
                 <div className="absolute inset-0 bg-[#1c355e]/60 pointer-events-none z-10"></div>
                 <div className="absolute inset-0 bg-gradient-to-t from-[#0F172A] via-[#0F172A]/40 to-transparent pointer-events-none z-10"></div>
                 
                 <div className="relative z-40 flex-1 flex flex-col justify-center pl-24 pr-12 w-2/3 pointer-events-none">
                    <div className="w-16 h-1.5 bg-[#D4AF37] mb-8 shadow-lg"></div>
+                   <input type="text" value={customFields.headline} onChange={e => handleCustomFieldChange('headline', e.target.value)} placeholder={ph("맨 위 한 줄 입력 (예: 급매물 – 23년 매입가 68억, 79억에서 대폭 조정)")} className="pointer-events-auto bg-transparent outline-none text-white font-bold text-xl mb-5 w-full placeholder:text-white/30 hover:bg-white/10 focus:bg-white/10 rounded px-1 -ml-1" />
                    <h2 className="text-[#D4AF37] font-bold tracking-[0.4em] text-lg mb-3 uppercase drop-shadow-md">Premium Real Estate</h2>
                    <h1 className="text-white font-black text-6xl leading-[1.2] mb-6 drop-shadow-2xl">{property.name}</h1>
                    <p className="text-slate-200 text-xl font-light flex items-center gap-3 drop-shadow-md"><MapPin className="w-5 h-5 text-[#D4AF37]"/> {property.address}</p>
@@ -669,98 +723,55 @@
                    <h2 className="text-white font-bold text-xl flex items-center gap-3"><Building2 className="w-5 h-5 text-[#D4AF37]"/> 물건 개요</h2>
                    <span className="text-[#D4AF37] font-bold tracking-widest text-sm">{property.name}</span>
                 </div>
-                <div className="flex-1 flex p-8 gap-8 h-[673px] overflow-hidden">
+                <div className="px-6 pt-3">
+                   <input type="text" value={customFields.summary} onChange={e => handleCustomFieldChange('summary', e.target.value)} placeholder={ph("한 줄 요약 입력 (예: 급매, 역 도보 6분, 23년 준공, 6m 도로 접, 수익률 3.4%)")} className="w-full bg-[#f2efe9] border border-[#1c355e]/30 text-ink-900 font-bold text-[14px] px-4 h-[34px] leading-[34px] py-0 outline-none rounded-lg placeholder:text-slate-400 placeholder:font-medium text-center" />
+                </div>
+                <div className="flex-1 flex px-6 pt-3 pb-[58px] gap-6 overflow-hidden min-h-0">
                    <div className="w-[35%] h-full relative">
                       {renderImageUploader("main", <ImageIcon className="w-12 h-12 mb-3 opacity-40"/>, "메인 건물 사진 등록", "클릭하여 업로드 (세로형 권장)")}
                    </div>
-                   <div className="w-[65%] h-full flex flex-col">
-                      <table className="w-full h-full border-collapse border-t-[3px] border-b-[3px] border-black text-[14px]">
-                         <tbody>
-                            <tr className="bg-[#f2efe9] border-b-2 border-black">
-                               <th colSpan="2" className="text-left py-1.5 px-4 font-bold text-ink-800 text-[15px]">토지 개요</th>
-                            </tr>
-                            <tr className="border-b border-slate-300">
-                               <th className="w-[28%] bg-white font-medium border-r border-slate-300 text-slate-700">물건 주소</th>
-                               <td className="w-[72%] px-4 font-bold text-center text-ink-900">{property.address}</td>
-                            </tr>
-                            <tr className="border-b border-slate-300">
-                               <th className="bg-white font-medium border-r border-slate-300 text-slate-700">물건 위치</th>
-                               <td className="px-4 font-bold text-center"><input type="text" value={customFields.location} onChange={e=>handleCustomFieldChange('location', e.target.value)} className="w-full text-center text-blue-600 bg-transparent outline-none font-bold hover:bg-blue-50" /></td>
-                            </tr>
-                            <tr className="border-b border-slate-300">
-                               <th className="bg-white font-medium border-r border-slate-300 text-slate-700">도로 현황</th>
-                               <td className="px-4 font-bold text-center"><input type="text" value={customFields.roadCond} onChange={e=>handleCustomFieldChange('roadCond', e.target.value)} className="w-full text-center text-blue-600 bg-transparent outline-none font-bold hover:bg-blue-50" /></td>
-                            </tr>
-                            <tr className="border-b border-slate-300">
-                               <th className="bg-white font-medium border-r border-slate-300 text-slate-700">용도 지역</th>
-                               <td className="px-4 font-bold text-center text-ink-900">{property.zoning || '-'}</td>
-                            </tr>
-                            <tr className="border-b-2 border-black">
-                               <th className="bg-white font-medium border-r border-slate-300 text-slate-700">대지 면적</th>
-                               <td className="px-4 font-bold text-center text-ink-900">{property.landArea || 0}㎡ ({getExactPyeong(property.landArea)}평)</td>
-                            </tr>
-
-                            <tr className="bg-[#f2efe9] border-b-2 border-black">
-                               <th colSpan="2" className="text-left py-1.5 px-4 font-bold text-ink-800 text-[15px]">건물 개요</th>
-                            </tr>
-                            <tr className="border-b border-slate-300">
-                               <th className="bg-white font-medium border-r border-slate-300 text-slate-700">연 면 적</th>
-                               <td className="px-4 font-bold text-center text-ink-900">{property.totalFloorArea || 0}㎡ ({getExactPyeong(property.totalFloorArea)}평)</td>
-                            </tr>
-                            <tr className="border-b border-slate-300">
-                               <th className="bg-white font-medium border-r border-slate-300 text-slate-700">건축 면적</th>
-                               <td className="px-4 font-bold text-center text-ink-900">{property.buildingArea || 0}㎡ ({getExactPyeong(property.buildingArea)}평)</td>
-                            </tr>
-                            <tr className="border-b border-slate-300">
-                               <th className="bg-white font-medium border-r border-slate-300 text-slate-700">건 폐 율</th>
-                               <td className="px-4 font-bold text-center text-ink-900">{property.buildingCoverage || '-'}%</td>
-                            </tr>
-                            <tr className="border-b border-slate-300">
-                               <th className="bg-white font-medium border-r border-slate-300 text-slate-700">용 적 률</th>
-                               <td className="px-4 font-bold text-center text-ink-900">{property.floorAreaRatio || '-'}%</td>
-                            </tr>
-                            <tr className="border-b border-slate-300">
-                               <th className="bg-white font-medium border-r border-slate-300 text-slate-700">구 조</th>
-                               <td className="px-4 font-bold text-center"><input type="text" value={customFields.structure} onChange={e=>handleCustomFieldChange('structure', e.target.value)} className="w-full text-center text-blue-600 bg-transparent outline-none font-bold hover:bg-blue-50" /></td>
-                            </tr>
-                            <tr className="border-b border-slate-300">
-                               <th className="bg-white font-medium border-r border-slate-300 text-slate-700">사용 승인</th>
-                               <td className="px-4 font-bold text-center text-ink-900">{property.completionYear || '-'}</td>
-                            </tr>
-                            <tr className="border-b border-slate-300">
-                               <th className="bg-white font-medium border-r border-slate-300 text-slate-700">사용 용도</th>
-                               <td className="px-4 font-bold text-center"><input type="text" value={customFields.usage} onChange={e=>handleCustomFieldChange('usage', e.target.value)} className="w-full text-center text-blue-600 bg-transparent outline-none font-bold hover:bg-blue-50" /></td>
-                            </tr>
-                            <tr className="border-b border-slate-300">
-                               <th className="bg-white font-medium border-r border-slate-300 text-slate-700">승 강 기</th>
-                               <td className="px-4 font-bold text-center"><input type="text" value={customFields.elevator} onChange={e=>handleCustomFieldChange('elevator', e.target.value)} className="w-full text-center text-blue-600 bg-transparent outline-none font-bold hover:bg-blue-50" /></td>
-                            </tr>
-                            <tr className="border-b border-slate-300">
-                               <th className="bg-white font-medium border-r border-slate-300 text-slate-700">주 차 장</th>
-                               <td className="px-4 font-bold text-center text-ink-900">{property.parking || 0}대</td>
-                            </tr>
-                            <tr className="border-b-2 border-black">
-                               <th className="bg-white font-medium border-r border-slate-300 text-slate-700">건축 규모</th>
-                               <td className="px-4 font-bold text-center text-ink-900">지하 {property.floorUnderground || 0}층 / 지상 {property.floorGround || 0}층</td>
-                            </tr>
-
-                            <tr className="bg-[#f2efe9] border-b-2 border-black h-[50px]">
-                               <th className="text-center font-bold border-r border-slate-300 text-[15px] text-ink-800">임대 현황</th>
-                               <td className="text-center font-bold text-[15px] text-ink-900">보증금 {formatKoreanCurrency(floorTotals.deposit)} / 월 {formatKoreanCurrency(floorTotals.rent)}</td>
-                            </tr>
-                            <tr className="bg-[#f2efe9] h-[55px]">
-                               <th className="text-center font-bold border-r border-slate-300 text-[16px] text-ink-800">매매 금액</th>
-                               <td className="text-center font-black text-red-600 text-[20px]">{formatKoreanCurrency(property.price?.sale)}</td>
-                            </tr>
-                         </tbody>
-                      </table>
+                   <div className="w-[65%] h-full flex flex-col overflow-hidden">
+                      <div className="border-t-[3px] border-b-[3px] border-black text-[13px]">
+                         {ovSection('토지 개요')}
+                         {ovRow('물건 주소', property.address)}
+                         {ovRow('물건 위치', <input type="text" value={customFields.location} onChange={e=>handleCustomFieldChange('location', e.target.value)} className={fieldInput} placeholder={ph("예: 학동역 도보 3분")} />)}
+                         {ovRow('도로 현황', <input type="text" value={customFields.roadCond} onChange={e=>handleCustomFieldChange('roadCond', e.target.value)} className={fieldInput} placeholder={ph("예: 6M 도로 접")} />)}
+                         {ovRow('용도 지역', property.zoning || '-')}
+                         {ovRow('대지 면적', `${property.landArea || 0}㎡ (${getExactPyeong(property.landArea)}평)`)}
+                         {ovRow('공시 지가', <input type="text" value={customFields.landPrice} onChange={e=>handleCustomFieldChange('landPrice', e.target.value)} className={fieldInput} placeholder={ph("예: ㎡당 1,085만원 / 합계 19억 8,447만원")} />)}
+                         {ovSection('건물 개요')}
+                         {ovRow('연 면 적', `${property.totalFloorArea || 0}㎡ (${getExactPyeong(property.totalFloorArea)}평)`)}
+                         {ovRow('건축 면적', `${property.buildingArea || 0}㎡ (${getExactPyeong(property.buildingArea)}평)`)}
+                         {ovRow('건 폐 율', `${property.buildingCoverage || '-'}%`)}
+                         {ovRow('용 적 률', `${property.floorAreaRatio || '-'}%`)}
+                         {ovRow('구 조', <input type="text" value={customFields.structure} onChange={e=>handleCustomFieldChange('structure', e.target.value)} className={fieldInput} placeholder={ph("예: 철근콘크리트조")} />)}
+                         {ovRow('사용 승인', property.completionYear || '-')}
+                         {ovRow('사용 용도', <input type="text" value={customFields.usage} onChange={e=>handleCustomFieldChange('usage', e.target.value)} className={fieldInput} placeholder={ph("예: 제2종근린생활시설")} />)}
+                         {ovRow('승 강 기', <input type="text" value={customFields.elevator} onChange={e=>handleCustomFieldChange('elevator', e.target.value)} className={fieldInput} placeholder={ph("예: 1대")} />)}
+                         {ovRow('주 차 장', `${property.parking || 0}대`)}
+                         {ovRow('건축 규모', `지하 ${property.floorUnderground || 0}층 / 지상 ${property.floorGround || 0}층`)}
+                         <div className="flex items-center bg-[#f2efe9] border-t-2 border-black border-b-2 min-h-[36px]">
+                            <div className="w-[28%] text-center font-bold text-[14px] text-ink-800 border-r border-slate-300 py-2">임대 현황</div>
+                            <div className="w-[72%] text-center font-bold text-[14px] text-ink-900 py-2 px-2">보증금 {formatKoreanCurrency(floorTotals.deposit)} / 월 {formatKoreanCurrency(floorTotals.rent)} / 관리비 {formatKoreanCurrency(floorTotals.maintenance)}</div>
+                         </div>
+                         <div className="flex items-center bg-[#f2efe9] min-h-[64px]">
+                            <div className="w-[28%] text-center font-bold text-[15px] text-ink-800 border-r border-slate-300 py-3">매매 금액</div>
+                            <div className="w-[72%] text-center py-2 px-2">
+                               <div className="leading-[28px]">
+                                  <span className="font-black text-red-600 text-[20px]">{formatKoreanCurrency(property.price?.sale)}</span>
+                                  {Number(property.landArea) > 0 && Number(property.price?.sale) > 0 && <span className="ml-2 text-[12px] font-bold text-slate-500">(대지 평당 {formatKoreanCurrency(Math.round(Number(property.price.sale) / (Number(property.landArea) * 0.3025)))})</span>}
+                               </div>
+                               <input type="text" value={customFields.saleNote} onChange={e=>handleCustomFieldChange('saleNote', e.target.value)} className="block w-full h-[20px] leading-[20px] py-0 text-center text-[12px] text-slate-600 bg-transparent outline-none font-bold hover:bg-white/60 placeholder:text-slate-300 placeholder:font-medium" placeholder={ph("매매 조건 메모 (예: 매각 후 2년간 2개층 리스백)")} />
+                            </div>
+                         </div>
+                      </div>
                    </div>
                 </div>
                 {renderFooter()}
              </div>
 
              {/* 3장: 지도 */}
-             <div className="report-page w-[1122px] h-[793px] bg-white shadow-2xl relative shrink-0 flex flex-col">
+             <div className={`report-page w-[1122px] h-[793px] bg-white shadow-2xl relative shrink-0 flex flex-col ${images.map ? "" : "print:hidden"} ${!images.map && isGeneratingPdf ? "hidden" : ""}`}>
                 <div className="h-[70px] bg-[#1c355e] flex items-center px-10 justify-between shrink-0">
                    <h2 className="text-white font-bold text-xl flex items-center gap-3"><MapPin className="w-5 h-5 text-[#D4AF37]"/> 위치도 (Location Map)</h2>
                 </div>
@@ -775,14 +786,14 @@
                 <div className="h-[70px] bg-[#1c355e] flex items-center px-10 justify-between shrink-0">
                    <h2 className="text-white font-bold text-xl flex items-center gap-3"><List className="w-5 h-5 text-[#D4AF37]"/> 층별 임대 현황 (Rent Roll)</h2>
                 </div>
-                <div className="flex-1 p-10 h-[673px] overflow-hidden flex flex-col">
-                   <table className="w-full h-full text-center border-collapse border-y-2 border-[#1c355e] flex-1">
+                <div className="flex-1 px-10 pt-8 pb-14 overflow-hidden flex flex-col gap-4 min-h-0">
+                   <table className="w-full text-center border-collapse border-y-2 border-[#1c355e]">
                       <thead className="bg-slate-50 h-[50px] shrink-0">
                         <tr><th className="py-4 px-4 font-extrabold text-slate-700 border-b border-slate-300">층수</th><th className="py-4 px-4 font-extrabold text-slate-700 border-b border-slate-300">임차인 (업체명)</th><th className="py-4 px-4 font-extrabold text-slate-700 border-b border-slate-300 text-right">보증금</th><th className="py-4 px-4 font-extrabold text-slate-700 border-b border-slate-300 text-right">월 임대료</th><th className="py-4 px-4 font-extrabold text-slate-700 border-b border-slate-300 text-right">관리비</th></tr>
                       </thead>
-                      <tbody className="text-[14px] h-full">
+                      <tbody className="text-[14px]">
                         {property.floorDetails?.map(f => (
-                          <tr key={f.id} className="border-b border-slate-200 h-[10%]">
+                          <tr key={f.id} className="border-b border-slate-200 h-[44px]">
                              <td className="py-3 px-4 font-bold text-ink-800 bg-slate-50/50">{f.floor}</td>
                              <td className="py-3 px-4 font-medium text-slate-700">{f.companyName || '공실'}</td>
                              <td className="py-3 px-4 font-bold text-ink-800 text-right">{formatKoreanCurrency(f.deposit)}</td>
@@ -791,7 +802,7 @@
                           </tr>
                         ))}
                       </tbody>
-                      <tfoot className="bg-[#f8fafc] border-t-2 border-[#1c355e] h-[60px] shrink-0">
+                      <tfoot className="bg-[#f8fafc] border-t-2 border-[#1c355e] h-[52px]">
                         <tr>
                            <th colSpan="2" className="py-4 px-4 font-extrabold text-ink-900 text-lg">총 합계</th>
                            <td className="py-4 px-4 font-extrabold text-blue-700 text-lg text-right">{formatKoreanCurrency(floorTotals.deposit)}</td>
@@ -800,12 +811,20 @@
                         </tr>
                       </tfoot>
                    </table>
+                   {rentNotes.trim() && (
+                      <ul className="space-y-1.5 text-[14px] font-bold text-ink-800 px-1">
+                         {rentNotes.split('\n').filter(l => l.trim()).map((l, i) => <li key={i} className="flex gap-2"><span className="text-[#1c355e]">•</span><span>{l.trim()}</span></li>)}
+                      </ul>
+                   )}
+                   <div data-html2canvas-ignore="true" className="print:hidden mt-auto">
+                      <textarea value={rentNotes} onChange={e => setRentNotes(e.target.value)} rows={3} placeholder={ph("특이사항 입력 (한 줄에 하나씩, 위 표 아래에 • 목록으로 나와요. 이 입력칸은 PDF·인쇄에 나오지 않아요.)")} className="w-full text-sm p-3 border border-dashed border-slate-300 rounded-xl outline-none focus:border-blue-400 bg-slate-50 resize-none" />
+                   </div>
                 </div>
                 {renderFooter()}
              </div>
 
              {/* 5장: 건축물대장 */}
-             <div className="report-page w-[1122px] h-[793px] bg-white shadow-2xl relative shrink-0 flex flex-col">
+             <div className={`report-page w-[1122px] h-[793px] bg-white shadow-2xl relative shrink-0 flex flex-col ${images.ledger ? "" : "print:hidden"} ${!images.ledger && isGeneratingPdf ? "hidden" : ""}`}>
                 <div className="h-[70px] bg-[#1c355e] flex items-center px-10 justify-between shrink-0">
                    <h2 className="text-white font-bold text-xl flex items-center gap-3"><FileText className="w-5 h-5 text-[#D4AF37]"/> 건축물대장</h2>
                 </div>
@@ -816,7 +835,7 @@
              </div>
 
              {/* 6장: 토지이용계획원 */}
-             <div className="report-page w-[1122px] h-[793px] bg-white shadow-2xl relative shrink-0 flex flex-col">
+             <div className={`report-page w-[1122px] h-[793px] bg-white shadow-2xl relative shrink-0 flex flex-col ${images.landPlan ? "" : "print:hidden"} ${!images.landPlan && isGeneratingPdf ? "hidden" : ""}`}>
                 <div className="h-[70px] bg-[#1c355e] flex items-center px-10 justify-between shrink-0">
                    <h2 className="text-white font-bold text-xl flex items-center gap-3"><MapIcon className="w-5 h-5 text-[#D4AF37]"/> 토지이용계획원</h2>
                 </div>
@@ -825,6 +844,43 @@
                 </div>
                 {renderFooter()}
              </div>
+
+             {/* 사진 쪽: 기본 1쪽, 필요하면 위쪽 버튼으로 추가 */}
+             {photoPages.map((pg) => (
+               <div key={pg.id} className={`report-page w-[1122px] h-[793px] bg-white shadow-2xl relative shrink-0 flex flex-col ${pg.photos.length ? "" : "print:hidden"} ${!pg.photos.length && isGeneratingPdf ? "hidden" : ""}`}>
+                  <div className="h-[70px] bg-[#1c355e] flex items-center px-10 justify-between shrink-0">
+                     <h2 className="text-white font-bold text-xl flex items-center gap-3"><ImageIcon className="w-5 h-5 text-[#D4AF37]"/>
+                        <input type="text" value={pg.title} onChange={e => setPhotoTitle(pg.id, e.target.value)} placeholder={ph("사진 제목")} className="bg-transparent outline-none text-white font-bold text-xl w-[360px] hover:bg-white/10 focus:bg-white/10 rounded px-1 placeholder:text-white/40" />
+                     </h2>
+                     <div data-html2canvas-ignore="true" className="print:hidden flex items-center gap-2">
+                        <label className="px-4 py-1.5 bg-white/15 hover:bg-white/25 text-white text-sm font-bold rounded-lg cursor-pointer transition-colors">+ 사진 추가
+                           <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => { addPhotos(pg.id, e.target.files); e.target.value = ''; }} />
+                        </label>
+                        {photoPages.length > 1 && <button type="button" onClick={() => removePhotoPage(pg.id)} className="px-3 py-1.5 bg-red-500/80 hover:bg-red-500 text-white text-sm font-bold rounded-lg transition-colors">이 쪽 지우기</button>}
+                     </div>
+                  </div>
+                  <div className="flex-1 p-6 pb-[66px] min-h-0">
+                     {pg.photos.length === 0 ? (
+                       <label className="print:hidden w-full h-full flex flex-col items-center justify-center rounded-3xl border-2 border-dashed border-slate-300 bg-slate-50 text-slate-400 cursor-pointer hover:bg-slate-100 transition-colors text-center">
+                          <ImageIcon className="w-12 h-12 mb-3 opacity-40" />
+                          <p className="text-sm font-bold text-slate-500 mb-1">사진을 올려 주세요 (한 쪽에 4장까지)</p>
+                          <p className="text-xs">클릭해서 여러 장을 한꺼번에 고를 수 있어요</p>
+                          <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => { addPhotos(pg.id, e.target.files); e.target.value = ''; }} />
+                       </label>
+                     ) : (
+                       <div className={`w-full h-full grid gap-4 ${pg.photos.length === 1 ? 'grid-cols-1' : 'grid-cols-2'} ${pg.photos.length >= 3 ? 'grid-rows-2' : ''}`}>
+                          {pg.photos.map((src, i) => (
+                            <div key={i} className={`relative group rounded-2xl overflow-hidden bg-slate-100 ${pg.photos.length === 3 && i === 0 ? 'row-span-2' : ''}`}>
+                               <img src={src} className="w-full h-full object-cover" />
+                               <button type="button" data-html2canvas-ignore="true" onClick={() => removePhoto(pg.id, i)} className="print:hidden absolute top-2 right-2 w-8 h-8 rounded-full bg-black/60 hover:bg-red-600 text-white font-bold text-sm opacity-0 group-hover:opacity-100 transition-opacity" title="이 사진 빼기">✕</button>
+                            </div>
+                          ))}
+                       </div>
+                     )}
+                  </div>
+                  {renderFooter()}
+               </div>
+             ))}
 
           </div>
         </div>
