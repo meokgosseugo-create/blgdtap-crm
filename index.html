@@ -287,7 +287,7 @@
           .sort((a, b) => Math.abs(a.y - addrLabel.y) - Math.abs(b.y - addrLabel.y))[0];
         if (cand) addrText = cand.s;
       }
-      put('address', addrText, '소재지');
+      put('address', addrText ? addrText.replace(/(\d)\s*번지/g, '$1').trim() : addrText, '소재지');
       put('landArea', m2('landArea') !== null ? m2('landArea') : m2('landArea2'), '대지면적');
       put('zoning', join('zoning'), '용도지역');
       const cm = join('completion'); let comp = null;
@@ -923,7 +923,7 @@
             </div>
           </div>
 
-          <div className="overflow-auto w-full max-h-[calc(100vh-290px)]">
+          <div className="overflow-auto w-full max-h-none md:max-h-[calc(100vh-290px)]">
             <table className="w-full text-left border-collapse whitespace-nowrap min-w-[1000px]">
               <thead>
                 <tr>
@@ -1000,7 +1000,7 @@
       );
     }
 
-    function PropertyDetailView({ property, onBack, onEdit, onDelete, onReport, currentUser, onUpdate, readOnly, onToggleShare, comments = [], onAddComment }) {
+    function PropertyDetailView({ property, onBack, onEdit, onDelete, onReport, currentUser, onUpdate, readOnly, onToggleShare, comments = [], onAddComment, onDeleteComment }) {
       const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
       const [newLog, setNewLog] = useState('');
       const [newComment, setNewComment] = useState('');
@@ -1211,7 +1211,7 @@
                     <div key={c.id} className="p-3 bg-stone-50 rounded-lg border border-stone-200 text-xs flex flex-col gap-1.5">
                       <div className="flex flex-wrap items-center justify-between gap-1 border-b border-stone-200 pb-1.5">
                         <span className="font-semibold text-slate-700 flex items-center gap-1.5"><UserCircle className="w-3.5 h-3.5 text-gold-500" /> {c.author}</span>
-                        <span className="text-slate-400">{c.date}</span>
+                        <span className="text-slate-400 flex items-center gap-2">{c.date}{currentUser && c.user_id === currentUser.loginId && onDeleteComment && (<button type="button" onClick={() => { if (confirm('이 코멘트를 삭제할까요?')) onDeleteComment(c.id); }} className="px-2 py-0.5 rounded border border-red-200 text-red-500 hover:bg-red-50 font-semibold">삭제</button>)}</span>
                       </div>
                       <p className="text-slate-800 whitespace-pre-line leading-relaxed text-[13px]">{c.content}</p>
                     </div>
@@ -1482,6 +1482,7 @@
                     <input type="file" accept="application/pdf,.pdf" className="hidden" onChange={(e) => { readPdf(e.target.files[0]); e.target.value = ''; }} />
                   </label>
                 </div>
+                <p className="mt-3 text-sm font-bold text-red-600 text-center sm:text-left">※ PDF 자동 입력은 완벽하지 않아요. 잘못 읽히거나 빠진 내용이 있을 수 있으니, 꼭 내용을 확인한 뒤 등록해 주세요.</p>
                 {pdfInfo && pdfInfo.error && <div className="mt-4 p-3 bg-red-50 border border-red-100 text-red-600 text-sm font-semibold rounded-lg">{pdfInfo.error}</div>}
                 {pdfInfo && pdfInfo.ok && (
                   <div className="mt-4 p-4 bg-white border border-gold-200 rounded-xl text-sm text-slate-700 space-y-1.5">
@@ -2193,6 +2194,7 @@
           
           const scrollArea = document.getElementById('main-scroll-area');
           if (scrollArea) scrollArea.scrollTo({ top: 0, behavior: 'auto' });
+          window.scrollTo({ top: 0, behavior: 'auto' });
 
           let { error } = await supabase.from('crm_properties').upsert(toDB(finalProp));
           if (error && /is_shared/.test(error.message || '')) {
@@ -2260,6 +2262,16 @@
         }
       };
 
+      const handleDeleteComment = async (id) => {
+        const old = comments.find(x => x.id === id);
+        setComments(prev => prev.filter(x => x.id !== id));
+        const { data, error } = await supabase.from('crm_comments').delete().eq('id', id).select();
+        if (error || !data || data.length === 0) {
+          if (old) setComments(prev => [old, ...prev]);
+          alert('코멘트를 삭제하지 못했어요. 처음 한 번 Supabase에서 supabase/comment-delete.sql 내용을 실행해야 해요.' + (error ? '\n\n(원인: ' + error.message + ')' : ''));
+        }
+      };
+
       const handleBulkDelete = async (ids) => {
         setProperties(prev => prev.filter(p => !ids.includes(p.id)));
         const { error } = await supabase.from('crm_properties').delete().in('id', ids);
@@ -2277,8 +2289,8 @@
       if (!isAuthenticated) return <AuthView onAuth={handleAuth} />;
 
       return (
-        <div className="flex flex-col md:flex-row h-screen bg-ivory font-sans text-slate-800">
-          <div className="md:hidden flex items-center justify-between bg-ink-900 text-white px-5 py-4 z-30 shadow-md sticky top-0 border-b border-gold-400/20">
+        <div className="flex flex-col md:flex-row min-h-screen md:h-screen bg-ivory font-sans text-slate-800">
+          <div className="md:hidden flex items-center justify-between bg-ink-900 text-white px-5 py-4 z-30 shadow-md border-b border-gold-400/20">
             <div className="flex items-center gap-2">
               <Building2 className="w-5 h-5 text-gold-300" />
               <h1 className="text-lg font-semibold tracking-wide">빌딩탭</h1>
@@ -2330,7 +2342,7 @@
             </div>
           </aside>
 
-          <main className="flex-1 flex flex-col h-[calc(100vh-60px)] md:h-screen overflow-hidden w-full relative">
+          <main className="flex-1 flex flex-col h-auto md:h-screen md:overflow-hidden w-full relative">
             {rlsError && (
               <div className="bg-red-600 text-white p-4 sm:p-6 text-sm font-bold flex flex-col gap-2 relative shadow-lg z-[100] w-full shrink-0 no-print">
                 <h3 className="text-base sm:text-lg flex items-center gap-2"><i className="fas fa-exclamation-triangle"></i> 데이터베이스 보안 정책(RLS) 차단 알림</h3>
@@ -2387,7 +2399,7 @@
               </div>
             </header>
 
-            <div id="main-scroll-area" className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:px-10 md:py-8 relative bg-ivory print-wrapper">
+            <div id="main-scroll-area" className="flex-1 md:overflow-y-auto overflow-x-hidden p-4 md:px-10 md:py-8 relative bg-ivory print-wrapper">
               {activeTab === 'properties' && (
                 <>
                   {currentView === 'list' && <PropertyListView properties={filteredMyProperties} selectable onBulkDelete={handleBulkDelete} onViewDetail={(p) => { setSelectedProperty(p); setCurrentView('detail'); }} />}
@@ -2403,6 +2415,7 @@
                       onToggleShare={handleToggleShare}
                       comments={comments.filter(c => selectedProperty && c.property_id === selectedProperty.id)}
                       onAddComment={handleAddComment}
+                      onDeleteComment={handleDeleteComment}
                     />
                   )}
                   {currentView === 'report' && (
@@ -2434,6 +2447,7 @@
                       currentUser={currentUser}
                       comments={comments.filter(c => selectedProperty && c.property_id === selectedProperty.id)}
                       onAddComment={handleAddComment}
+                      onDeleteComment={handleDeleteComment}
                     />
                   )}
                   {currentView === 'report' && (
