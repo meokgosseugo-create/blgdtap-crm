@@ -440,6 +440,48 @@
         </svg>
       );
     };
+    // 표지 캡슐 기본 그림: 파란 도시 야경 (사진을 올리면 사진이 대신 들어간다)
+    const CityArt = ({ variant }) => {
+      const lit = (seed, n, x0, y0, w, h) => Array.from({ length: n }, (_, i) => { const r = Math.sin(seed * 97 + i * 31.7) * 43758.5453; const f = r - Math.floor(r); const g = Math.sin(seed * 53 + i * 17.3) * 12345.678; const g2 = g - Math.floor(g); return <rect key={seed + '-' + i} x={x0 + Math.floor(f * (w - 6) / 6) * 6 + 1} y={y0 + Math.floor(g2 * (h - 8) / 8) * 8 + 2} width="4" height="5" fill="#ffe8a3" opacity={0.55 + f * 0.4} />; });
+      if (variant === 'a') return (
+        <svg viewBox="0 0 270 380" className="absolute inset-0 w-full h-full" preserveAspectRatio="xMidYMid slice">
+          <defs>
+            <linearGradient id="caBg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#4a74ff" /><stop offset="1" stopColor="#1b2fa6" /></linearGradient>
+            <pattern id="caWin" width="8" height="10" patternUnits="userSpaceOnUse"><rect x="1.5" y="2" width="5" height="6" fill="#ffffff" opacity="0.28" /></pattern>
+          </defs>
+          <rect width="270" height="380" fill="url(#caBg)" />
+          <circle cx="215" cy="70" r="46" fill="#ffffff" opacity="0.08" /><circle cx="60" cy="120" r="24" fill="#ffffff" opacity="0.07" />
+          <rect x="14" y="170" width="54" height="210" fill="#7ea0ff" opacity="0.45" /><rect x="14" y="170" width="54" height="210" fill="url(#caWin)" />
+          <rect x="196" y="120" width="60" height="260" fill="#6d93ff" opacity="0.5" /><rect x="196" y="120" width="60" height="260" fill="url(#caWin)" />
+          <polygon points="84,60 150,40 150,380 84,380" fill="#2c4fe0" /><polygon points="150,40 204,70 204,380 150,380" fill="#1d37b8" />
+          <polygon points="84,60 150,40 150,380 84,380" fill="url(#caWin)" /><polygon points="150,40 204,70 204,380 150,380" fill="url(#caWin)" opacity="0.7" />
+          {lit(1, 26, 84, 60, 66, 320)}{lit(2, 20, 150, 70, 54, 310)}
+          <rect x="0" y="330" width="270" height="50" fill="#0e1b73" opacity="0.55" />
+        </svg>
+      );
+      return (
+        <svg viewBox="0 0 262 570" className="absolute inset-0 w-full h-full" preserveAspectRatio="xMidYMid slice">
+          <defs>
+            <linearGradient id="cbSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#0a1038" /><stop offset="0.6" stopColor="#1f3bbd" /><stop offset="1" stopColor="#4f7bff" /></linearGradient>
+            <linearGradient id="cbWater" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#2a4fe0" /><stop offset="1" stopColor="#0a1038" /></linearGradient>
+            <pattern id="cbWin" width="7" height="9" patternUnits="userSpaceOnUse"><rect x="1" y="2" width="4" height="5" fill="#9fc0ff" opacity="0.35" /></pattern>
+          </defs>
+          <rect width="262" height="570" fill="url(#cbSky)" />
+          {[[20,40],[60,90],[200,60],[235,120],[170,30],[40,150],[225,180],[90,25]].map(([x, y], i) => <circle key={i} cx={x} cy={y} r="1.3" fill="#fff" opacity="0.7" />)}
+          <rect x="0" y="360" width="46" height="110" fill="#14257e" /><rect x="0" y="360" width="46" height="110" fill="url(#cbWin)" />
+          <rect x="46" y="330" width="40" height="140" fill="#1b34a8" /><rect x="46" y="330" width="40" height="140" fill="url(#cbWin)" />
+          <rect x="176" y="340" width="44" height="130" fill="#1b34a8" /><rect x="176" y="340" width="44" height="130" fill="url(#cbWin)" />
+          <rect x="220" y="372" width="42" height="98" fill="#14257e" /><rect x="220" y="372" width="42" height="98" fill="url(#cbWin)" />
+          <g fill="#0e1b73"><rect x="84" y="318" width="94" height="152" /><rect x="97" y="262" width="68" height="60" /><rect x="109" y="212" width="44" height="54" /><rect x="119" y="172" width="24" height="44" /><rect x="127" y="120" width="8" height="56" /><rect x="130.2" y="78" width="1.6" height="46" /></g>
+          <g fill="url(#cbWin)"><rect x="84" y="318" width="94" height="152" /><rect x="97" y="262" width="68" height="60" /><rect x="109" y="212" width="44" height="54" /><rect x="119" y="172" width="24" height="44" /></g>
+          {lit(3, 40, 84, 318, 94, 152)}{lit(4, 14, 97, 262, 68, 60)}{lit(5, 9, 109, 212, 44, 54)}{lit(6, 4, 119, 172, 24, 44)}
+          <circle cx="131" cy="76" r="3" fill="#ff5a5a" />
+          <rect x="0" y="470" width="262" height="100" fill="url(#cbWater)" />
+          {Array.from({ length: 16 }, (_, i) => <rect key={i} x={20 + i * 14} y={476 + (i % 4) * 8} width="2" height={26 + (i % 5) * 9} fill="#ffe8a3" opacity="0.22" />)}
+          <rect x="125" y="474" width="12" height="80" fill="#ffe8a3" opacity="0.18" />
+        </svg>
+      );
+    };
     // 작업 일지는 쓴 사람만 지울 수 있다. (예전 일지는 아이디가 없어 이름으로 비교)
     const canDeleteLog = (log, user) => !!user && (log.authorId ? log.authorId === user.loginId : log.author === user.name);
     function FloorMoneyInput({ label, value, onChange }) { return <div className="w-full min-w-0" title={value ? formatKoreanCurrency(value) : ''}><label className="block text-xs font-bold text-slate-500 mb-1 pl-0.5 md:hidden">{label}<span className="text-blue-600 ml-1">{value ? formatKoreanCurrency(value) : ''}</span></label><div className="flex items-center border border-slate-300 rounded-lg bg-white focus-within:border-blue-500 focus-within:ring-1 overflow-hidden shadow-sm transition-all"><input type="text" inputMode="decimal" value={fmtMoneyInput(value || '')} onChange={(e) => onChange({ target: { value: cleanMoneyInput(e.target.value) } })} className="w-full min-w-0 py-3 md:py-2 px-2 text-right text-sm font-bold outline-none bg-transparent" placeholder="0" /><span className="text-xs font-bold text-slate-500 pr-2 whitespace-nowrap">만원</span></div></div>; }
@@ -713,13 +755,15 @@
                 <div className="absolute left-[610px] top-[34px] w-[270px] h-[380px] rounded-[135px] overflow-hidden bg-gradient-to-b from-[#3158e8] to-[#1f3fc0] shadow-xl">
                    {(images.cover1 || images.main) && <img src={images.cover1 || images.main} crossOrigin="anonymous" className="absolute inset-0 w-full h-full object-cover" style={{ objectPosition: '50% 20%' }} />}
                    <div className="absolute inset-0 bg-gradient-to-b from-[#2f55e6]/55 to-[#1b34a8]/60 pointer-events-none"></div>
-                   {!(images.cover1 || images.main) && <div className="print:hidden absolute inset-0 flex items-center justify-center text-white/80 text-sm font-bold text-center px-10 pointer-events-none" data-html2canvas-ignore="true">클릭해서<br/>건물 사진 올리기</div>}
+                   {!(images.cover1 || images.main) && <CityArt variant="a" />}
+                   {!(images.cover1 || images.main) && <div className="print:hidden absolute top-3 inset-x-0 text-center text-white/90 text-xs font-bold pointer-events-none" data-html2canvas-ignore="true">클릭해서 사진 올리기</div>}
                    <input type="file" accept="image/*" onChange={(e) => handleImageUpload(e, 'cover1')} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" title="클릭하여 표지 사진 올리기" data-html2canvas-ignore="true" />
                 </div>
                 <div className="absolute left-[810px] top-[190px] w-[262px] h-[570px] rounded-[131px] overflow-hidden bg-gradient-to-b from-[#16205c] to-[#0b1233] shadow-2xl">
                    {(images.cover2 || images.cover1 || images.main) && <img src={images.cover2 || images.cover1 || images.main} crossOrigin="anonymous" className="absolute inset-0 w-full h-full object-cover" style={{ objectPosition: '50% 55%' }} />}
                    <div className="absolute inset-0 bg-gradient-to-t from-[#0b1233]/65 via-[#1a2f9c]/20 to-transparent pointer-events-none"></div>
-                   {!(images.cover2 || images.cover1 || images.main) && <div className="print:hidden absolute inset-0 flex items-center justify-center text-white/80 text-sm font-bold text-center px-10 pointer-events-none" data-html2canvas-ignore="true">클릭해서<br/>건물 사진 올리기</div>}
+                   {!(images.cover2 || images.cover1 || images.main) && <CityArt variant="b" />}
+                   {!(images.cover2 || images.cover1 || images.main) && <div className="print:hidden absolute top-3 inset-x-0 text-center text-white/90 text-xs font-bold pointer-events-none" data-html2canvas-ignore="true">클릭해서 사진 올리기</div>}
                    <input type="file" accept="image/*" onChange={(e) => handleImageUpload(e, 'cover2')} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" title="클릭하여 표지 사진 올리기" data-html2canvas-ignore="true" />
                 </div>
                 {/* 글자 */}
