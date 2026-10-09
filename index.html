@@ -1774,7 +1774,7 @@
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200 text-[11px] md:text-xs uppercase tracking-wider text-slate-500">
                   {!shared && <th className={th}>이름</th>}{!shared && <th className={th}>전화번호</th>}
-                  <th className={th + " text-right"}>투자금액</th><th className={th}>희망 지역</th><th className="p-3 md:p-4 font-medium">구매사유</th>
+                  <th className={th}>투자금액</th><th className={th}>희망 지역</th><th className="p-3 md:p-4 font-medium">구매사유</th>
                   {shared && <th className={th}>등록자</th>}{shared && <th className={th}>등록일</th>}
                   {!shared && <th className={th + " text-center"}>공유</th>}
                 </tr>
@@ -1783,7 +1783,7 @@
                 {shown.map(cust => (
                   <tr key={cust.id} className="hover:bg-blue-50/50 transition-colors align-top">
                     {!shared && <td className="p-3 md:p-4 font-bold text-ink-800 whitespace-nowrap">{cust.name}</td>}{!shared && <td className={td}>{cust.phone}</td>}
-                    <td className="p-3 md:p-4 text-right font-bold text-red-600 whitespace-nowrap">{money(cust.budget)}</td>
+                    <td className="p-3 md:p-4 font-bold text-red-600 whitespace-nowrap">{money(cust.budget)}</td>
                     <td className={td}>{cust.region}</td>
                     <td className="p-3 md:p-4 text-slate-600 whitespace-pre-line min-w-[260px]">{cust.reason}</td>
                     {shared && <td className={td}>{cust.registrant}</td>}{shared && <td className={td}>{cust.date}</td>}
@@ -1828,10 +1828,10 @@
               <div className="sm:col-span-4">
                 <FormGroup label="금액 (단위: 억)">
                   <div className="flex items-center border rounded-lg bg-white focus-within:ring-2 focus-within:ring-blue-500 overflow-hidden">
-                    <input type="text" inputMode="decimal" name="budget" value={fmtMoneyInput(formData.budget)} onChange={(e) => setFormData({ ...formData, budget: cleanMoneyInput(e.target.value) })} className="w-full min-w-0 p-2.5 md:p-3 text-right text-sm md:text-base font-bold outline-none bg-transparent" placeholder="예: 30 또는 12.5" />
+                    <input type="text" inputMode="decimal" name="budget" value={fmtMoneyInput(formData.budget)} onChange={(e) => setFormData({ ...formData, budget: cleanMoneyInput(e.target.value) })} className="w-full min-w-0 p-2.5 md:p-3 text-sm md:text-base font-bold outline-none bg-transparent" placeholder="예: 30 또는 12.5" />
                     <span className="text-xs font-bold text-slate-500 pr-3 pl-1 whitespace-nowrap">억</span>
                   </div>
-                  <span className="text-sm font-bold text-blue-600 text-right block min-h-[20px]">{formData.budget ? formatEok(formData.budget) : ''}</span>
+                  <span className="text-sm font-bold text-blue-600 block min-h-[20px] mt-1">{formData.budget ? formatEok(formData.budget) : ''}</span>
                 </FormGroup>
               </div>
               <div className="sm:col-span-2"><FormGroup label="지역"><input type="text" name="region" onChange={handleChange} className="form-input w-full p-2.5 md:p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm md:text-base" placeholder="예: 분당구 일대" /></FormGroup></div>
