@@ -354,9 +354,9 @@
       return { fields, floors, notes, filled, skipped };
     }
 
-    const STATUS_OPTIONS = ['보류', '매매', '완료'];
-    const STATUS_FORM_COLORS = { '보류': 'bg-amber-100 text-amber-800', '매매': 'bg-emerald-100 text-emerald-800', '완료': 'bg-sky-100 text-sky-800' };
-    const STATUS_BADGE_COLORS = { '보류': 'bg-amber-100 text-amber-800', '매매': 'bg-emerald-100 text-emerald-800', '완료': 'bg-sky-100 text-sky-800' };
+    const STATUS_OPTIONS = ['보류', '완료', '매매'];
+    const STATUS_FORM_COLORS = { '보류': 'bg-yellow-200 text-yellow-900', '완료': 'bg-blue-100 text-blue-800', '매매': 'bg-red-100 text-red-700' };
+    const STATUS_BADGE_COLORS = { '보류': 'bg-yellow-200 text-yellow-900', '완료': 'bg-blue-100 text-blue-800', '매매': 'bg-red-100 text-red-700' };
 
     const SVG_PATHS = {"calendar": "<rect width=\"18\" height=\"18\" x=\"3\" y=\"4\" rx=\"2\"/><path d=\"M16 2v4M8 2v4M3 10h18\"/>", "building2": "<path d=\"M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z\"/><path d=\"M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2\"/><path d=\"M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2\"/><path d=\"M10 6h4M10 10h4M10 14h4M10 18h4\"/>", "building": "<rect width=\"16\" height=\"20\" x=\"4\" y=\"2\" rx=\"2\"/><path d=\"M9 22v-4h6v4M8 6h.01M16 6h.01M12 6h.01M12 10h.01M12 14h.01M16 10h.01M16 14h.01M8 10h.01M8 14h.01\"/>", "share": "<circle cx=\"18\" cy=\"5\" r=\"3\"/><circle cx=\"6\" cy=\"12\" r=\"3\"/><circle cx=\"18\" cy=\"19\" r=\"3\"/><path d=\"m8.59 13.51 6.83 3.98M15.41 6.51l-6.82 3.98\"/>", "users": "<path d=\"M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2\"/><circle cx=\"9\" cy=\"7\" r=\"4\"/><path d=\"M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75\"/>", "usersround": "<path d=\"M18 21a8 8 0 0 0-16 0\"/><circle cx=\"10\" cy=\"8\" r=\"5\"/><path d=\"M22 20c0-3.37-2-6.5-4-8a5 5 0 0 0-.45-8.3\"/>", "usercircle": "<circle cx=\"12\" cy=\"12\" r=\"10\"/><circle cx=\"12\" cy=\"10\" r=\"3\"/><path d=\"M7 20.662V19a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v1.662\"/>", "logout": "<path d=\"M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9\"/>", "store": "<path d=\"m2 7 4.41-4.41A2 2 0 0 1 7.83 2h8.34a2 2 0 0 1 1.42.59L22 7\"/><path d=\"M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8\"/><path d=\"M15 22v-4a2 2 0 0 0-2-2h-2a2 2 0 0 0-2 2v4\"/><path d=\"M2 7h20\"/>", "briefcase": "<rect width=\"20\" height=\"14\" x=\"2\" y=\"7\" rx=\"2\"/><path d=\"M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16\"/>", "home": "<path d=\"M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8\"/><path d=\"M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z\"/>", "door": "<path d=\"M18 20V6a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v14\"/><path d=\"M2 20h20\"/><path d=\"M14 12v.01\"/>"};
     const FA2SVG = { 'fa-calendar-alt': 'calendar', 'fa-building': 'building2', 'fa-share-alt': 'share', 'fa-users': 'users', 'fa-user-circle': 'usercircle', 'fa-user-friends': 'usersround' };
@@ -924,7 +924,7 @@
               <div className="grid grid-cols-[4.5rem_minmax(0,1fr)] items-center gap-2 md:flex">
                 <span className="text-xs font-bold text-slate-600">상태</span>
                 <div className="grid grid-cols-4 gap-1.5 md:flex md:gap-1">
-                  {['전체', '보류', '매매', '완료'].map(st => (
+                  {['전체', '보류', '완료', '매매'].map(st => (
                     <button key={st} onClick={() => setStatusFilter(st)} className={`h-8 md:h-7 px-2 md:px-3 whitespace-nowrap rounded-md text-xs font-bold border transition-colors ${statusFilter === st ? 'bg-ink-900 text-gold-200 border-ink-900' : 'bg-white border-stone-300 text-slate-500 hover:text-ink-900'}`}>{st} <span className="opacity-60 font-medium">{counts[st]}</span></button>
                   ))}
                 </div>
@@ -1684,7 +1684,7 @@
               <div className="grid grid-cols-3 gap-2 sm:gap-3">
                 {STATUS_OPTIONS.map(st => {
                   const on = formData.status === st || (!formData.status && st === '보류');
-                  const tone = { '보류': on ? 'bg-amber-400 border-amber-400 text-white' : 'border-amber-200 text-amber-700 hover:bg-amber-50', '매매': on ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-emerald-200 text-emerald-700 hover:bg-emerald-50', '완료': on ? 'bg-sky-500 border-sky-500 text-white' : 'border-sky-200 text-sky-700 hover:bg-sky-50' }[st];
+                  const tone = { '보류': on ? 'bg-yellow-300 border-yellow-300 text-yellow-900' : 'border-yellow-300 text-yellow-800 hover:bg-yellow-50', '완료': on ? 'bg-blue-600 border-blue-600 text-white' : 'border-blue-200 text-blue-700 hover:bg-blue-50', '매매': on ? 'bg-red-500 border-red-500 text-white' : 'border-red-200 text-red-600 hover:bg-red-50' }[st];
                   return <button key={st} type="button" onClick={() => setFormData(prev => ({ ...prev, status: st }))} className={`py-3 sm:py-3.5 rounded-2xl border-2 text-sm sm:text-base font-bold transition-colors ${on ? 'shadow-sm' : 'bg-white'} ${tone}`}>{on ? '✓ ' : ''}{st}</button>;
                 })}
               </div>
@@ -2029,9 +2029,9 @@
             <button type="button" key={d} onClick={() => setSelectedDay(dayStr)} className={`h-14 rounded-xl flex flex-col items-center pt-1.5 gap-1 border transition-colors ${selected ? 'border-blue-500 bg-blue-50' : isToday ? 'border-blue-200 bg-blue-50/40' : 'border-slate-100 bg-white'}`}>
               <span className={`text-sm font-semibold ${dow === 0 ? 'text-red-500' : dow === 6 ? 'text-blue-500' : 'text-slate-700'} ${isToday ? 'underline' : ''}`}>{d}</span>
               <span className="flex items-center gap-0.5 h-1.5">
-                {memoCount > 0 && <i className="w-1.5 h-1.5 rounded-full bg-blue-500 block"></i>}
-                {memoCount > 1 && <i className="w-1.5 h-1.5 rounded-full bg-blue-300 block"></i>}
-                {doneCount > 0 && <i className="w-1.5 h-1.5 rounded-full bg-red-500 block"></i>}
+                {memoCount > 0 && <i className="w-1.5 h-1.5 rounded-full bg-slate-400 block"></i>}
+                {memoCount > 1 && <i className="w-1.5 h-1.5 rounded-full bg-slate-300 block"></i>}
+                {doneCount > 0 && <i className="w-1.5 h-1.5 rounded-full bg-blue-700 block"></i>}
               </span>
             </button>
           );
@@ -2070,8 +2070,8 @@
                 ))}
 
                 {completedCount > 0 && (
-                  <div className="inline-flex items-center gap-1 text-[10px] md:text-[11px] font-bold bg-red-50 text-red-600 px-1.5 py-1 rounded border border-red-100 mt-0.5 w-max">
-                    <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span>
+                  <div className="inline-flex items-center gap-1 text-[10px] md:text-[11px] font-bold bg-blue-100 text-blue-800 px-1.5 py-1 rounded border border-blue-200 mt-0.5 w-max">
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-700"></span>
                     완료: {completedCount}건
                   </div>
                 )}
@@ -2114,7 +2114,7 @@
                 <>
                   <div className="flex items-center justify-between gap-2 mb-3">
                     <h3 className="font-bold text-sm text-ink-800">{month + 1}월 {selDate.getDate()}일 ({['일', '월', '화', '수', '목', '금', '토'][selDate.getDay()]})</h3>
-                    {selDone > 0 && <span className="inline-flex items-center gap-1 text-xs font-bold bg-red-50 text-red-600 px-2 py-1 rounded-full border border-red-100"><span className="w-1.5 h-1.5 rounded-full bg-red-500"></span>완료 {selDone}건</span>}
+                    {selDone > 0 && <span className="inline-flex items-center gap-1 text-xs font-bold bg-blue-100 text-blue-800 px-2 py-1 rounded-full border border-blue-200"><span className="w-1.5 h-1.5 rounded-full bg-blue-700"></span>완료 {selDone}건</span>}
                   </div>
                   <div className="space-y-2">
                     {selMemos.length === 0 && <p className="text-sm text-slate-400">등록된 일정이 없어요.</p>}
