@@ -135,6 +135,7 @@
       const eok = Math.floor(n / 10000), man = n % 10000;
       return [eok ? `${eok.toLocaleString('ko-KR')}억` : '', man ? `${man.toLocaleString('ko-KR')}만원` : ''].filter(Boolean).join(' ');
     };
+    const BUILDING_TYPES = ['빌딩', '상가', '오피스텔', '아파트', '빌라', '원룸', '투룸', '쓰리룸+'];
     // 억 단위 숫자를 "33.5억"처럼 보여 준다
     const formatEok = (v) => { const n = Number(String(v === undefined || v === null ? '' : v).replace(/,/g, '')); return !n || isNaN(n) ? '0억' : n.toLocaleString('ko-KR', { maximumFractionDigits: 4 }) + '억'; };
     const fmtMoneyInput = (v) => { const t = String(v === undefined || v === null ? '' : v).replace(/,/g, ''); if (t === '') return ''; const [i, d] = t.split('.'); return (Number(i) || 0).toLocaleString('ko-KR') + (d !== undefined ? '.' + d : ''); };
@@ -1502,11 +1503,6 @@
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-6 w-full md:w-auto">
               <h2 className="text-xl sm:text-2xl font-bold text-ink-800 shrink-0">{initialData ? '등록된 물건 수정' : '신규 물건 등록'}</h2>
-              <div className="flex items-center p-1 bg-slate-200/70 rounded-3xl border border-slate-200 w-full sm:w-auto overflow-x-auto">
-                {STATUS_OPTIONS.map(s => (
-                  <button key={s} type="button" onClick={() => setFormData(prev => ({...prev, status: s}))} className={`flex-1 sm:flex-none items-center justify-center gap-1 sm:gap-2 px-3 sm:px-4 py-1.5 rounded-lg text-xs sm:text-sm font-bold transition-all duration-300 ${formData.status === s || (!formData.status && s==='보류') ? STATUS_FORM_COLORS[s] : 'text-slate-400 hover:text-slate-600'}`}>{s}</button>
-                ))}
-              </div>
               <button type="button" onClick={() => setFormData(prev => ({ ...prev, is_shared: !prev.is_shared }))} title="켜면 모든 직원의 '공유 물건'에 보여요. 소유자 정보는 가려집니다." className={`flex items-center justify-center gap-2 px-4 py-2 rounded-3xl text-xs sm:text-sm font-bold border transition-all w-full sm:w-auto ${formData.is_shared ? 'bg-gold-400 border-gold-400 text-ink-900 shadow' : 'bg-white border-slate-300 text-slate-500 hover:text-ink-800'}`}><ShareIcon className="w-4 h-4" /> 공유 물건 {formData.is_shared ? 'ON' : 'OFF'}</button>
             </div>
             <div className="flex items-center gap-2 w-full md:w-auto">
@@ -1682,6 +1678,18 @@
               </div>
             </div>
 
+            <div className="bg-white rounded-3xl border border-slate-200 p-4 sm:p-5">
+              <p className="text-sm sm:text-base font-bold text-ink-800 mb-1">물건 상태</p>
+              <p className="text-xs sm:text-sm text-slate-500 mb-3">저장하기 전에 지금 상태를 골라 주세요.</p>
+              <div className="grid grid-cols-3 gap-2 sm:gap-3">
+                {STATUS_OPTIONS.map(st => {
+                  const on = formData.status === st || (!formData.status && st === '보류');
+                  const tone = { '보류': on ? 'bg-amber-400 border-amber-400 text-white' : 'border-amber-200 text-amber-700 hover:bg-amber-50', '매매': on ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-emerald-200 text-emerald-700 hover:bg-emerald-50', '완료': on ? 'bg-sky-500 border-sky-500 text-white' : 'border-sky-200 text-sky-700 hover:bg-sky-50' }[st];
+                  return <button key={st} type="button" onClick={() => setFormData(prev => ({ ...prev, status: st }))} className={`py-3 sm:py-3.5 rounded-2xl border-2 text-sm sm:text-base font-bold transition-colors ${on ? 'shadow-sm' : 'bg-white'} ${tone}`}>{on ? '✓ ' : ''}{st}</button>;
+                })}
+              </div>
+            </div>
+
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 pt-2 sm:pt-4">
               <button type="button" onClick={onBack} className="w-full sm:flex-1 py-3.5 sm:py-4 bg-slate-200 text-ink-800 font-bold rounded-3xl hover:bg-slate-300 transition-colors text-base sm:text-lg order-2 sm:order-1">취소</button>
               <button type="submit" disabled={isSubmitting} className={`w-full sm:flex-[2] py-3.5 sm:py-4 bg-blue-600 text-white font-bold rounded-3xl hover:bg-blue-700 transition-colors shadow-md text-base sm:text-lg order-1 sm:order-2 ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}>
@@ -1805,7 +1813,7 @@
                 <tr className="bg-slate-50 border-b border-slate-200 text-[11px] md:text-xs uppercase tracking-wider text-slate-500">
                   {selectable && <th className={th + " w-10 text-center"}><input type="checkbox" checked={allChecked} onChange={toggleAll} title="전체 선택" className="w-4 h-4 accent-blue-600 cursor-pointer" /></th>}
                   {!shared && <th className={th}>이름</th>}{!shared && <th className={th}>전화번호</th>}
-                  <th className={th}>투자금액</th><th className={th}>희망 지역</th><th className="p-3 md:p-4 font-medium">구매사유</th>
+                  <th className={th}>투자금액</th><th className={th}>희망 지역</th><th className={th}>건물 유형</th><th className="p-3 md:p-4 font-medium">구매사유</th>
                   {shared && <th className={th}>등록자</th>}{shared && <th className={th}>등록일</th>}
                   {!shared && <th className={th + " text-center"}>공유</th>}
                 </tr>
@@ -1817,12 +1825,13 @@
                     {!shared && <td className="p-3 md:p-4 font-bold text-ink-800 whitespace-nowrap">{cust.name}</td>}{!shared && <td className={td}>{cust.phone}</td>}
                     <td className="p-3 md:p-4 font-bold text-red-600 whitespace-nowrap">{money(cust.budget)}</td>
                     <td className={td}>{cust.region}</td>
+                    <td className={td}>{cust.buildingtype || '-'}</td>
                     <td className="p-3 md:p-4 text-slate-600 whitespace-pre-line min-w-[260px]">{cust.reason}</td>
                     {shared && <td className={td}>{cust.registrant}</td>}{shared && <td className={td}>{cust.date}</td>}
                     {!shared && <td className="p-3 md:p-4 text-center"><button type="button" onClick={(e) => { e.stopPropagation(); onToggleShare && onToggleShare(cust.id); }} title="공유 매수자에 올리거나 내리기" className={`px-3 py-1 rounded-full text-xs font-bold border transition-colors ${cust.is_shared ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-500 border-slate-300'}`}>{cust.is_shared ? '공유 중' : '비공개'}</button></td>}
                   </tr>
                 ))}
-                {shown.length === 0 && <tr><td colSpan={7} className="p-8 text-center text-slate-400">{shared ? '공유된 매수자가 없습니다.' : '조건에 맞는 매수자가 없습니다.'}</td></tr>}
+                {shown.length === 0 && <tr><td colSpan={8} className="p-8 text-center text-slate-400">{shared ? '공유된 매수자가 없습니다.' : '조건에 맞는 매수자가 없습니다.'}</td></tr>}
               </tbody>
             </table>
           </div>
@@ -1886,7 +1895,7 @@
             {customer.region && <p className="text-slate-500 mt-2">{customer.region}</p>}
           </div>
           <InfoSection title="매수 조건" icon={<Users className="w-4 h-4" />}>
-            <InfoGrid rows={[...(shared ? [] : [['이름', customer.name || '-'], ['전화번호', phoneLink(customer.phone)]]), ['투자금액', formatEok(customer.budget)], ['희망 지역', customer.region || '-'], ['등록일', customer.date || '-']]} />
+            <InfoGrid rows={[...(shared ? [] : [['이름', customer.name || '-'], ['전화번호', phoneLink(customer.phone)]]), ['투자금액', formatEok(customer.budget)], ['희망 지역', customer.region || '-'], ['건물 유형', customer.buildingtype || '상관없음'], ['등록일', customer.date || '-']]} />
           </InfoSection>
           <InfoSection title="구매사유" icon={<FileText className="w-4 h-4" />}>
             <div className="p-4 text-sm text-ink-800 whitespace-pre-line leading-relaxed min-h-[80px]">{customer.reason || '적어 둔 내용이 없어요.'}</div>
@@ -1901,7 +1910,7 @@
     }
 
     function CustomerFormView({ onBack, onSave, initialData }) {
-      const [formData, setFormData] = useState(initialData ? { name: initialData.name || '', phone: initialData.phone || '', budget: String(initialData.budget === undefined || initialData.budget === null ? '' : initialData.budget), region: initialData.region || '', reason: initialData.reason || '', is_shared: !!initialData.is_shared } : { name: '', phone: '', budget: '', region: '', reason: '', is_shared: true });
+      const [formData, setFormData] = useState(initialData ? { name: initialData.name || '', phone: initialData.phone || '', buildingtype: initialData.buildingtype || '', budget: String(initialData.budget === undefined || initialData.budget === null ? '' : initialData.budget), region: initialData.region || '', reason: initialData.reason || '', is_shared: !!initialData.is_shared } : { name: '', phone: '', buildingtype: '', budget: '', region: '', reason: '', is_shared: true });
       const [isSubmitting, setIsSubmitting] = useState(false);
 
       const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -1938,6 +1947,7 @@
               </div>
               <div className="sm:col-span-2"><FormGroup label="지역"><input type="text" name="region" value={formData.region} onChange={handleChange} className="form-input w-full p-2.5 md:p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm md:text-base" placeholder="예: 분당구 일대" /></FormGroup></div>
             </div>
+            <FormGroup label="건물 유형"><select name="buildingtype" value={formData.buildingtype} onChange={handleChange} className="form-input w-full p-2.5 md:p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm md:text-base bg-white"><option value="">상관없음</option>{BUILDING_TYPES.map(t => <option key={t} value={t}>{t}</option>)}</select></FormGroup>
             <FormGroup label="구매사유"><textarea name="reason" value={formData.reason} onChange={handleChange} rows={7} className="form-input w-full p-2.5 md:p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none resize-y text-sm md:text-base" placeholder="예: 사옥 이전, 임대수익 목적 등 (길게 적어도 돼요)" /></FormGroup>
             <div className="flex items-center justify-between gap-3 p-4 rounded-2xl bg-blue-50 border border-blue-100">
               <div>
@@ -2563,7 +2573,7 @@
       const handleSaveCustomer = async (newCust) => {
         const cust = { ...newCust, id: `C-${Date.now()}`, date: new Date().toISOString().split('T')[0], user_id: currentUser.loginId, registrant: currentUser.name, registrantphone: currentUser.phone || '' };
         setCustomers(prev => [cust, ...prev]);
-        if (cust.is_shared) setSharedCustomers(prev => [{ id: cust.id, budget: cust.budget, region: cust.region, reason: cust.reason, registrant: cust.registrant, registrantphone: cust.registrantphone, date: cust.date }, ...prev]);
+        if (cust.is_shared) setSharedCustomers(prev => [{ id: cust.id, budget: cust.budget, region: cust.region, buildingtype: cust.buildingtype, reason: cust.reason, registrant: cust.registrant, registrantphone: cust.registrantphone, date: cust.date }, ...prev]);
         setCurrentCustomerView('list');
         const { error } = await supabase.from('crm_customers').insert([cust]);
         if (error) {
@@ -2578,12 +2588,12 @@
         const old = customers.find(x => x.id === id);
         if (!old) return;
         const upd = { ...old, ...data };
-        const sc = { id, budget: upd.budget, region: upd.region, reason: upd.reason, registrant: upd.registrant, registrantphone: upd.registrantphone, date: upd.date };
+        const sc = { id, budget: upd.budget, region: upd.region, buildingtype: upd.buildingtype, reason: upd.reason, registrant: upd.registrant, registrantphone: upd.registrantphone, date: upd.date };
         setCustomers(prev => prev.map(x => x.id === id ? upd : x));
         setSharedCustomers(prev => upd.is_shared ? (prev.some(x => x.id === id) ? prev.map(x => x.id === id ? sc : x) : [sc, ...prev]) : prev.filter(x => x.id !== id));
         setSelectedCustomer(upd);
         setCurrentCustomerView('detail');
-        const { error } = await supabase.from('crm_customers').update({ name: upd.name, phone: upd.phone, budget: upd.budget, region: upd.region, reason: upd.reason, is_shared: upd.is_shared }).eq('id', id);
+        const { error } = await supabase.from('crm_customers').update({ name: upd.name, phone: upd.phone, budget: upd.budget, region: upd.region, buildingtype: upd.buildingtype || '', reason: upd.reason, is_shared: upd.is_shared }).eq('id', id);
         if (error) { alert('수정한 내용을 저장하지 못했어요.\n\n(원인: ' + error.message + ')'); fetchCloudData(); }
       };
 
@@ -2626,11 +2636,11 @@
         if (!cust) return;
         const next = !cust.is_shared;
         setCustomers(prev => prev.map(x => x.id === id ? { ...x, is_shared: next } : x));
-        setSharedCustomers(prev => next ? [{ id: cust.id, budget: cust.budget, region: cust.region, reason: cust.reason, registrant: cust.registrant, registrantphone: cust.registrantphone, date: cust.date }, ...prev.filter(x => x.id !== id)] : prev.filter(x => x.id !== id));
+        setSharedCustomers(prev => next ? [{ id: cust.id, budget: cust.budget, region: cust.region, buildingtype: cust.buildingtype, reason: cust.reason, registrant: cust.registrant, registrantphone: cust.registrantphone, date: cust.date }, ...prev.filter(x => x.id !== id)] : prev.filter(x => x.id !== id));
         const { error } = await supabase.from('crm_customers').update({ is_shared: next }).eq('id', id);
         if (error) {
           setCustomers(prev => prev.map(x => x.id === id ? { ...x, is_shared: !next } : x));
-          setSharedCustomers(prev => !next ? [{ id: cust.id, budget: cust.budget, region: cust.region, reason: cust.reason, registrant: cust.registrant, registrantphone: cust.registrantphone, date: cust.date }, ...prev.filter(x => x.id !== id)] : prev.filter(x => x.id !== id));
+          setSharedCustomers(prev => !next ? [{ id: cust.id, budget: cust.budget, region: cust.region, buildingtype: cust.buildingtype, reason: cust.reason, registrant: cust.registrant, registrantphone: cust.registrantphone, date: cust.date }, ...prev.filter(x => x.id !== id)] : prev.filter(x => x.id !== id));
           alert('공유 설정을 바꾸지 못했어요.\n\n(원인: ' + error.message + ')');
         }
       };
