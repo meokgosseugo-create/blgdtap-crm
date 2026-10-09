@@ -149,7 +149,9 @@
     const fmtMoneyInput = (v) => { const t = String(v === undefined || v === null ? '' : v).replace(/,/g, ''); if (t === '') return ''; const [i, d] = t.split('.'); return (Number(i) || 0).toLocaleString('ko-KR') + (d !== undefined ? '.' + d : ''); };
     const cleanMoneyInput = (t) => t.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1');
 
-    const getExactPyeong = (sqm) => ((Number(sqm) || 0) * 0.3025).toFixed(2);
+    // 숫자에 천 단위 콤마를 넣는다 (소수는 최대 2자리, 끝의 0은 지운다)
+    const fmtNum = (n) => { const v = Number(n); return isFinite(v) ? v.toLocaleString('en-US', { maximumFractionDigits: 2 }) : String(n ?? 0); };
+    const getExactPyeong = (sqm) => ((Number(sqm) || 0) * 0.3025).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
     // ───────── PDF 매물 소개서 읽기 ─────────
     // ── PDF 매물 소개서 → 물건카드 항목 (브라우저/Node 공용, 순수 함수) ──
@@ -755,13 +757,13 @@
                          {ovRow('교통 여건', <input type="text" value={customFields.location} onChange={e=>handleCustomFieldChange('location', e.target.value)} className={fieldInput} placeholder={ph("예: 9호선 신논현역 도보 6분")} />)}
                       </>)}
                       {ovGroup(<>
-                         {ovRow('대지 면적', `${property.landArea || 0}㎡ (${getExactPyeong(property.landArea)}평)`)}
+                         {ovRow('대지 면적', `${fmtNum(property.landArea || 0)}㎡ (${getExactPyeong(property.landArea)}평)`)}
                          {ovRow('용도지역/지구', property.zoning || '-')}
                          {ovRow('도로 상황', <input type="text" value={customFields.roadCond} onChange={e=>handleCustomFieldChange('roadCond', e.target.value)} className={fieldInput + " !text-blue-700"} placeholder={ph("예: 전면 6m 도로 접함")} />)}
                          {ovRow('공시 지가', <input type="text" value={customFields.landPrice} onChange={e=>handleCustomFieldChange('landPrice', e.target.value)} className={fieldInput} placeholder={ph("예: 1,085만원/㎡, 합계 19억 8,447만원")} />)}
                       </>)}
                       {ovGroup(<>
-                         {ovRow('연 면 적', `${property.totalFloorArea || 0}㎡ (${getExactPyeong(property.totalFloorArea)}평)`)}
+                         {ovRow('연 면 적', `${fmtNum(property.totalFloorArea || 0)}㎡ (${getExactPyeong(property.totalFloorArea)}평)`)}
                          {ovPair('건 폐 율', `${property.buildingCoverage || '-'}%`, '용 적 률', `${property.floorAreaRatio || '-'}%`)}
                          {ovPair('층 수', `지하${property.floorUnderground || 0}층 / 지상${property.floorGround || 0}층`, '사용승인', property.completionYear || '-')}
                          {ovPair('주 차', `${property.parking || 0}대`, '승 강 기', <input type="text" value={customFields.elevator} onChange={e=>handleCustomFieldChange('elevator', e.target.value)} className={fieldInput} placeholder={ph("예: 1대")} />)}
@@ -1192,7 +1194,7 @@
 
       if (!property) return null;
 
-      const areaText = (v) => <span>{getExactPyeong(v)}평 <span className="text-slate-400 font-normal ml-1">({v || 0}㎡)</span></span>;
+      const areaText = (v) => <span>{getExactPyeong(v)}평 <span className="text-slate-400 font-normal ml-1">({fmtNum(v || 0)}㎡)</span></span>;
       const TYPE_BADGE = { '매매': 'bg-sky-100 text-sky-800', '전세': 'bg-emerald-100 text-emerald-800', '월세': 'bg-rose-100 text-rose-800' };
       const isSale = property.transactionType === '매매';
 
