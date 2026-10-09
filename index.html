@@ -471,6 +471,8 @@
 
       const [images, setImages] = useState({
         main: property?.images?.[0] || null,
+        cover1: null,
+        cover2: null,
         map: null,
         ledger: null,
         landPlan: null
@@ -709,12 +711,16 @@
                 <div className="absolute left-[520px] top-[560px] w-[26px] h-[26px] rounded-full bg-[#c9d6f7]"></div>
                 {/* 캡슐 사진 두 개 */}
                 <div className="absolute left-[610px] top-[34px] w-[270px] h-[380px] rounded-[135px] overflow-hidden bg-gradient-to-b from-[#3158e8] to-[#1f3fc0] shadow-xl">
-                   {images.main && <img src={images.main} crossOrigin="anonymous" className="absolute inset-0 w-full h-full object-cover" style={{ objectPosition: '50% 20%' }} />}
-                   <div className="absolute inset-0 bg-gradient-to-b from-[#2f55e6]/65 to-[#1b34a8]/70"></div>
+                   {(images.cover1 || images.main) && <img src={images.cover1 || images.main} crossOrigin="anonymous" className="absolute inset-0 w-full h-full object-cover" style={{ objectPosition: '50% 20%' }} />}
+                   <div className="absolute inset-0 bg-gradient-to-b from-[#2f55e6]/55 to-[#1b34a8]/60 pointer-events-none"></div>
+                   {!(images.cover1 || images.main) && <div className="print:hidden absolute inset-0 flex items-center justify-center text-white/80 text-sm font-bold text-center px-10 pointer-events-none" data-html2canvas-ignore="true">클릭해서<br/>건물 사진 올리기</div>}
+                   <input type="file" accept="image/*" onChange={(e) => handleImageUpload(e, 'cover1')} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" title="클릭하여 표지 사진 올리기" data-html2canvas-ignore="true" />
                 </div>
                 <div className="absolute left-[810px] top-[190px] w-[262px] h-[570px] rounded-[131px] overflow-hidden bg-gradient-to-b from-[#16205c] to-[#0b1233] shadow-2xl">
-                   {images.main && <img src={images.main} crossOrigin="anonymous" className="absolute inset-0 w-full h-full object-cover" style={{ objectPosition: '50% 60%' }} />}
-                   <div className="absolute inset-0 bg-gradient-to-t from-[#0b1233]/70 via-[#1a2f9c]/25 to-transparent"></div>
+                   {(images.cover2 || images.cover1 || images.main) && <img src={images.cover2 || images.cover1 || images.main} crossOrigin="anonymous" className="absolute inset-0 w-full h-full object-cover" style={{ objectPosition: '50% 55%' }} />}
+                   <div className="absolute inset-0 bg-gradient-to-t from-[#0b1233]/65 via-[#1a2f9c]/20 to-transparent pointer-events-none"></div>
+                   {!(images.cover2 || images.cover1 || images.main) && <div className="print:hidden absolute inset-0 flex items-center justify-center text-white/80 text-sm font-bold text-center px-10 pointer-events-none" data-html2canvas-ignore="true">클릭해서<br/>건물 사진 올리기</div>}
+                   <input type="file" accept="image/*" onChange={(e) => handleImageUpload(e, 'cover2')} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" title="클릭하여 표지 사진 올리기" data-html2canvas-ignore="true" />
                 </div>
                 {/* 글자 */}
                 <div className="relative z-40 pl-20 pt-16 w-[560px] pointer-events-none">
@@ -722,8 +728,9 @@
                 </div>
                 <div className="absolute z-40 left-20 top-[250px] w-[540px] pointer-events-none">
                    <p className="text-[#2f55e6] font-bold tracking-[0.35em] text-sm mb-4 uppercase">Premium Real Estate</p>
-                   <h1 className="text-[#2340c8] font-black text-[68px] leading-[1.12] mb-5 break-keep">{property.name}</h1>
+                   <h1 className="text-[#2340c8] text-[68px] leading-[1.12] mb-5 break-keep" style={{ fontFamily: "'Pretendard', -apple-system, sans-serif", fontWeight: 900 }}>{property.name}</h1>
                    <p className="text-slate-500 text-xl font-medium flex items-center gap-2"><MapPin className="w-5 h-5 text-[#2f55e6]"/> {property.address}</p>
+                   <p className="text-[#d93636] text-[46px] leading-[1.2] mt-6 text-left" style={{ fontFamily: "'Pretendard', -apple-system, sans-serif", fontWeight: 900 }}>{formatKoreanCurrency(property.price?.sale)}</p>
                 </div>
                 <div className="absolute z-40 left-20 bottom-14 pointer-events-none">
                    <p className="text-slate-400 text-xs tracking-widest uppercase mb-1 ml-1">Consultant</p>
@@ -732,10 +739,6 @@
                       <span className="text-slate-300 mx-2">|</span>
                       <input type="text" value={consultantInfo.phone} onChange={e => setConsultantInfo({...consultantInfo, phone: e.target.value})} className="bg-transparent outline-none w-[190px] px-1 hover:bg-white/70 focus:bg-white/70 rounded transition-colors" title="클릭하여 연락처 수정" />
                    </div>
-                </div>
-                <div className="absolute z-40 left-20 bottom-[128px] pointer-events-none">
-                   <p className="text-slate-400 text-xs tracking-widest uppercase mb-1 ml-1">Target Price</p>
-                   <p className="text-[#d93636] font-black text-4xl ml-1">{formatKoreanCurrency(property.price?.sale)}</p>
                 </div>
              </div>
 
