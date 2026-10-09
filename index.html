@@ -1822,6 +1822,36 @@
       );
     }
 
+    function ProfileModal({ user, onClose, onSave }) {
+      const [form, setForm] = useState({ name: user.name || '', department: user.department || '', phone: user.phone || '' });
+      const [saving, setSaving] = useState(false);
+      const submit = async (e) => {
+        e.preventDefault();
+        if (!form.name.trim()) return alert('이름을 입력해주세요.');
+        setSaving(true);
+        await onSave({ name: form.name.trim(), department: form.department.trim(), phone: form.phone.trim() });
+        setSaving(false);
+        onClose();
+      };
+      const input = "form-input w-full p-2.5 md:p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm md:text-base";
+      return (
+        <div className="fixed inset-0 bg-slate-900/60 z-[60] flex items-center justify-center p-4" onClick={onClose}>
+          <form onSubmit={submit} onClick={(e) => e.stopPropagation()} className="bg-white p-6 rounded-3xl shadow-2xl max-w-md w-full border border-slate-200 space-y-4">
+            <h3 className="text-lg font-bold text-ink-800 flex items-center gap-2"><UserCircle className="w-5 h-5 text-blue-600" /> 내 정보</h3>
+            <p className="text-xs text-slate-500">여기에 적은 이름과 전화번호가 내가 올린 물건·매수자의 "담당자"로 보여요.</p>
+            <FormGroup label="아이디"><div className="p-2.5 md:p-3 rounded-lg bg-slate-50 border text-sm text-slate-500">{user.loginId}</div></FormGroup>
+            <FormGroup label="이름"><input type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={input} /></FormGroup>
+            <FormGroup label="소속"><input type="text" value={form.department} onChange={(e) => setForm({ ...form, department: e.target.value })} className={input} placeholder="예: 영업1팀" /></FormGroup>
+            <FormGroup label="전화번호"><input type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className={input} placeholder="010-0000-0000" /></FormGroup>
+            <div className="flex gap-3 pt-2">
+              <button type="button" onClick={onClose} className="flex-1 px-4 py-2.5 bg-slate-100 rounded-3xl text-slate-700 font-bold hover:bg-slate-200 transition-colors">취소</button>
+              <button type="submit" disabled={saving} className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-3xl font-bold hover:bg-blue-700 transition-colors disabled:opacity-50">{saving ? '저장 중...' : '저장'}</button>
+            </div>
+          </form>
+        </div>
+      );
+    }
+
     function CustomerDetailView({ customer, shared, registrantPhone, onBack, onEdit, onDelete, onToggleShare }) {
       const telHref = (v) => 'tel:' + String(v || '').replace(/[^0-9+]/g, '');
       const phoneLink = (v) => v ? <a href={telHref(v)} className="inline-flex items-center gap-2 font-bold text-blue-600 hover:underline">{v}<span className="px-2 py-0.5 rounded-full bg-blue-50 border border-blue-100 text-xs">전화 걸기</span></a> : <span className="text-slate-400">등록된 번호가 없어요</span>;
@@ -2125,6 +2155,7 @@
       const [currentEmployeeView, setCurrentEmployeeView] = useState('list');
       const [currentCustomerView, setCurrentCustomerView] = useState('list');
       const [selectedCustomer, setSelectedCustomer] = useState(null);
+      const [showProfile, setShowProfile] = useState(false);
 
       const [searchTerm, setSearchTerm] = useState('');
       const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -2477,6 +2508,23 @@
         if (error) { alert('수정한 내용을 저장하지 못했어요.\n\n(원인: ' + error.message + ')'); fetchCloudData(); }
       };
 
+      const handleSaveProfile = async (info) => {
+        const me = currentUser;
+        setCurrentUser(prev => ({ ...prev, ...info }));
+        const { error: authErr } = await supabase.auth.updateUser({ data: { name: info.name, department: info.department, phone: info.phone } });
+        if (authErr) { alert('내 정보를 저장하지 못했어요.\n\n(원인: ' + authErr.message + ')'); return; }
+        // 직원 목록, 내가 올린 매수자·물건의 담당자 이름/전화번호도 같이 바꾼다 (일부가 안 바뀌어도 내 정보 저장은 유지)
+        const warn = (label, e) => { if (e) console.warn(label + ' 갱신 실패:', e.message); };
+        const r1 = await supabase.from('crm_users').update({ name: info.name, department: info.department, phone: info.phone }).eq('id', me.id); warn('직원 목록', r1.error);
+        setEmployees(prev => prev.map(e => e.id === me.id ? { ...e, name: info.name, department: info.department, phone: info.phone } : e));
+        const r2 = await supabase.from('crm_customers').update({ registrant: info.name, registrantphone: info.phone }).eq('user_id', me.loginId); warn('내 매수자', r2.error);
+        setCustomers(prev => prev.map(c => c.user_id && c.user_id.toLowerCase() === me.loginId.toLowerCase() ? { ...c, registrant: info.name, registrantphone: info.phone } : c));
+        const mine = new Set(customers.map(c => c.id));
+        setSharedCustomers(prev => prev.map(c => mine.has(c.id) ? { ...c, registrant: info.name, registrantphone: info.phone } : c));
+        const r3 = await supabase.from('crm_properties').update({ registrant: info.name, registrantphone: info.phone }).eq('user_id', me.loginId); warn('내 물건', r3.error);
+        setProperties(prev => prev.map(p => p.user_id && p.user_id.toLowerCase() === me.loginId.toLowerCase() ? { ...p, registrant: info.name, registrantphone: info.phone } : p));
+      };
+
       const handleBulkDeleteCustomers = async (ids) => {
         setCustomers(prev => prev.filter(x => !ids.includes(x.id)));
         setSharedCustomers(prev => prev.filter(x => !ids.includes(x.id)));
@@ -2556,6 +2604,7 @@
               <span className="relative"><SvgIcon k="usercircle" className="w-6 h-6" />{unreadCusts > 0 && <span className="absolute -top-1.5 -right-3 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">{unreadCusts > 99 ? '99+' : unreadCusts}</span>}</span>더보기
             </button>
           </nav>
+          {showProfile && currentUser && <ProfileModal user={currentUser} onClose={() => setShowProfile(false)} onSave={handleSaveProfile} />}
           {isMobileMenuOpen && <div id="sidebar-overlay" className="md:hidden fixed inset-0 bg-black/50 z-40"></div>}
 
           <aside className={`${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 fixed md:static md:relative inset-y-0 left-0 z-50 w-64 ${sidebarCollapsed ? 'md:w-[76px]' : 'md:w-64'} bg-white text-ink-800 border-r border-stone-100 flex flex-col md:shadow-none transition-transform md:transition-[width] duration-300 ease-in-out no-print`}>
@@ -2585,14 +2634,14 @@
               </div>
             </nav>
 
-            <div className={`m-4 p-4 ${sidebarCollapsed ? "md:m-2 md:p-2" : ""} rounded-3xl bg-white border border-stone-200`}>
+            <div role="button" tabIndex={0} onClick={() => { setShowProfile(true); setIsMobileMenuOpen(false); }} onKeyDown={(e) => { if (e.key === 'Enter') { setShowProfile(true); setIsMobileMenuOpen(false); } }} title="내 정보 보기·고치기" className={`m-4 p-4 ${sidebarCollapsed ? "md:m-2 md:p-2" : ""} rounded-3xl bg-white border border-stone-200 cursor-pointer hover:bg-slate-50 transition-colors`}>
               <div className={`flex items-center gap-3 ${sidebarCollapsed ? "md:justify-center md:gap-0" : ""}`}>
                 <div className="w-10 h-10 rounded-full bg-gradient-to-br from-gold-300 to-gold-500 text-ink-900 flex items-center justify-center font-bold shrink-0">
                   {currentUser ? currentUser.name.charAt(0) : 'U'}
                 </div>
                 <div className={`truncate ${sidebarCollapsed ? "md:hidden" : ""}`}>
                   <p className="text-sm font-semibold truncate">{currentUser ? currentUser.name : '사용자'} 님</p>
-                  <p className="text-xs text-slate-400 truncate mt-0.5">{currentUser ? currentUser.department : '사원'}</p>
+                  <p className="text-xs text-slate-400 truncate mt-0.5">{currentUser ? currentUser.department : '사원'}{currentUser && !currentUser.phone ? ' · 전화번호 없음' : ''}</p>
                 </div>
               </div>
             </div>
