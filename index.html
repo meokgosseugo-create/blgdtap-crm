@@ -204,6 +204,8 @@
       });
       return { width: imgW * scale, items };
     }
+    // 읽은 결과를 사람이 볼 수 있는 줄 글로 (칸은 | 로 구분)
+    const pagesToDebugText = (pages) => pages.map((pg, i) => '── ' + (i + 1) + '번째 이미지 ──\n' + pdfGroupLines(pg.items).map(l => l.cells.map(c => c.s).join(' | ')).join('\n')).join('\n');
     async function loadImageCanvas(file) {
       const bmp = await createImageBitmap(file);
       const targetW = Math.min(3200, Math.max(2000, bmp.width));
@@ -216,14 +218,21 @@
     // ── 건축물대장(건축물현황도 포함) 읽기: 매물 소개서와 모양이 달라서 따로 읽는다 ──
     function isBuildingLedger(pages) {
       const all = pages.flatMap(pg => pg.items.map(it => it.s.replace(/\s/g, ''))).join('|');
-      return /대지위치/.test(all) && /(건축면적|층별현황)/.test(all) && !/(매매가|매매금액|보증금)/.test(all);
+      if (/(매매가|매매금액|보증금)/.test(all)) return false;
+      const keys = ['대지위치', '지번', '대지면적', '연면적', '건축면적', '건폐율', '용적률', '주용도', '주구조', '허가일자', '사용승인일자', '착공일자', '층별현황', '건축물정보', '총호수', '건축물수', '부속건축물', '위반건축물'];
+      return keys.filter(k => all.includes(k)).length >= 4;
     }
     function parseBuildingLedger(pages) {
       const norm = (t) => t.replace(/[\s·ㆍ:：]/g, '');
       const LAB = ['대지위치', '지번', '대지면적', '연면적', '명칭및번호', '건축면적', '용적률산정용연면적', '건축물수', '건폐율', '용적률', '총호수', '주용도', '주구조', '부속건축물', '허가일자', '착공일자', '사용승인일자', '위반건축물여부', '특이사항', '용적률산정용', '용도지역', '용도지구', '구역'];
       const fields = {}, filled = [], skipped = [], notes = [], floors = [];
       const put = (k, v, label) => { if (v !== null && v !== undefined && v !== '' && !Number.isNaN(v)) { fields[k] = v; filled.push(label); } };
-      const cellsOf = (pg) => pdfGroupLines(pg.items).flatMap(l => l.cells.map(c => ({ ...c, y: l.y, n: norm(c.s) })));
+      let fixLabLater = (n) => n;
+      const cellsOf = (pg) => pdfGroupLines(pg.items).flatMap(l => l.cells.map(c => ({ ...c, y: l.y, n: fixLabLater(norm(c.s)) })));
+      // 글자 인식이 한두 글자 틀려도 같은 이름으로 보기 (예: 대지위지 → 대지위치)
+      const lev = (a, b) => { const d = Array.from({ length: a.length + 1 }, (_, i) => [i]); for (let j = 1; j <= b.length; j++) d[0][j] = j; for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); return d[a.length][b.length]; };
+      const fixLab = (n) => { if (LAB.includes(n) || n.length < 3 || n.length > 10 || /\d/.test(n)) return n; const hit = LAB.find(l => (l.length >= 4 ? Math.abs(l.length - n.length) <= 1 : l.length === n.length) && lev(l, n) <= 1); return hit || n; };
+      fixLabLater = fixLab;
       const pgCells = pages.map(cellsOf);
       const all = pgCells.flat();
       // 칸이 두 줄로 쪼개진 '용적률 산정용 / 연면적' → 한 칸으로
@@ -413,7 +422,7 @@
       }
       put('address', addrText ? addrText.replace(/(\d)\s*번지/g, '$1').trim() : addrText, '소재지');
       put('landArea', m2('landArea') !== null ? m2('landArea') : m2('landArea2'), '대지면적');
-      put('zoning', join('zoning'), '용도지역');
+      { const zv = join('zoning'); if (!/^(용도|지구|구역|지역|\s)+$/.test(zv)) put('zoning', zv, '용도지역'); }
       const cm = join('completion'); let comp = null;
       const m8 = cm.match(/\b(\d{4})(\d{2})(\d{2})\b/); const mk = cm.match(/(\d{4})\s*년\s*(\d{1,2})\s*월\s*(\d{1,2})\s*일/);
       const my = cm.match(/(\d{4})\s*년\s*(\d{1,2})\s*월/);
@@ -1498,13 +1507,13 @@
       const [pdfBusy, setPdfBusy] = useState(false);
       const [pdfInfo, setPdfInfo] = useState(null);
       const [busyMsg, setBusyMsg] = useState('');
-      const applyParsed = (r, fileName, isImage) => {
+      const applyParsed = (r, fileName, isImage, debugText) => {
         if (r.filled.length === 0) {
-          setPdfInfo({ error: isImage ? '이 사진에서 물건 정보를 찾지 못했어요. 글자가 또렷하고 반듯하게 찍힌(캡처한) 이미지를 올려 보세요.' : '이 PDF에서 물건 정보를 찾지 못했어요. 사진이나 스캔한 PDF이거나, 지원하지 않는 형식일 수 있어요.' });
+          setPdfInfo({ debug: debugText, error: isImage ? '이 사진에서 물건 정보를 찾지 못했어요. 글자가 또렷하고 반듯하게 찍힌(캡처한) 이미지를 올려 보세요.' : '이 PDF에서 물건 정보를 찾지 못했어요. 사진이나 스캔한 PDF이거나, 지원하지 않는 형식일 수 있어요.' });
         } else {
           setFormData(prev => ({ ...prev, ...r.fields, floorDetails: r.floors.length ? r.floors : prev.floorDetails }));
           if (r.notes.length) setNewLog(prev => prev || ((isImage ? '[사진 참고사항]\n' : '[PDF 참고사항]\n') + r.notes.map(n => '- ' + n).join('\n')));
-          setPdfInfo({ ok: true, filled: r.filled, skipped: r.skipped, hasNotes: r.notes.length > 0, fileName: fileName });
+          setPdfInfo({ ok: true, debug: debugText, filled: r.filled, skipped: r.skipped, hasNotes: r.notes.length > 0, fileName: fileName });
         }
       };
       const readImages = async (files) => {
@@ -1519,7 +1528,7 @@
             const { data } = await worker.recognize(cv, {}, { blocks: true });
             pages.push(ocrToPage(data, cv.width, cv.height));
           }
-          applyParsed(parsePropertyPdf(pages, {}), files.map(f => f.name).join(', '), true);
+          applyParsed(parsePropertyPdf(pages, {}), files.map(f => f.name).join(', '), true, pagesToDebugText(pages));
         } catch (e) {
           setPdfInfo({ error: '사진을 읽는 중 문제가 생겼어요: ' + e.message });
         } finally {
@@ -1776,6 +1785,12 @@
                 <p className="mt-3 text-sm font-bold text-red-600 text-center sm:text-left">※ 자동 입력은 완벽하지 않아요. 사진은 글자 인식이라 더 틀릴 수 있어요. 잘못 읽히거나 빠진 내용이 있을 수 있으니, 꼭 내용을 확인한 뒤 등록해 주세요.</p>
                 {pdfBusy && busyMsg && <div className="mt-4 p-3 bg-blue-50 border border-blue-100 text-blue-700 text-sm font-semibold rounded-lg">{busyMsg}</div>}
                 {pdfInfo && pdfInfo.error && <div className="mt-4 p-3 bg-red-50 border border-red-100 text-red-600 text-sm font-semibold rounded-lg">{pdfInfo.error}</div>}
+                {pdfInfo && pdfInfo.debug && (
+                  <details className="mt-3 text-sm text-slate-600">
+                    <summary className="cursor-pointer font-semibold text-blue-700">사진에서 읽힌 글자 보기 (잘못 읽혔는지 확인용)</summary>
+                    <pre className="mt-2 p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs whitespace-pre-wrap max-h-72 overflow-auto">{pdfInfo.debug}</pre>
+                  </details>
+                )}
                 {pdfInfo && pdfInfo.ok && (
                   <div className="mt-4 p-4 bg-white border border-gold-200 rounded-3xl text-sm text-slate-700 space-y-1.5">
                     <p className="font-bold text-ink-800">✓ {pdfInfo.fileName}에서 {pdfInfo.filled.length}개 항목을 채웠어요. 내용을 확인한 뒤 저장해 주세요.</p>
