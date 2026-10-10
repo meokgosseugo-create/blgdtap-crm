@@ -182,8 +182,111 @@
       });
     }
 
+    // ───────── 사진/캡처 이미지 읽기 (글자 인식, 브라우저 안에서만 처리) ─────────
+    const loadScriptOnce = (src) => new Promise((resolve, reject) => {
+      if (document.querySelector('script[src="' + src + '"]')) return resolve();
+      const sc = document.createElement('script'); sc.src = src; sc.onload = resolve; sc.onerror = () => reject(new Error('글자 읽기 도구를 불러오지 못했어요. 인터넷 연결을 확인해 주세요.'));
+      document.head.appendChild(sc);
+    });
+    // 글자 인식 결과 → PDF 읽기와 같은 모양({ width, items:[{s,x,y,w}] })으로 바꾼다
+    function ocrToPage(data, imgW, imgH) {
+      const scale = (imgW >= imgH ? 842 : 595) / imgW;
+      let lines = data.lines;
+      if (!lines && data.blocks) lines = data.blocks.flatMap(b => (b.paragraphs || []).flatMap(pg => pg.lines || []));
+      const items = [];
+      (lines || []).forEach(line => {
+        const yc = ((line.bbox.y0 + line.bbox.y1) / 2) * scale;
+        (line.words || []).forEach(w => {
+          const t = String(w.text || '').trim();
+          if (!t || (w.confidence !== undefined && w.confidence < 25)) return;
+          items.push({ s: t, x: w.bbox.x0 * scale, y: yc, w: (w.bbox.x1 - w.bbox.x0) * scale });
+        });
+      });
+      return { width: imgW * scale, items };
+    }
+    async function loadImageCanvas(file) {
+      const bmp = await createImageBitmap(file);
+      const targetW = Math.min(3200, Math.max(2000, bmp.width));
+      const ratio = targetW / bmp.width;
+      const cv = document.createElement('canvas'); cv.width = Math.round(bmp.width * ratio); cv.height = Math.round(bmp.height * ratio);
+      const ctx = cv.getContext('2d'); ctx.filter = 'grayscale(1) contrast(1.15)'; ctx.drawImage(bmp, 0, 0, cv.width, cv.height);
+      return cv;
+    }
+
+    // ── 건축물대장(건축물현황도 포함) 읽기: 매물 소개서와 모양이 달라서 따로 읽는다 ──
+    function isBuildingLedger(pages) {
+      const all = pages.flatMap(pg => pg.items.map(it => it.s.replace(/\s/g, ''))).join('|');
+      return /대지위치/.test(all) && /(건축면적|층별현황)/.test(all) && !/(매매가|매매금액|보증금)/.test(all);
+    }
+    function parseBuildingLedger(pages) {
+      const norm = (t) => t.replace(/[\s·ㆍ:：]/g, '');
+      const LAB = ['대지위치', '지번', '대지면적', '연면적', '명칭및번호', '건축면적', '용적률산정용연면적', '건축물수', '건폐율', '용적률', '총호수', '주용도', '주구조', '부속건축물', '허가일자', '착공일자', '사용승인일자', '위반건축물여부', '특이사항', '용적률산정용', '용도지역', '용도지구', '구역'];
+      const fields = {}, filled = [], skipped = [], notes = [], floors = [];
+      const put = (k, v, label) => { if (v !== null && v !== undefined && v !== '' && !Number.isNaN(v)) { fields[k] = v; filled.push(label); } };
+      const cellsOf = (pg) => pdfGroupLines(pg.items).flatMap(l => l.cells.map(c => ({ ...c, y: l.y, n: norm(c.s) })));
+      const pgCells = pages.map(cellsOf);
+      const all = pgCells.flat();
+      // 칸이 두 줄로 쪼개진 '용적률 산정용 / 연면적' → 한 칸으로
+      const farLab = all.find(c => /^용적률산정용(연면적)?$/.test(c.n));
+      const stray = farLab ? all.find(c => c.n === '연면적' && Math.abs(c.x - farLab.x) < 25 && c.y > farLab.y && c.y - farLab.y <= 22) : null;
+      const cells = all.filter(c => c !== stray);
+      const isLab = (c) => LAB.includes(c.n);
+      const right = (lab, yTol) => {
+        const cy = lab === farLab && stray ? (farLab.y + stray.y) / 2 : lab.y;
+        return cells.filter(c => !isLab(c) && Math.abs(c.y - cy) <= (yTol || 11) && c.x >= lab.x2 - 2).sort((a, b) => a.x - b.x)[0];
+      };
+      const val = (re) => { const lab = cells.find(c => re.test(c.n)); const v = lab && right(lab); return v ? v.s.trim() : ''; };
+      const num = (t) => { const m = String(t || '').replace(/,/g, '').match(/(\d+(?:\.\d+)?)/); return m ? Number(m[1]) : null; };
+      // 주소 = 대지위치 + 지번
+      let addr = val(/^대지위치$/), lot = val(/^지번$/);
+      if (addr) put('address', (addr + (lot && /\d/.test(lot) ? ' ' + lot : '')).replace(/\s+/g, ' ').trim(), '소재지');
+      put('landArea', num(val(/^대지면적$/)), '대지면적');
+      put('totalFloorArea', num(val(/^연면적$/)), '연면적');
+      const farA = farLab ? right(farLab) : null; put('groundFloorArea', farA ? num(farA.s) : null, '지상층연면적(용적률 산정용)');
+      put('buildingArea', num(val(/^건축면적$/)), '건축면적');
+      put('buildingCoverage', num(val(/^건폐율$/)), '건폐율'); put('floorAreaRatio', num(val(/^용적률$/)), '용적률');
+      const dm = val(/^사용승인일자$/).match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/);
+      if (dm) put('completionYear', `${dm[1]}-${dm[2].padStart(2, '0')}-${dm[3].padStart(2, '0')}`, '준공(사용승인)');
+      // 용도지역 (칸 머리글 바로 아래 값이 있을 때만)
+      const zh = cells.find(c => c.n === '용도지역');
+      if (zh) { const z = cells.find(c => !isLab(c) && c.y > zh.y + 6 && c.y < zh.y + 70 && Math.abs((c.x + c.x2) / 2 - (zh.x + zh.x2) / 2) < 120 && !/^(구분|층별|구조|용도|면적)/.test(c.n)); if (z && !/^\d/.test(z.s) && z.y < (cells.find(c => c.n === '층별현황') || { y: 1e9 }).y) put('zoning', z.s.trim(), '용도지역'); }
+      // 층별현황 표
+      const hdr = cells.find(c => c.n === '층별');
+      const secY = (name) => { const c = cells.find(x => x.n === name && (!hdr || x.y > hdr.y)); return c ? c.y : 1e9; };
+      const parkY = secY('주차장'), elevY = secY('승강기');
+      if (hdr) {
+        const hy = hdr.y, endY = Math.min(parkY, elevY, 1e9);
+        const heads = cells.filter(c => Math.abs(c.y - hy) <= 8).map(c => ({ n: c.n.replace(/\(.*\)/, ''), cx: (c.x + c.x2) / 2 }));
+        const colName = (cx) => { let b = null, d = 1e9; heads.forEach(h => { const dd = Math.abs(h.cx - cx); if (dd < d) { d = dd; b = h.n; } }); return b; };
+        const rows = {};
+        cells.filter(c => c.y > hy + 6 && c.y < endY - 6).forEach(c => { const k = Math.round(c.y / 5); (rows[k] = rows[k] || []).push(c); });
+        Object.keys(rows).map(Number).sort((a, b) => a - b).forEach(k => {
+          const r = {}; rows[k].forEach(c => { const cn = colName((c.x + c.x2) / 2); if (cn) r[cn] = (r[cn] ? r[cn] + ' ' : '') + c.s.trim(); });
+          const fl = (r['층별'] || '').replace(/\s/g, ''); if (!fl) return;
+          let label = fl; let m;
+          if ((m = fl.match(/^지(\d+)$/)) || (m = fl.match(/^지하(\d+)층?$/))) label = `지하${m[1]}층`; else if ((m = fl.match(/^(\d+)층?$/))) label = `${m[1]}층`; else if (/^옥탑|옥상/.test(fl)) label = fl;
+          const area = num(r['면적']);
+          floors.push({ id: Date.now() + floors.length, floor: label, companyName: [r['용도'], area !== null ? `${area}㎡` : ''].filter(Boolean).join(' · '), deposit: '', rent: '', maintenance: '' });
+        });
+      }
+      if (floors.length) {
+        filled.push(`층별 현황 ${floors.length}건`);
+        const ug = Math.max(0, ...floors.map(f => { const m = f.floor.match(/^지하(\d+)/); return m ? Number(m[1]) : 0; }));
+        const gr = Math.max(0, ...floors.map(f => { const m = f.floor.match(/^(\d+)층/); return m ? Number(m[1]) : 0; }));
+        put('floorUnderground', ug, '지하 층수'); put('floorGround', gr || null, '지상 층수');
+      }
+      const sumDae = (y0, y1) => cells.filter(c => c.y > y0 && c.y < y1 && /^\d+대$/.test(c.n)).reduce((a, c) => a + num(c.s), 0);
+      const pk = parkY < 1e9 ? sumDae(parkY, Math.min(elevY > parkY ? elevY : 1e9, 1e9)) : 0; put('parking', pk > 0 ? pk : null, '주차대수');
+      const ev = elevY < 1e9 ? sumDae(elevY, 1e9) : 0; put('elevators', ev > 0 ? ev : null, '엘리베이터');
+      if (fields.address) fields.name = fields.address.split(/\s+/).slice(-2).join(' '), filled.push('물건명(주소 기준)');
+      const extra = [['주용도', /^주용도$/], ['주구조', /^주구조$/], ['허가일자', /^허가일자$/], ['위반건축물여부', /^위반건축물여부$/]].map(([l, re]) => { const v = val(re); return v ? `${l}: ${v}` : ''; }).filter(Boolean);
+      if (extra.length) notes.push('건축물대장 - ' + extra.join(' / '));
+      return { fields, floors, notes, filled, skipped: ['용도(주용도·주구조)는 참고사항에 적어 두었어요'] };
+    }
+
     function parsePropertyPdf(pages, opts) {
       opts = opts || {};
+      if (isBuildingLedger(pages)) return parseBuildingLedger(pages);
       const norm = (t) => t.replace(/[\s·ㆍ:：]/g, '');
       // 금액 → 만원 단위 숫자. "180억원"→1,800,000 / "5억 3,500만원"→53,500 / "3,110만원"→3,110 / "1,000,000 만원"→1,000,000 / 숫자만 있으면 만원으로 본다
       const parseMan = (t) => {
@@ -1394,11 +1497,47 @@
       const [isSubmitting, setIsSubmitting] = useState(false);
       const [pdfBusy, setPdfBusy] = useState(false);
       const [pdfInfo, setPdfInfo] = useState(null);
-      const readPdf = async (file) => {
-        if (!file) return;
-        if (!/\.pdf$/i.test(file.name) && file.type !== 'application/pdf') { setPdfInfo({ error: 'PDF 파일만 올릴 수 있어요.' }); return; }
+      const [busyMsg, setBusyMsg] = useState('');
+      const applyParsed = (r, fileName, isImage) => {
+        if (r.filled.length === 0) {
+          setPdfInfo({ error: isImage ? '이 사진에서 물건 정보를 찾지 못했어요. 글자가 또렷하고 반듯하게 찍힌(캡처한) 이미지를 올려 보세요.' : '이 PDF에서 물건 정보를 찾지 못했어요. 사진이나 스캔한 PDF이거나, 지원하지 않는 형식일 수 있어요.' });
+        } else {
+          setFormData(prev => ({ ...prev, ...r.fields, floorDetails: r.floors.length ? r.floors : prev.floorDetails }));
+          if (r.notes.length) setNewLog(prev => prev || ((isImage ? '[사진 참고사항]\n' : '[PDF 참고사항]\n') + r.notes.map(n => '- ' + n).join('\n')));
+          setPdfInfo({ ok: true, filled: r.filled, skipped: r.skipped, hasNotes: r.notes.length > 0, fileName: fileName });
+        }
+      };
+      const readImages = async (files) => {
+        setPdfBusy(true); setPdfInfo(null); setBusyMsg('글자 읽기 도구를 준비하는 중... (처음에는 1~2분 걸려요)');
+        let worker = null;
+        try {
+          await loadScriptOnce('https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js');
+          worker = await window.Tesseract.createWorker('kor+eng', 1, { logger: (m) => { if (m.status === 'recognizing text') setBusyMsg('사진 속 글자를 읽는 중... ' + Math.round((m.progress || 0) * 100) + '%'); } });
+          const pages = [];
+          for (const f of files) {
+            const cv = await loadImageCanvas(f);
+            const { data } = await worker.recognize(cv, {}, { blocks: true });
+            pages.push(ocrToPage(data, cv.width, cv.height));
+          }
+          applyParsed(parsePropertyPdf(pages, {}), files.map(f => f.name).join(', '), true);
+        } catch (e) {
+          setPdfInfo({ error: '사진을 읽는 중 문제가 생겼어요: ' + e.message });
+        } finally {
+          if (worker) { try { await worker.terminate(); } catch (e) {} }
+          setPdfBusy(false); setBusyMsg('');
+        }
+      };
+      const readPdf = async (fileOrList) => {
+        const files = fileOrList && fileOrList.length !== undefined && !fileOrList.name ? [...fileOrList] : (fileOrList ? [fileOrList] : []);
+        if (!files.length) return;
+        const isPdfFile = (f) => /\.pdf$/i.test(f.name) || f.type === 'application/pdf';
+        const isImgFile = (f) => /^image\//.test(f.type) || /\.(png|jpe?g|webp|bmp)$/i.test(f.name);
+        const imgs = files.filter(isImgFile);
+        if (imgs.length) return readImages(imgs.slice(0, 5));
+        const file = files.find(isPdfFile);
+        if (!file) { setPdfInfo({ error: 'PDF 또는 이미지(사진·캡처) 파일만 올릴 수 있어요.' }); return; }
         if (!window.pdfjsLib) { setPdfInfo({ error: 'PDF 읽기 도구를 불러오지 못했어요. 인터넷 연결을 확인하고 새로고침해 주세요.' }); return; }
-        setPdfBusy(true); setPdfInfo(null);
+        setPdfBusy(true); setPdfInfo(null); setBusyMsg('');
         try {
           window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
           const doc = await window.pdfjsLib.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
@@ -1410,14 +1549,7 @@
             const tc = await page.getTextContent();
             pages.push({ width: vp.width, items: tc.items.filter(t => t.str && t.str.trim()).map(t => ({ s: t.str, x: t.transform[4], y: vp.height - t.transform[5], w: t.width })) });
           }
-          const r = parsePropertyPdf(pages, { title: meta && meta.info && meta.info.Title });
-          if (r.filled.length === 0) {
-            setPdfInfo({ error: '이 PDF에서 물건 정보를 찾지 못했어요. 사진이나 스캔한 PDF이거나, 지원하지 않는 형식일 수 있어요.' });
-          } else {
-            setFormData(prev => ({ ...prev, ...r.fields, floorDetails: r.floors.length ? r.floors : prev.floorDetails }));
-            if (r.notes.length) setNewLog(prev => prev || ('[PDF 참고사항]\n' + r.notes.map(n => '- ' + n).join('\n')));
-            setPdfInfo({ ok: true, filled: r.filled, skipped: r.skipped, hasNotes: r.notes.length > 0, fileName: file.name });
-          }
+          applyParsed(parsePropertyPdf(pages, { title: meta && meta.info && meta.info.Title }), file.name, false);
         } catch (e) {
           setPdfInfo({ error: 'PDF를 읽는 중 문제가 생겼어요: ' + e.message });
         } finally {
@@ -1629,19 +1761,20 @@
 
           <form onSubmit={handleSubmit} onKeyDown={(e) => { if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') e.preventDefault(); }} className="space-y-4 sm:space-y-6">
             {!initialData && (
-              <div onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); readPdf(e.dataTransfer.files[0]); }} className="rounded-3xl border-2 border-dashed border-gold-300 bg-gold-50/70 p-5 sm:p-6">
+              <div onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); readPdf(e.dataTransfer.files); }} className="rounded-3xl border-2 border-dashed border-gold-300 bg-gold-50/70 p-5 sm:p-6">
                 <div className="flex flex-col sm:flex-row items-center gap-4">
                   <div className="w-12 h-12 rounded-3xl bg-gold-400 text-ink-900 flex items-center justify-center shrink-0"><FileText className="w-6 h-6" /></div>
                   <div className="flex-1 text-center sm:text-left">
-                    <p className="font-bold text-ink-800">PDF로 자동 입력</p>
-                    <p className="text-sm text-slate-500 mt-0.5">매물 소개서 PDF를 끌어다 놓거나 선택하면 아래 입력칸이 채워져요. 파일은 이 컴퓨터에서만 읽고 밖으로 보내지 않아요.</p>
+                    <p className="font-bold text-ink-800">PDF·사진으로 자동 입력</p>
+                    <p className="text-sm text-slate-500 mt-0.5">매물 소개서 PDF나 사진·캡처 이미지(여러 장 가능)를 끌어다 놓거나 선택하면 아래 입력칸이 채워져요. 파일은 이 컴퓨터에서만 읽고 밖으로 보내지 않아요.</p>
                   </div>
                   <label className="px-5 py-2.5 rounded-3xl bg-ink-900 text-gold-200 text-sm font-bold cursor-pointer hover:bg-ink-700 transition-colors whitespace-nowrap">
-                    {pdfBusy ? '읽는 중...' : 'PDF 선택'}
-                    <input type="file" accept="application/pdf,.pdf" className="hidden" onChange={(e) => { readPdf(e.target.files[0]); e.target.value = ''; }} />
+                    {pdfBusy ? '읽는 중...' : 'PDF·사진 선택'}
+                    <input type="file" multiple accept="application/pdf,.pdf,image/*" className="hidden" onChange={(e) => { readPdf(e.target.files); e.target.value = ''; }} />
                   </label>
                 </div>
-                <p className="mt-3 text-sm font-bold text-red-600 text-center sm:text-left">※ PDF 자동 입력은 완벽하지 않아요. 잘못 읽히거나 빠진 내용이 있을 수 있으니, 꼭 내용을 확인한 뒤 등록해 주세요.</p>
+                <p className="mt-3 text-sm font-bold text-red-600 text-center sm:text-left">※ 자동 입력은 완벽하지 않아요. 사진은 글자 인식이라 더 틀릴 수 있어요. 잘못 읽히거나 빠진 내용이 있을 수 있으니, 꼭 내용을 확인한 뒤 등록해 주세요.</p>
+                {pdfBusy && busyMsg && <div className="mt-4 p-3 bg-blue-50 border border-blue-100 text-blue-700 text-sm font-semibold rounded-lg">{busyMsg}</div>}
                 {pdfInfo && pdfInfo.error && <div className="mt-4 p-3 bg-red-50 border border-red-100 text-red-600 text-sm font-semibold rounded-lg">{pdfInfo.error}</div>}
                 {pdfInfo && pdfInfo.ok && (
                   <div className="mt-4 p-4 bg-white border border-gold-200 rounded-3xl text-sm text-slate-700 space-y-1.5">
