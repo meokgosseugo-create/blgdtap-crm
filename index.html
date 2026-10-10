@@ -135,6 +135,20 @@
       return addr.replace(/\s{2,}/g, ' ').trim();
     };
 
+    // 같은 주소 찾기: '구·동·지번'이 모두 같아야 같은 주소로 본다. 124 / 124-1 / 124-12 는 서로 다른 지번이다.
+    const addrKey = (addr) => {
+      const t = String(addr || '').replace(/\([^)]*\)/g, ' ').replace(/번지/g, ' ').replace(/\s+/g, ' ').trim();
+      let m = t.match(/([가-힣]+(?:구|군|시))\s*([가-힣0-9]+(?:동|읍|면|리|가))\s*(산?)\s*(\d+)(?:\s*-\s*(\d+))?(?!\d)/);
+      if (m) return `${m[1]}${m[2]}${m[3]}${m[4]}${m[5] ? '-' + m[5] : ''}`;
+      m = t.match(/([가-힣]+(?:구|군|시))\s*([가-힣0-9]+(?:로|길))\s*(\d+)(?:\s*-\s*(\d+))?(?!\d)/);
+      if (m) return `${m[1]}${m[2]}${m[3]}${m[4] ? '-' + m[4] : ''}`;
+      return null;
+    };
+    const findSameAddress = (addr, list, selfId) => {
+      const k = addrKey(addr); if (!k) return [];
+      return (list || []).filter(p => p.id !== selfId && addrKey(p.address) === k);
+    };
+
     // 금액 입력칸: 화면에는 콤마(1,800,000), 저장 값은 숫자만
     // 만원 단위 숫자를 "3,333억 3,333만원"처럼 빠짐없이 보여 준다
     const formatKoreanMoneyFull = (val) => {
@@ -1501,7 +1515,7 @@
       );
     }
 
-    function PropertyFormView({ initialData, onBack, onSave, currentUser }) {
+    function PropertyFormView({ initialData, onBack, onSave, currentUser, allProperties }) {
       const [newLog, setNewLog] = useState('');
       const [isSubmitting, setIsSubmitting] = useState(false);
       const [pdfBusy, setPdfBusy] = useState(false);
@@ -1614,6 +1628,8 @@
         });
       };
       
+      const sameAddr = useMemo(() => findSameAddress(formData.address, allProperties, initialData && initialData.id), [formData.address, allProperties, initialData]);
+      const ownerLabel = (p) => (currentUser && String(p.user_id || '').toLowerCase() === String(currentUser.loginId || '').toLowerCase()) ? '내 물건' : (p.registrant ? p.registrant + ' 등록·공유' : '공유 물건');
       const handleAddressBlur = () => {
         const formatted = autoFormatAddress(formData.address);
         setFormData(prev => ({ ...prev, address: formatted }));
@@ -1701,6 +1717,8 @@
 
         if (!formData.name || formData.name.trim() === '') return alert("물건명을 입력해주세요.");
         if (!formData.address || formData.address.trim() === '') return alert("소재지(주소)를 입력해주세요.");
+        const sameNow = findSameAddress(formData.address, allProperties, initialData && initialData.id);
+        if (sameNow.length && !window.confirm(`같은 주소로 이미 등록된 물건이 있어요.\n\n${sameNow.slice(0, 3).map(p => '- ' + p.name + ' (' + p.address + ')').join('\n')}\n\n그래도 등록할까요?`)) return;
 
         setIsSubmitting(true);
 
@@ -1805,7 +1823,15 @@
               <h3 className="text-lg sm:text-xl font-bold text-ink-800 mb-4 sm:mb-6 pb-3 sm:pb-4 border-b border-slate-100 flex items-center gap-2"><Building2 className="w-5 h-5 sm:w-6 sm:h-6 text-blue-500" /> 기본 정보</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                 <FormGroup label="물건명 (필수)"><input type="text" name="name" value={formData.name || ''} onChange={handleChange} className="form-input w-full p-2.5 sm:p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-bold text-sm sm:text-base" placeholder="예: 엠파이어 빌딩" /></FormGroup>
-                <FormGroup label="소재지 (주소)"><input type="text" name="address" value={formData.address || ''} onChange={handleChange} onBlur={handleAddressBlur} className={`form-input w-full p-2.5 sm:p-3 border rounded-lg outline-none focus:ring-2 bg-white text-sm sm:text-base border-slate-300 focus:ring-blue-500`} placeholder="예: 서울시 강남구 신사동 10" /></FormGroup>
+                <FormGroup label="소재지 (주소)"><input type="text" name="address" value={formData.address || ''} onChange={handleChange} onBlur={handleAddressBlur} className={`form-input w-full p-2.5 sm:p-3 border rounded-lg outline-none focus:ring-2 bg-white text-sm sm:text-base border-slate-300 focus:ring-blue-500`} placeholder="예: 서울시 강남구 신사동 10" />
+                  {sameAddr.length > 0 && (
+                    <div className="mt-2 p-3 rounded-lg bg-amber-50 border border-amber-300 text-amber-900 text-sm">
+                      <p className="font-bold">⚠ 같은 주소로 이미 등록된 물건이 있어요</p>
+                      <ul className="mt-1 space-y-0.5">{sameAddr.slice(0, 3).map(p => <li key={p.id}>· {p.name} <span className="text-amber-700">({p.address} · {ownerLabel(p)})</span></li>)}</ul>
+                      <p className="mt-1 text-xs text-amber-700">지번이 124와 124-1처럼 다르면 다른 주소로 봅니다. 같은 물건이 맞는지 확인해 주세요.</p>
+                    </div>
+                  )}
+                  </FormGroup>
                 <FormGroup label="물건 종류"><select name="type" value={formData.type || ''} onChange={handleChange} className="form-input w-full p-2.5 sm:p-3 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 bg-white font-bold text-slate-700 text-sm sm:text-base"><option>빌딩</option><option>상가</option><option>오피스텔</option><option>아파트</option><option>빌라</option><option>원룸</option><option>투룸</option><option>쓰리룸+</option></select></FormGroup>
                 <FormGroup label="거래 방식">
                   <div className="flex flex-wrap gap-2 sm:gap-6 mt-1 sm:mt-3">
@@ -3107,6 +3133,7 @@
                       onBack={() => { currentView === 'form' && selectedProperty ? setCurrentView('detail') : setCurrentView('list'); }} 
                       onSave={handleSaveProperty} 
                       currentUser={currentUser}
+                      allProperties={properties}
                     />
                   )}
                 </>
