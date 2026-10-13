@@ -172,6 +172,9 @@
     const BUILDING_TYPES = ['빌딩', '상가', '오피스텔', '아파트', '빌라', '원룸', '투룸', '쓰리룸+'];
     // 억 단위 숫자를 "33.5억"처럼 보여 준다
     const formatEok = (v) => { const n = Number(String(v === undefined || v === null ? '' : v).replace(/,/g, '')); return !n || isNaN(n) ? '0억' : n.toLocaleString('ko-KR', { maximumFractionDigits: 4 }) + '억'; };
+    // 매수자 투자금액: '최소-최대'(예: 10억-20억). 최대가 없거나 같으면 한 금액만 보여 준다
+    const formatBudgetRange = (min, max) => { const a = Number(min) || 0, b = Number(max) || 0; return b && b !== a ? `${formatEok(a)}-${formatEok(b)}` : formatEok(a || b); };
+    const budgetMaxPayload = (obj, ref) => ((obj.budget_max !== null && obj.budget_max !== undefined) || (ref && 'budget_max' in ref)) ? { budget_max: (obj.budget_max === '' || obj.budget_max === undefined) ? null : obj.budget_max } : {};
     const fmtMoneyInput = (v) => { const t = String(v === undefined || v === null ? '' : v).replace(/,/g, ''); if (t === '') return ''; const [i, d] = t.split('.'); return (Number(i) || 0).toLocaleString('ko-KR') + (d !== undefined ? '.' + d : ''); };
     const cleanMoneyInput = (t) => t.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1');
 
@@ -2077,9 +2080,9 @@
       const [minEok, setMinEok] = useState('');
       const [maxEok, setMaxEok] = useState('');
       const shown = customers.filter(c => {
-        const budget = Number(c.budget) || 0;
-        if (minEok !== '' && budget < Number(minEok)) return false;
-        if (maxEok !== '' && budget > Number(maxEok)) return false;
+        const lo = Number(c.budget) || 0, hi = Number(c.budget_max) || lo;   // 이 매수자의 금액 범위 [lo, hi]
+        if (minEok !== '' && hi < Number(minEok)) return false;
+        if (maxEok !== '' && lo > Number(maxEok)) return false;
         return true;
       });
       const filtering = minEok !== '' || maxEok !== '';
@@ -2134,7 +2137,7 @@
                   <tr key={cust.id} onClick={() => onViewDetail && onViewDetail(cust)} className="hover:bg-blue-50/50 transition-colors align-top cursor-pointer">
                     {selectable && <td className="p-3 md:p-4 text-center" onClick={(e) => e.stopPropagation()}><input type="checkbox" checked={checkedIds.includes(cust.id)} onChange={() => toggleOne(cust.id)} className="w-4 h-4 accent-blue-600 cursor-pointer" /></td>}
                     {!shared && <td className="p-3 md:p-4 font-bold text-ink-800 whitespace-nowrap">{cust.name}</td>}{!shared && <td className={td}>{cust.phone}</td>}
-                    <td className="p-3 md:p-4 font-bold text-red-600 whitespace-nowrap">{money(cust.budget)}</td>
+                    <td className="p-3 md:p-4 font-bold text-red-600 whitespace-nowrap">{formatBudgetRange(cust.budget, cust.budget_max)}</td>
                     <td className={td}>{cust.region}</td>
                     <td className={td}>{cust.buildingtype || '-'}</td>
                     <td className="p-3 md:p-4 text-slate-600 whitespace-pre-line min-w-[260px]">{cust.reason}</td>
@@ -2203,11 +2206,11 @@
             </div>
             {!shared && <h1 className="text-2xl md:text-3xl font-semibold tracking-tight text-ink-900">{customer.name}</h1>}
             <p className="text-xs text-slate-400 mt-3">투자금액</p>
-            <p className="text-3xl md:text-4xl font-semibold text-ink-900 mt-1">{formatEok(customer.budget)}</p>
+            <p className="text-3xl md:text-4xl font-semibold text-ink-900 mt-1">{formatBudgetRange(customer.budget, customer.budget_max)}</p>
             {customer.region && <p className="text-slate-500 mt-2">{customer.region}</p>}
           </div>
           <InfoSection title="매수 조건" icon={<Users className="w-4 h-4" />}>
-            <InfoGrid rows={[...(shared ? [] : [['이름', customer.name || '-'], ['전화번호', phoneLink(customer.phone)]]), ['투자금액', formatEok(customer.budget)], ['희망 지역', customer.region || '-'], ['건물 유형', customer.buildingtype || '상관없음'], ['등록일', customer.date || '-']]} />
+            <InfoGrid rows={[...(shared ? [] : [['이름', customer.name || '-'], ['전화번호', phoneLink(customer.phone)]]), ['투자금액', formatBudgetRange(customer.budget, customer.budget_max)], ['희망 지역', customer.region || '-'], ['건물 유형', customer.buildingtype || '상관없음'], ['등록일', customer.date || '-']]} />
           </InfoSection>
           <InfoSection title="구매사유" icon={<FileText className="w-4 h-4" />}>
             <div className="p-4 text-sm text-ink-800 whitespace-pre-line leading-relaxed min-h-[80px]">{customer.reason || '적어 둔 내용이 없어요.'}</div>
@@ -2222,7 +2225,7 @@
     }
 
     function CustomerFormView({ onBack, onSave, initialData }) {
-      const [formData, setFormData] = useState(initialData ? { name: initialData.name || '', phone: initialData.phone || '', buildingtype: initialData.buildingtype || '', budget: String(initialData.budget === undefined || initialData.budget === null ? '' : initialData.budget), region: initialData.region || '', reason: initialData.reason || '', is_shared: !!initialData.is_shared } : { name: '', phone: '', buildingtype: '', budget: '', region: '', reason: '', is_shared: true });
+      const [formData, setFormData] = useState(initialData ? { name: initialData.name || '', phone: initialData.phone || '', buildingtype: initialData.buildingtype || '', budget: String(initialData.budget === undefined || initialData.budget === null ? '' : initialData.budget), budget_max: String(initialData.budget_max === undefined || initialData.budget_max === null ? '' : initialData.budget_max), region: initialData.region || '', reason: initialData.reason || '', is_shared: !!initialData.is_shared } : { name: '', phone: '', buildingtype: '', budget: '', budget_max: '', region: '', reason: '', is_shared: true });
       const [isSubmitting, setIsSubmitting] = useState(false);
 
       const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -2231,10 +2234,11 @@
         e.preventDefault();
         if (!formData.name) return alert("이름을 입력해주세요.");
         if (!formData.phone) return alert("전화번호를 입력해주세요.");
-        if (!formData.budget) return alert("투자금액을 입력해주세요.");
+        if (!formData.budget) return alert("투자금액(최소)을 입력해주세요.");
+        if (formData.budget_max && Number(formData.budget_max) < Number(formData.budget)) return alert("최대 금액은 최소 금액보다 크거나 같아야 해요.");
 
         setIsSubmitting(true);
-        await onSave({ ...formData, budget: Number(formData.budget) || 0 });
+        await onSave({ ...formData, budget: Number(formData.budget) || 0, budget_max: formData.budget_max ? Number(formData.budget_max) : null });
         setIsSubmitting(false);
       };
 
@@ -2249,12 +2253,19 @@
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-6 gap-4">
               <div className="sm:col-span-4">
-                <FormGroup label="금액 (단위: 억)">
-                  <div className="flex items-center border rounded-lg bg-white focus-within:ring-2 focus-within:ring-blue-500 overflow-hidden">
-                    <input type="text" inputMode="decimal" name="budget" value={fmtMoneyInput(formData.budget)} onChange={(e) => setFormData({ ...formData, budget: cleanMoneyInput(e.target.value) })} className="w-full min-w-0 p-2.5 md:p-3 text-sm md:text-base font-bold outline-none bg-transparent" placeholder="예: 30 또는 12.5" />
-                    <span className="text-xs font-bold text-slate-500 pr-3 pl-1 whitespace-nowrap">억</span>
+                <FormGroup label="투자금액 (단위: 억) — 얼마에서 얼마까지">
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 flex items-center border rounded-lg bg-white focus-within:ring-2 focus-within:ring-blue-500 overflow-hidden">
+                      <input type="text" inputMode="decimal" name="budget" value={fmtMoneyInput(formData.budget)} onChange={(e) => setFormData({ ...formData, budget: cleanMoneyInput(e.target.value) })} className="w-full min-w-0 p-2.5 md:p-3 text-sm md:text-base font-bold outline-none bg-transparent" placeholder="최소 (예: 10)" />
+                      <span className="text-xs font-bold text-slate-500 pr-3 pl-1 whitespace-nowrap">억</span>
+                    </div>
+                    <span className="font-bold text-slate-400">~</span>
+                    <div className="flex-1 flex items-center border rounded-lg bg-white focus-within:ring-2 focus-within:ring-blue-500 overflow-hidden">
+                      <input type="text" inputMode="decimal" name="budget_max" value={fmtMoneyInput(formData.budget_max)} onChange={(e) => setFormData({ ...formData, budget_max: cleanMoneyInput(e.target.value) })} className="w-full min-w-0 p-2.5 md:p-3 text-sm md:text-base font-bold outline-none bg-transparent" placeholder="최대 (예: 20)" />
+                      <span className="text-xs font-bold text-slate-500 pr-3 pl-1 whitespace-nowrap">억</span>
+                    </div>
                   </div>
-                  <span className="text-sm font-bold text-blue-600 block min-h-[20px] mt-1">{formData.budget ? formatEok(formData.budget) : ''}</span>
+                  <span className="text-sm font-bold text-blue-600 block min-h-[20px] mt-1">{formData.budget ? formatBudgetRange(formData.budget, formData.budget_max) : ''}<span className="text-xs font-normal text-slate-400 ml-2">{formData.budget && !formData.budget_max ? '(최대를 비우면 한 금액으로 저장돼요)' : ''}</span></span>
                 </FormGroup>
               </div>
               <div className="sm:col-span-2"><FormGroup label="지역"><input type="text" name="region" value={formData.region} onChange={handleChange} className="form-input w-full p-2.5 md:p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm md:text-base" placeholder="예: 분당구 일대" /></FormGroup></div>
@@ -2886,9 +2897,9 @@
       const handleSaveCustomer = async (newCust) => {
         const cust = { ...newCust, id: `C-${Date.now()}`, date: new Date().toISOString().split('T')[0], user_id: currentUser.loginId, registrant: currentUser.name, registrantphone: currentUser.phone || '' };
         setCustomers(prev => [cust, ...prev]);
-        if (cust.is_shared) setSharedCustomers(prev => [{ id: cust.id, budget: cust.budget, region: cust.region, buildingtype: cust.buildingtype, reason: cust.reason, registrant: cust.registrant, registrantphone: cust.registrantphone, date: cust.date }, ...prev]);
+        if (cust.is_shared) setSharedCustomers(prev => [{ id: cust.id, budget: cust.budget, budget_max: cust.budget_max, region: cust.region, buildingtype: cust.buildingtype, reason: cust.reason, registrant: cust.registrant, registrantphone: cust.registrantphone, date: cust.date }, ...prev]);
         setCurrentCustomerView('list');
-        const { error } = await supabase.from('crm_customers').insert([cust]);
+        const { error } = await supabase.from('crm_customers').insert([{ ...cust, ...((cust.budget_max === null || cust.budget_max === undefined) ? { budget_max: undefined } : {}) }]);
         if (error) {
           setCustomers(prev => prev.filter(x => x.id !== cust.id));
           setSharedCustomers(prev => prev.filter(x => x.id !== cust.id));
@@ -2901,12 +2912,12 @@
         const old = customers.find(x => x.id === id);
         if (!old) return;
         const upd = { ...old, ...data };
-        const sc = { id, budget: upd.budget, region: upd.region, buildingtype: upd.buildingtype, reason: upd.reason, registrant: upd.registrant, registrantphone: upd.registrantphone, date: upd.date };
+        const sc = { id, budget: upd.budget, budget_max: upd.budget_max, region: upd.region, buildingtype: upd.buildingtype, reason: upd.reason, registrant: upd.registrant, registrantphone: upd.registrantphone, date: upd.date };
         setCustomers(prev => prev.map(x => x.id === id ? upd : x));
         setSharedCustomers(prev => upd.is_shared ? (prev.some(x => x.id === id) ? prev.map(x => x.id === id ? sc : x) : [sc, ...prev]) : prev.filter(x => x.id !== id));
         setSelectedCustomer(upd);
         setCurrentCustomerView('detail');
-        const { error } = await supabase.from('crm_customers').update({ name: upd.name, phone: upd.phone, budget: upd.budget, region: upd.region, buildingtype: upd.buildingtype || '', reason: upd.reason, is_shared: upd.is_shared }).eq('id', id);
+        const { error } = await supabase.from('crm_customers').update({ name: upd.name, phone: upd.phone, budget: upd.budget, ...budgetMaxPayload(upd, old), region: upd.region, buildingtype: upd.buildingtype || '', reason: upd.reason, is_shared: upd.is_shared }).eq('id', id);
         if (error) { alert('수정한 내용을 저장하지 못했어요.\n\n(원인: ' + error.message + ')'); fetchCloudData(); }
       };
 
@@ -2949,11 +2960,11 @@
         if (!cust) return;
         const next = !cust.is_shared;
         setCustomers(prev => prev.map(x => x.id === id ? { ...x, is_shared: next } : x));
-        setSharedCustomers(prev => next ? [{ id: cust.id, budget: cust.budget, region: cust.region, buildingtype: cust.buildingtype, reason: cust.reason, registrant: cust.registrant, registrantphone: cust.registrantphone, date: cust.date }, ...prev.filter(x => x.id !== id)] : prev.filter(x => x.id !== id));
+        setSharedCustomers(prev => next ? [{ id: cust.id, budget: cust.budget, budget_max: cust.budget_max, region: cust.region, buildingtype: cust.buildingtype, reason: cust.reason, registrant: cust.registrant, registrantphone: cust.registrantphone, date: cust.date }, ...prev.filter(x => x.id !== id)] : prev.filter(x => x.id !== id));
         const { error } = await supabase.from('crm_customers').update({ is_shared: next }).eq('id', id);
         if (error) {
           setCustomers(prev => prev.map(x => x.id === id ? { ...x, is_shared: !next } : x));
-          setSharedCustomers(prev => !next ? [{ id: cust.id, budget: cust.budget, region: cust.region, buildingtype: cust.buildingtype, reason: cust.reason, registrant: cust.registrant, registrantphone: cust.registrantphone, date: cust.date }, ...prev.filter(x => x.id !== id)] : prev.filter(x => x.id !== id));
+          setSharedCustomers(prev => !next ? [{ id: cust.id, budget: cust.budget, budget_max: cust.budget_max, region: cust.region, buildingtype: cust.buildingtype, reason: cust.reason, registrant: cust.registrant, registrantphone: cust.registrantphone, date: cust.date }, ...prev.filter(x => x.id !== id)] : prev.filter(x => x.id !== id));
           alert('공유 설정을 바꾸지 못했어요.\n\n(원인: ' + error.message + ')');
         }
       };
