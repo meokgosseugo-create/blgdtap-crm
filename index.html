@@ -135,6 +135,18 @@
       return addr.replace(/\s{2,}/g, ' ').trim();
     };
 
+    // 합계: 직접 고친 값(price)이 있으면 그것을 쓰고, 없으면 층별 금액을 더한다
+    const sumFloors = (list) => (list || []).reduce((acc, curr) => ({
+      deposit: acc.deposit + (Number(curr.deposit) || 0),
+      rent: acc.rent + (Number(curr.rent) || 0),
+      maintenance: acc.maintenance + (Number(curr.maintenance) || 0),
+    }), { deposit: 0, rent: 0, maintenance: 0 });
+    const savedTotals = (property) => {
+      const auto = sumFloors(property && property.floorDetails); const pr = (property && property.price) || {};
+      const pick = (k) => (pr[k] !== undefined && pr[k] !== null && pr[k] !== '' ? Number(pr[k]) || 0 : auto[k]);
+      return { deposit: pick('deposit'), rent: pick('rent'), maintenance: pick('maintenance') };
+    };
+
     // 같은 주소 찾기: '구·동·지번'이 모두 같아야 같은 주소로 본다. 124 / 124-1 / 124-12 는 서로 다른 지번이다.
     const addrKey = (addr) => {
       const t = String(addr || '').replace(/\([^)]*\)/g, ' ').replace(/번지/g, ' ').replace(/\s+/g, ' ').trim();
@@ -734,11 +746,7 @@
 
       if (!property) return null;
 
-      const floorTotals = (property.floorDetails || []).reduce((acc, curr) => ({
-        deposit: acc.deposit + (Number(curr.deposit) || 0),
-        rent: acc.rent + (Number(curr.rent) || 0),
-        maintenance: acc.maintenance + (Number(curr.maintenance) || 0),
-      }), { deposit: 0, rent: 0, maintenance: 0 });
+      const floorTotals = savedTotals(property);
 
       const ph = (t) => (isGeneratingPdf ? '' : t);   // PDF를 찍는 동안에는 안내 글씨를 지운다
       // 개요 쪽 표: 참고 PDF처럼 묶음마다 떨어뜨리고, 칸마다 이름 칸(연한 파랑)과 값 칸으로 나눈다
@@ -1292,12 +1300,8 @@
       const submitComment = () => { if (!newComment.trim()) return; onAddComment(property.id, newComment.trim()); setNewComment(''); };
 
       const floorTotals = useMemo(() => {
-        if (!property || !property.floorDetails) return { deposit: 0, rent: 0, maintenance: 0 };
-        return property.floorDetails.reduce((acc, curr) => ({
-          deposit: acc.deposit + (Number(curr.deposit) || 0),
-          rent: acc.rent + (Number(curr.rent) || 0),
-          maintenance: acc.maintenance + (Number(curr.maintenance) || 0),
-        }), { deposit: 0, rent: 0, maintenance: 0 });
+        if (!property) return { deposit: 0, rent: 0, maintenance: 0 };
+        return savedTotals(property);
       }, [property]);
 
       const handleAddLog = () => {
@@ -1703,14 +1707,17 @@
         setNewLog('');
       };
 
-      const totals = useMemo(() => {
-        const details = formData.floorDetails || [];
-        return details.reduce((acc, curr) => ({
-          deposit: acc.deposit + (Number(curr.deposit) || 0),
-          rent: acc.rent + (Number(curr.rent) || 0),
-          maintenance: acc.maintenance + (Number(curr.maintenance) || 0),
-        }), { deposit: 0, rent: 0, maintenance: 0 });
-      }, [formData.floorDetails]);
+      const autoTotals = useMemo(() => sumFloors(formData.floorDetails), [formData.floorDetails]);
+      // 합계를 직접 고친 값 (null이면 층별 합계를 자동으로 쓴다). 저장돼 있던 합계가 층별 합과 다르면 직접 고친 값으로 본다.
+      const [manualTotals, setManualTotals] = useState(() => {
+        const init = { deposit: null, rent: null, maintenance: null };
+        if (initialData && initialData.price) { const auto = sumFloors(initialData.floorDetails); ['deposit', 'rent', 'maintenance'].forEach(k => { const v = initialData.price[k]; if (v !== undefined && v !== null && v !== '' && Number(v) !== auto[k]) init[k] = String(Number(v)); }); }
+        return init;
+      });
+      const shownTotals = { deposit: manualTotals.deposit !== null ? manualTotals.deposit : autoTotals.deposit, rent: manualTotals.rent !== null ? manualTotals.rent : autoTotals.rent, maintenance: manualTotals.maintenance !== null ? manualTotals.maintenance : autoTotals.maintenance };
+      const totals = { deposit: Number(shownTotals.deposit) || 0, rent: Number(shownTotals.rent) || 0, maintenance: Number(shownTotals.maintenance) || 0 };
+      const hasManual = Object.values(manualTotals).some(v => v !== null);
+      const setManual = (k, v) => setManualTotals(prev => ({ ...prev, [k]: v }));
 
       const handleSubmit = async (e) => {
         e.preventDefault();
@@ -1922,11 +1929,12 @@
                 <div className="flex flex-col gap-3 p-3 md:px-3 md:py-2 bg-blue-50 rounded-3xl border border-blue-200 mt-2 md:grid md:grid-cols-[5rem_minmax(6rem,0.9fr)_repeat(3,minmax(8.5rem,1fr))_2.25rem] md:items-center md:gap-2">
                   <div className="w-full md:col-span-2 md:text-center"><span className="font-bold text-blue-800 text-sm">전체 합계</span></div>
                   <div className="grid grid-cols-1 sm:grid-cols-3 w-full gap-3 md:contents">
-                    <FloorMoneyInputReadOnly label="총 보증금" value={totals.deposit} />
-                    <FloorMoneyInputReadOnly label="총 월세" value={totals.rent} />
-                    <FloorMoneyInputReadOnly label="총 관리비" value={totals.maintenance} />
+                    <FloorMoneyInput label="총 보증금" value={shownTotals.deposit} onChange={(e) => setManual('deposit', e.target.value)} />
+                    <FloorMoneyInput label="총 월세" value={shownTotals.rent} onChange={(e) => setManual('rent', e.target.value)} />
+                    <FloorMoneyInput label="총 관리비" value={shownTotals.maintenance} onChange={(e) => setManual('maintenance', e.target.value)} />
                   </div>
                 </div>
+                <p className="text-xs text-slate-500 px-1">합계는 층별 금액을 자동으로 더해요. 직접 숫자를 고치면 그 값이 쓰여요.{hasManual && <button type="button" onClick={() => setManualTotals({ deposit: null, rent: null, maintenance: null })} className="ml-2 font-bold text-blue-700 underline">전부 자동 합계로 되돌리기</button>}</p>
               </div>
             </div>
 
