@@ -1400,15 +1400,15 @@
                   <th className={th}>종류</th>
                   <th className={th}>물건명</th>
                   <th className={th}>지번주소</th>
-                  {showRegistrant && <th className={th}>등록자</th>}
-                  <th className={th + " text-center"}>층수</th>
-                  <th className={th + " text-right"}>대지(평)</th>
-                  <th className={th + " text-right"}>연면(평)</th>
                   <th className={th + " text-center"}>방식</th>
                   <th className={th + " text-right"}>매매가</th>
                   <th className={th + " text-right"}>보증금</th>
                   <th className={th + " text-right"}>월세</th>
                   <th className={th + " text-center cursor-pointer select-none hover:bg-stone-200 text-emerald-700"} onClick={() => handleSort('yield')}>수익률 {sortArrow('yield')}</th>
+                  <th className={th + " text-right"}>대지(평)</th>
+                  <th className={th + " text-right"}>연면(평)</th>
+                  <th className={th + " text-center"}>층수</th>
+                  {showRegistrant && <th className={th}>등록자</th>}
                   <th className={th + " text-center cursor-pointer select-none hover:bg-stone-200"} onClick={() => handleSort('date')}>등록일 {sortArrow('date')}</th>
                 </tr>
               </thead>
@@ -1425,15 +1425,15 @@
                         <span className="truncate" title={prop.address}>{prop.address}</span>
                       </span>
                     </td>
-                    {showRegistrant && <td className="px-2.5 text-slate-700 text-xs">{prop.registrant || '-'}</td>}
-                    <td className="px-2.5 text-center text-slate-600 text-xs">지상 {prop.floorGround || 0} · 지하 {prop.floorUnderground || 0}</td>
-                    <td className="px-2.5 text-right text-slate-600">{getExactPyeong(prop.landArea)}</td>
-                    <td className="px-2.5 text-right text-slate-600">{getExactPyeong(prop.totalFloorArea)}</td>
                     <td className="px-2.5 text-center"><span className={`px-2 py-0.5 rounded text-[11px] font-bold ${TYPE_BADGE[prop.transactionType] || 'bg-slate-500 text-white'}`}>{prop.transactionType}</span></td>
                     <td className="px-2.5 text-right font-bold text-red-600 whitespace-nowrap"><span className="inline-flex items-center justify-end gap-1.5"><FlagBadges prop={prop} />{formatKoreanCurrency(prop.price?.sale || 0)}</span></td>
                     <td className="px-2.5 text-right text-slate-700">{formatKoreanCurrency(prop.price?.deposit || 0)}</td>
                     <td className="px-2.5 text-right text-slate-700">{formatKoreanCurrency(prop.price?.rent || 0)}</td>
                     <td className="px-2.5 text-center font-bold text-emerald-600">{prop.transactionType === '매매' ? `${getYield(prop.price?.sale, prop.price?.deposit, prop.price?.rent)}%` : '-'}</td>
+                    <td className="px-2.5 text-right text-slate-600">{getExactPyeong(prop.landArea)}</td>
+                    <td className="px-2.5 text-right text-slate-600">{getExactPyeong(prop.totalFloorArea)}</td>
+                    <td className="px-2.5 text-center text-slate-600 text-xs">지상 {prop.floorGround || 0} · 지하 {prop.floorUnderground || 0}</td>
+                    {showRegistrant && <td className="px-2.5 text-slate-700 text-xs">{prop.registrant || '-'}</td>}
                     <td className="px-2.5 text-center text-slate-500 text-xs">{prop.date}</td>
                   </tr>
                 )) : <tr><td colSpan={colCount} className="p-12 text-center text-slate-500 font-medium bg-stone-50">조건에 맞는 물건이 없습니다.</td></tr>}
