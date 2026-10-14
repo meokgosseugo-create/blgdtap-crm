@@ -302,7 +302,21 @@
         };
         const tree = doc.getElementsByTagName('p:spTree')[0];
         if (tree) walk(tree, { kx: 1, ky: 1, dx: 0, dy: 0 });
+        // 글자 크기가 달라 높이가 조금씩 다른 글상자들을 같은 줄로 묶는다 (6pt 이내)
+        const ordered = [...items].sort((a, b) => a.y - b.y);
+        let grp = [];
+        const flush = () => { if (grp.length > 1) { const my = grp.reduce((a, it) => a + it.y, 0) / grp.length; grp.forEach(it => { it.y = my; }); } grp = []; };
+        ordered.forEach(it => { if (grp.length && it.y - grp[0].y > 6) flush(); grp.push(it); });
+        flush();
         pages.push({ width: slideW, items });
+      }
+      // 표지 다음 장 위쪽의 제목(예: '상영빌딩')을 물건명 후보로
+      const GENERIC = /(개요|현황|입지|사진|위치|분석|요약|투자|포인트|summary|overview|contents|목차|index|business|plan)/i;
+      pages.nameHint = '';
+      for (let i = 1; i < pages.length && !pages.nameHint; i++) {
+        const top = pages[i].items.filter(it => it.y < 45 && it.x > 40 && it.x < 140).sort((a, b) => a.x - b.x)[0];
+        const real = pages[i].items.filter(it => !/^\d{4}-\d{2}-\d{2}$/.test(it.s) && !/^\d{1,2}$/.test(it.s));
+        if (top && real.length <= 3 && !GENERIC.test(top.s)) pages.nameHint = top.s.trim();
       }
       return pages;
     }
@@ -412,7 +426,7 @@
         ['floors', /^(층수|(건축)?규모)$/], ['ratios', /^건폐율.*용적[률율]$/], ['coverage', /^건폐율$/], ['far', /^용적[률율]$/],
         ['mainUse', /^주용도/], ['parking', /^주차(장|대수)?$/], ['elevator', /^승강기$/], ['heating', /^냉난방$/],
         ['deposit', /^보증금$/], ['rent', /^(월)?임대료$/], ['maint', /^관리비$/], ['yield', /^(년)?수익[률율]$/], ['bond', /^채권최고액$/],
-        ['buildingPerPy', /^건물가/], ['landPerPy', /^토지가/], ['perPy', /^평단가$/], ['monthIncome', /^월수익$/], ['maintExpense', /^관리비지출$/], ['sale', /^매매(가|금액)$/]
+        ['buildingPerPy', /^건물가/], ['landPerPy', /^토지가/], ['perPy', /^평단가$/], ['monthIncome', /^월수익$/], ['maintExpense', /^관리비지출$/], ['sale', /^(매매(가|금액)|askingprice|매각(희망)?가(격)?|희망(매매)?가(격)?)$/i]
       ];
       const labelOf = (s) => { const n = norm(s); const f = LABELS.find(([, re]) => re.test(n)); return f ? f[0] : null; };
       const joinSpaced = (t) => /^(?:[가-힣]\s)+[가-힣]$/.test(t || '') ? t.replace(/\s+/g, '') : (t || '').trim();   // "사 무 소"→"사무소", "롯데 리아"는 그대로
@@ -520,7 +534,11 @@
           .sort((a, b) => Math.abs(a.y - addrLabel.y) - Math.abs(b.y - addrLabel.y))[0];
         if (cand) addrText = cand.s;
       }
-      put('address', addrText ? addrText.replace(/(\d)\s*번지/g, '$1').trim() : addrText, '소재지');
+      if (!addrText || !ADDR_RE.test(addrText)) {   // 이름 칸이 없는 소개서: 문서 안에서 가장 먼저 나오는 짧은 주소 글을 쓴다
+        const any = allLines.flatMap(ls => ls.flatMap(l => l.cells.map(c => c.s))).find(t => /^(?:[가-힣]+(?:특별시|광역시|특별자치시|특별자치도|도|시|군|구)\s*){1,4}[가-힣0-9]+(?:동|읍|면|리|가)\s*산?\s*\d+(?:-\d+)?(?:번지)?\.?\s*$/.test(t.trim()));
+        if (any) addrText = any;
+      }
+      put('address', addrText ? addrText.replace(/(\d)\s*번지/g, '$1').replace(/[.\s]+$/, '').trim() : addrText, '소재지');
       put('landArea', m2('landArea') !== null ? m2('landArea') : m2('landArea2'), '대지면적');
       { const zv = join('zoning'); if (!/^(용도|지구|구역|지역|\s)+$/.test(zv)) put('zoning', zv, '용도지역'); }
       const cm = join('completion'); let comp = null;
@@ -540,7 +558,7 @@
       const pkAll = [...join('parking').matchAll(/(\d+)\s*대/g)].map(m => Number(m[1]));
       const pkVal = pkAll.length > 1 && !/[()]/.test(join('parking')) ? pkAll.reduce((a, b) => a + b, 0) : pkAll[0];
       put('parking', pkVal > 0 ? pkVal : null, '주차대수');
-      const el = join('elevator').match(/(\d+)\s*대/); put('elevators', el && Number(el[1]) > 0 ? Number(el[1]) : null, '엘리베이터');
+      const el = join('elevator').match(/(\d+)\s*[대기]/); put('elevators', el && Number(el[1]) > 0 ? Number(el[1]) : null, '엘리베이터');
       const sale = parseMan(join('sale'));
       if (sale > 0) { put('sale', sale, '매매가'); fields.transactionType = '매매'; }
       else {
@@ -549,7 +567,7 @@
       }
 
       // 물건명: 표지 → ◎제목 → 인쇄된 파일 제목의 마지막 조각 → 주소의 동·번지
-      let name = coverName || markName;
+      let name = coverName || markName || opts.nameHint || '';
       if (!name && opts.title) { const m = String(opts.title).match(/_([^_]+)$/); if (m) name = m[1].trim(); }
       if (!name && fields.address) name = fields.address.split(/\s+/).slice(-2).join(' ');
       put('name', name, '물건명');
@@ -1640,7 +1658,7 @@
           setPdfBusy(true); setPdfInfo(null); setBusyMsg('파워포인트를 읽는 중...');
           try {
             const pages = await pptxToPages(ppt);
-            applyParsed(parsePropertyPdf(pages, { title: ppt.name.replace(/\.pptx$/i, '') }), ppt.name, false, pagesToDebugText(pages, '슬라이드'));
+            applyParsed(parsePropertyPdf(pages, { title: ppt.name.replace(/\.pptx$/i, ''), nameHint: pages.nameHint }), ppt.name, false, pagesToDebugText(pages, '슬라이드'));
           } catch (e) { setPdfInfo({ error: '파워포인트를 읽는 중 문제가 생겼어요: ' + e.message }); }
           finally { setPdfBusy(false); setBusyMsg(''); }
           return;
