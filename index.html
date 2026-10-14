@@ -135,11 +135,18 @@
       return addr.replace(/\s{2,}/g, ' ').trim();
     };
 
-    // 급매 / 금액조정 표시 (물건 목록의 매매가 옆, 물건 상세에서 쓴다)
+    // 급매 / 금액인하 / 금액인상 표시 (물건 목록의 매매가 옆, 물건 상세에서 쓴다)
+    const FLAG_DEFS = [
+      { key: 'is_urgent', label: '급매', on: 'bg-red-600 text-white border-red-600', off: 'bg-white text-red-600 border-red-300 hover:bg-red-50', badge: 'bg-red-600', filterOff: 'text-red-600 border-red-200 hover:bg-red-50' },
+      { key: 'is_price_down', label: '금액인하', on: 'bg-amber-500 text-white border-amber-500', off: 'bg-white text-amber-600 border-amber-300 hover:bg-amber-50', badge: 'bg-amber-500', filterOff: 'text-amber-600 border-amber-200 hover:bg-amber-50' },
+      { key: 'is_price_up', label: '금액인상', on: 'bg-blue-600 text-white border-blue-600', off: 'bg-white text-blue-600 border-blue-300 hover:bg-blue-50', badge: 'bg-blue-600', filterOff: 'text-blue-600 border-blue-200 hover:bg-blue-50' }
+    ];
     const FlagBadges = ({ prop }) => (<>
-      {prop && prop.is_urgent && <span className="inline-block px-1.5 py-0.5 rounded text-[11px] font-extrabold bg-red-600 text-white leading-none align-middle">급매</span>}
-      {prop && prop.is_adjusted && <span className="inline-block px-1.5 py-0.5 rounded text-[11px] font-extrabold bg-amber-500 text-white leading-none align-middle">금액조정</span>}
+      {prop && FLAG_DEFS.filter(f => prop[f.key]).map(f => <span key={f.key} className={`inline-block px-1.5 py-0.5 rounded text-[11px] font-extrabold ${f.badge} text-white leading-none align-middle`}>{f.label}</span>)}
     </>);
+    const FlagButtons = ({ prop, onToggle }) => (<span className="inline-flex flex-wrap items-center gap-1.5">
+      {FLAG_DEFS.map(f => <button key={f.key} type="button" onClick={() => onToggle && onToggle(prop, f.key)} className={`px-3 py-1.5 rounded-lg text-xs font-extrabold border-2 transition-colors ${prop[f.key] ? f.on : f.off}`}>{f.label}</button>)}
+    </span>);
 
     // 합계: 직접 고친 값(price)이 있으면 그것을 쓰고, 없으면 층별 금액을 더한다
     const sumFloors = (list) => (list || []).reduce((acc, curr) => ({
@@ -1241,7 +1248,7 @@
       const [minYield, setMinYield] = useState('');
       const [sortConfig, setSortConfig] = useState({ key: 'date', direction: 'desc' });
       const [typeFilters, setTypeFilters] = useState([]);
-      const [flagFilters, setFlagFilters] = useState([]);   // ['is_urgent', 'is_adjusted']
+      const [flagFilters, setFlagFilters] = useState([]);   // ['is_urgent', 'is_price_down', 'is_price_up']
       const toggleFlagFilter = (f) => setFlagFilters(prev => prev.includes(f) ? prev.filter(x => x !== f) : [...prev, f]);
       const [selectedIds, setSelectedIds] = useState([]);
       const [showBulkConfirm, setShowBulkConfirm] = useState(false);
@@ -1341,10 +1348,11 @@
                 </div>
               </div>
                           <div className="grid grid-cols-[4.5rem_minmax(0,1fr)] items-center gap-2 md:flex">
-                <span className="text-xs font-bold text-slate-600">급매·조정</span>
-                <div className="grid grid-cols-2 gap-1.5 md:flex md:gap-1">
-                  <button onClick={() => toggleFlagFilter('is_urgent')} className={`h-8 md:h-7 px-3 whitespace-nowrap rounded-md text-xs font-bold border transition-colors ${flagFilters.includes('is_urgent') ? 'bg-red-600 text-white border-red-600' : 'bg-white text-red-600 border-red-200 hover:bg-red-50'}`}>급매 {properties.filter(p => p.is_urgent).length}</button>
-                  <button onClick={() => toggleFlagFilter('is_adjusted')} className={`h-8 md:h-7 px-3 whitespace-nowrap rounded-md text-xs font-bold border transition-colors ${flagFilters.includes('is_adjusted') ? 'bg-amber-500 text-white border-amber-500' : 'bg-white text-amber-600 border-amber-200 hover:bg-amber-50'}`}>금액조정 {properties.filter(p => p.is_adjusted).length}</button>
+                <span className="text-xs font-bold text-slate-600">급매·금액</span>
+                <div className="grid grid-cols-3 gap-1.5 md:flex md:gap-1">
+                  {FLAG_DEFS.map(f => (
+                    <button key={f.key} onClick={() => toggleFlagFilter(f.key)} className={`h-8 md:h-7 px-3 whitespace-nowrap rounded-md text-xs font-bold border transition-colors ${flagFilters.includes(f.key) ? f.on : 'bg-white ' + f.filterOff}`}>{f.label} {properties.filter(p => p[f.key]).length}</button>
+                  ))}
                 </div>
               </div>
 </div>
@@ -1551,10 +1559,7 @@
                     : <><span>{formatKoreanCurrency(property.price?.deposit || 0)}</span><span className="text-slate-300 mx-1 text-2xl">/</span><span>{formatKoreanCurrency(property.price?.rent || 0)}</span></>}
                 </div>
                 <div className="mt-3 flex flex-wrap md:justify-end items-center gap-2">
-                  {!readOnly ? (<>
-                    <button type="button" onClick={() => onToggleFlag && onToggleFlag(property, 'is_urgent')} className={`px-3 py-1.5 rounded-lg text-xs font-extrabold border-2 transition-colors ${property.is_urgent ? 'bg-red-600 text-white border-red-600' : 'bg-white text-red-600 border-red-300 hover:bg-red-50'}`}>급매</button>
-                    <button type="button" onClick={() => onToggleFlag && onToggleFlag(property, 'is_adjusted')} className={`px-3 py-1.5 rounded-lg text-xs font-extrabold border-2 transition-colors ${property.is_adjusted ? 'bg-amber-500 text-white border-amber-500' : 'bg-white text-amber-600 border-amber-300 hover:bg-amber-50'}`}>금액조정</button>
-                  </>) : <FlagBadges prop={property} />}
+                  <FlagBadges prop={property} />
                   {isSale && (<>
                     {property.landArea > 0 && <span className="text-xs font-semibold text-red-600 bg-red-50 px-2.5 py-1.5 rounded-lg">토지 평단가 약 {getPricePerPyeong(property.price?.sale, property.landArea).toLocaleString()}만원</span>}
                     <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-lg border border-emerald-200 text-xs font-bold"><TrendingUp className="w-3 h-3" /> 수익률 <span className="text-sm">{getYield(property.price?.sale, property.price?.deposit, property.price?.rent)}%</span></span>
@@ -1588,8 +1593,8 @@
               <InfoSection title="물건금액" icon={<Banknote className="w-4 h-4" />}>
                 <InfoGrid rows={[
                   ['거래방식', <span className="flex gap-1.5">{['매매', '전세', '월세'].map(t => <span key={t} className={`px-2.5 py-1 rounded text-xs font-bold ${property.transactionType === t ? TYPE_BADGE[t] : 'bg-stone-100 text-slate-300'}`}>{t}</span>)}</span>],
-                  ['매매가', <span className="text-red-600 font-bold text-base">{formatKoreanCurrency(property.price?.sale || 0)}</span>],
-                  ['보증금 (총액)', <b>{formatKoreanCurrency(property.price?.deposit || 0)}</b>],
+                  ['매매가', <span className="flex flex-wrap items-center gap-x-3 gap-y-1.5 w-full"><span className="text-red-600 font-bold text-base">{formatKoreanCurrency(property.price?.sale || 0)}</span>{isSale && (readOnly ? <FlagBadges prop={property} /> : <FlagButtons prop={property} onToggle={onToggleFlag} />)}</span>],
+                  ['보증금 (총액)', <span className="flex flex-wrap items-center gap-x-3 gap-y-1.5 w-full"><b>{formatKoreanCurrency(property.price?.deposit || 0)}</b>{!isSale && (readOnly ? <FlagBadges prop={property} /> : <FlagButtons prop={property} onToggle={onToggleFlag} />)}</span>],
                   ['월세 (총액)', <b>{formatKoreanCurrency(property.price?.rent || 0)}</b>],
                   ['관리비', <b>{formatKoreanCurrency(property.price?.maintenance || 0)}</b>],
                   ...(isSale ? [['수익률', <span className="text-emerald-600 font-bold text-base">{getYield(property.price?.sale, property.price?.deposit, property.price?.rent)}%</span>]] : [])
@@ -3059,17 +3064,20 @@
         }
       };
 
-      // 급매 / 금액조정 켜고 끄기 (내 물건만)
+      // 급매 / 금액인하 / 금액인상 켜고 끄기 (내 물건만)
       const handleToggleFlag = async (prop, field) => {
         const next = { ...prop, [field]: !prop[field] };
+        const patch = { [field]: !!next[field] };
+        if (next[field] && field === 'is_price_down') { next.is_price_up = false; patch.is_price_up = false; }   // 인하와 인상은 동시에 켜지 않는다
+        if (next[field] && field === 'is_price_up') { next.is_price_down = false; patch.is_price_down = false; }
         setProperties(prev => prev.map(p => p.id === prop.id ? next : p));
         setSelectedProperty(next);
-        const { error } = await supabase.from('crm_properties').update({ [field]: !!next[field] }).eq('id', prop.id);
+        const { error } = await supabase.from('crm_properties').update(patch).eq('id', prop.id);
         if (error) {
           setProperties(prev => prev.map(p => p.id === prop.id ? prop : p));
           setSelectedProperty(prop);
           if (error.code === '42501') handleSupabaseError(error, 'crm_properties');
-          else alert('급매·금액조정 표시를 저장하지 못했어요. Supabase에서 supabase/urgent-flags.sql 내용을 실행했는지 확인해 주세요.\n\n(원인: ' + error.message + ')');
+          else alert('급매·금액인하·금액인상 표시를 저장하지 못했어요. Supabase에서 supabase/urgent-flags.sql 내용을 실행했는지 확인해 주세요.\n\n(원인: ' + error.message + ')');
         }
       };
 
