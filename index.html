@@ -442,7 +442,7 @@
           // (a) 표지: 글자가 거의 없는 첫 장에서 주소 줄 앞의 글자 = 물건명
           if (!lines.some(l => l.cells.some(c => labelOf(c.s)))) {
             const texts = lines.map(l => l.cells.map(c => c.s).join(' ').trim()).filter(Boolean);
-            const idx = texts.findIndex(t => /번지|\d+-\d+/.test(t));
+            const idx = texts.findIndex(t => /번지|[가-힣]\s*\d+-\d+/.test(t) && !/(Tel|Fax|Email|@|전화|연락)/i.test(t));
             if (idx >= 0) {
               const m = texts[idx].match(/^(.*?\d+(?:-\d+)?(?:번지)?)\s+(\S.*)$/);
               if (m) coverName = m[2].trim(); else if (idx > 0) coverName = texts.slice(0, idx).join(' ').trim();
@@ -485,7 +485,7 @@
         });
 
         // 층별 현황 표 (머리글 예: 층 | 임차인현황/업종/업체명 | (건축)면적 | 보증금 | (월)임대료 | 관리비 | 비고/임대만기)
-        const headName = (n) => /^(층|B\/F)$/i.test(n) ? 'floor' : /^(임차인현황|업종|업체명|임차인|용도)$/.test(n) ? 'tenant' : /^(건축)?면적/.test(n) ? 'area' : /^보증금/.test(n) ? 'deposit' : /임대료/.test(n) ? 'rent' : /^관리비/.test(n) ? 'maint' : /^(비고|임대만기|계약기간)$/.test(n) ? 'note' : null;
+        const headName = (n) => /^(층|층별|B\/F)$/i.test(n) ? 'floor' : /^(임차인현황|업종|업체명|임차인|용도)$/.test(n) ? 'tenant' : /^(건축|바닥)?면적/.test(n) ? 'area' : /^보증금/.test(n) ? 'deposit' : /임대료/.test(n) ? 'rent' : /^관리비/.test(n) ? 'maint' : /^(비고|임대만기|계약기간)$/.test(n) ? 'note' : null;
         const hi = lines.findIndex(l => l.cells.some(c => headName(norm(c.s)) === 'floor') && l.cells.some(c => headName(norm(c.s)) === 'tenant') && l.cells.some(c => headName(norm(c.s)) === 'note'));
         if (hi >= 0) {
           const hy = lines[hi].y;
@@ -568,6 +568,10 @@
 
       // 물건명: 표지 → ◎제목 → 인쇄된 파일 제목의 마지막 조각 → 주소의 동·번지
       let name = coverName || markName || opts.nameHint || '';
+      if (!name && allLines[0]) {   // 표지의 짧은 건물 이름 모양 글 (예: '청담동 제이엠빌딩')
+        const nm = allLines[0].flatMap(l => l.cells.map(c => c.s.trim())).find(t => /^[가-힣A-Za-z0-9 ]{2,20}(빌딩|타워|센터|빌라|프라자|스퀘어|오피스텔|상가|사옥|하우스)$/.test(t));
+        if (nm) name = nm;
+      }
       if (!name && opts.title) { const m = String(opts.title).match(/_([^_]+)$/); if (m) name = m[1].trim(); }
       if (!name && fields.address) name = fields.address.split(/\s+/).slice(-2).join(' ');
       put('name', name, '물건명');
