@@ -1553,13 +1553,15 @@
               </div>
               <div className="text-left md:text-right w-full md:w-auto">
                 <p className="text-xs text-slate-400 mb-1">{isSale ? '매매가' : property.transactionType === '전세' ? '전세보증금' : '보증금 / 월세'}</p>
-                <div className="text-3xl sm:text-4xl font-semibold tracking-tight text-ink-900 flex flex-wrap items-baseline justify-start md:justify-end gap-1">
+                <div className="text-3xl sm:text-4xl font-semibold tracking-tight text-ink-900 flex flex-wrap items-center justify-start md:justify-end gap-x-4 gap-y-2">
+                  {readOnly ? <span className="inline-flex items-center gap-1.5 text-base"><FlagBadges prop={property} /></span> : <FlagButtons prop={property} onToggle={onToggleFlag} />}
+                  <span className="inline-flex flex-wrap items-baseline gap-1">
                   {isSale ? <span>{formatKoreanCurrency(property.price?.sale || 0)}</span>
                     : property.transactionType === '전세' ? <span>{formatKoreanCurrency(property.price?.deposit || 0)}</span>
                     : <><span>{formatKoreanCurrency(property.price?.deposit || 0)}</span><span className="text-slate-300 mx-1 text-2xl">/</span><span>{formatKoreanCurrency(property.price?.rent || 0)}</span></>}
+                  </span>
                 </div>
                 <div className="mt-3 flex flex-wrap md:justify-end items-center gap-2">
-                  <FlagBadges prop={property} />
                   {isSale && (<>
                     {property.landArea > 0 && <span className="text-xs font-semibold text-red-600 bg-red-50 px-2.5 py-1.5 rounded-lg">토지 평단가 약 {getPricePerPyeong(property.price?.sale, property.landArea).toLocaleString()}만원</span>}
                     <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-lg border border-emerald-200 text-xs font-bold"><TrendingUp className="w-3 h-3" /> 수익률 <span className="text-sm">{getYield(property.price?.sale, property.price?.deposit, property.price?.rent)}%</span></span>
@@ -1593,8 +1595,8 @@
               <InfoSection title="물건금액" icon={<Banknote className="w-4 h-4" />}>
                 <InfoGrid rows={[
                   ['거래방식', <span className="flex gap-1.5">{['매매', '전세', '월세'].map(t => <span key={t} className={`px-2.5 py-1 rounded text-xs font-bold ${property.transactionType === t ? TYPE_BADGE[t] : 'bg-stone-100 text-slate-300'}`}>{t}</span>)}</span>],
-                  ['매매가', <span className="flex flex-wrap items-center gap-x-3 gap-y-1.5 w-full"><span className="text-red-600 font-bold text-base">{formatKoreanCurrency(property.price?.sale || 0)}</span>{isSale && (readOnly ? <FlagBadges prop={property} /> : <FlagButtons prop={property} onToggle={onToggleFlag} />)}</span>],
-                  ['보증금 (총액)', <span className="flex flex-wrap items-center gap-x-3 gap-y-1.5 w-full"><b>{formatKoreanCurrency(property.price?.deposit || 0)}</b>{!isSale && (readOnly ? <FlagBadges prop={property} /> : <FlagButtons prop={property} onToggle={onToggleFlag} />)}</span>],
+                  ['매매가', <span className="text-red-600 font-bold text-base">{formatKoreanCurrency(property.price?.sale || 0)}</span>],
+                  ['보증금 (총액)', <b>{formatKoreanCurrency(property.price?.deposit || 0)}</b>],
                   ['월세 (총액)', <b>{formatKoreanCurrency(property.price?.rent || 0)}</b>],
                   ['관리비', <b>{formatKoreanCurrency(property.price?.maintenance || 0)}</b>],
                   ...(isSale ? [['수익률', <span className="text-emerald-600 font-bold text-base">{getYield(property.price?.sale, property.price?.deposit, property.price?.rent)}%</span>]] : [])
