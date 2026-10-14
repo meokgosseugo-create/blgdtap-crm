@@ -236,6 +236,42 @@
     // 읽은 결과를 사람이 볼 수 있는 줄 글로 (칸은 | 로 구분)
     const pagesToDebugText = (pages, unit) => pages.map((pg, i) => '── ' + (i + 1) + '번째 ' + (unit || '이미지') + ' ──\n' + pdfGroupLines(pg.items).map(l => l.cells.map(c => c.s).join(' | ')).join('\n')).join('\n');
     // ───────── 파워포인트(.pptx) 읽기: 슬라이드 안의 글자와 표를 위치와 함께 꺼내서 PDF와 같은 모양으로 만든다 ─────────
+    // 엑셀 파일(.xlsx) 안의 칸들을 '글자+위치'로: 칸 번호가 위치가 된다 (퍼센트 칸은 45%처럼 바꿔서)
+    async function xlsxToPages(zip) {
+      const parse = (t) => new DOMParser().parseFromString(t, 'application/xml');
+      const txt = async (n) => { const f = zip.file(n); return f ? parse(await f.async('string')) : null; };
+      const ss = []; const sst = await txt('xl/sharedStrings.xml');
+      if (sst) [...sst.getElementsByTagName('si')].forEach(si => ss.push([...si.getElementsByTagName('t')].map(t => t.textContent).join('')));
+      const pct = []; const st = await txt('xl/styles.xml');
+      if (st) {
+        const custom = {}; [...st.getElementsByTagName('numFmt')].forEach(n => { custom[n.getAttribute('numFmtId')] = n.getAttribute('formatCode') || ''; });
+        const xfs = st.getElementsByTagName('cellXfs')[0];
+        if (xfs) [...xfs.getElementsByTagName('xf')].forEach((xf, i) => { const id = xf.getAttribute('numFmtId'); pct[i] = id === '9' || id === '10' || /%/.test(custom[id] || ''); });
+      }
+      const colIdx = (ref) => { const m = ref.match(/^([A-Z]+)/)[1]; return [...m].reduce((a, ch) => a * 26 + ch.charCodeAt(0) - 64, 0) - 1; };
+      const rowIdx = (ref) => Number(ref.match(/(\d+)$/)[1]);
+      const names = Object.keys(zip.files).filter(n => /^xl\/worksheets\/sheet\d+\.xml$/.test(n)).sort();
+      const pages = [];
+      for (const n of names) {
+        const doc = parse(await zip.file(n).async('string')); const items = [];
+        // 칸 너비(글자 수 단위)로 칸의 가로 위치를 정한다
+        const colW = {}; [...doc.getElementsByTagName('col')].forEach(cl => { for (let k = Number(cl.getAttribute('min')); k <= Number(cl.getAttribute('max')) && k < 200; k++) colW[k - 1] = Number(cl.getAttribute('width')) || 8.43; });
+        const wOf = (i) => (colW[i] === undefined ? 8.43 : colW[i]) * 5.25;
+        const xOf = (i) => { let x = 0; for (let k = 0; k < i; k++) x += wOf(k); return x; };
+        [...doc.getElementsByTagName('c')].forEach(c => {
+          const ref = c.getAttribute('r'); if (!ref) return;
+          const t = c.getAttribute('t'); const v = c.getElementsByTagName('v')[0]; let val = '';
+          if (t === 's') val = v ? (ss[Number(v.textContent)] || '') : '';
+          else if (t === 'inlineStr') val = [...c.getElementsByTagName('t')].map(x => x.textContent).join('');
+          else if (v) { const num = Number(v.textContent); val = isNaN(num) ? v.textContent : (pct[Number(c.getAttribute('s'))] ? (Math.round(num * 10000) / 100) + '%' : String(Math.round(num * 10000) / 10000)); }
+          val = String(val).replace(/\s+/g, ' ').trim(); if (!val) return;
+          const wd = [...val].reduce((a, ch) => a + (/[\u1100-\u11ff\u3130-\u318f\uac00-\ud7af\u4e00-\u9fff]/.test(ch) ? 1 : 0.55), 0) * 10;
+          const ci = colIdx(ref); items.push({ s: val, x: xOf(ci) * 2 + ci * 20, y: rowIdx(ref) * 24, w: Math.min(wd, Math.max(10, wOf(ci) - 4)) });
+        });
+        if (items.length) pages.push({ width: 842, items });
+      }
+      return pages;
+    }
     async function pptxToPages(file) {
       await loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js');
       const zip = await window.JSZip.loadAsync(await file.arrayBuffer());
@@ -310,6 +346,17 @@
         flush();
         pages.push({ width: slideW, items });
       }
+      // 슬라이드에 끼워 넣은 엑셀 표(그림처럼 보이지만 안에 글자와 숫자가 들어 있음)도 읽는다
+      const xlsxPages = [];
+      for (const name of slideNames) {
+        const relFile = zip.file(name.replace('slides/', 'slides/_rels/') + '.rels'); if (!relFile) continue;
+        const rels = [...parse(await relFile.async('string')).getElementsByTagName('Relationship')].filter(r => /\/package$/.test(r.getAttribute('Type') || '') && /\.xlsx$/i.test(r.getAttribute('Target') || ''));
+        for (const r of rels) {
+          const path = 'ppt/' + r.getAttribute('Target').replace(/^\.\.\//, '');
+          const f = zip.file(path); if (!f) continue;
+          try { xlsxPages.push(...await xlsxToPages(await window.JSZip.loadAsync(await f.async('arraybuffer')))); } catch (e) { /* 읽지 못한 표는 건너뜀 */ }
+        }
+      }
       // 표지 다음 장 위쪽의 제목(예: '상영빌딩')을 물건명 후보로
       const GENERIC = /(개요|현황|입지|사진|위치|분석|요약|투자|포인트|summary|overview|contents|목차|index|business|plan)/i;
       pages.nameHint = '';
@@ -318,6 +365,8 @@
         const real = pages[i].items.filter(it => !/^\d{4}-\d{2}-\d{2}$/.test(it.s) && !/^\d{1,2}$/.test(it.s));
         if (top && real.length <= 3 && !GENERIC.test(top.s)) pages.nameHint = top.s.trim();
       }
+      const nameHint = pages.nameHint;
+      pages.push(...xlsxPages); pages.nameHint = nameHint;
       return pages;
     }
     async function loadImageCanvas(file) {
@@ -422,7 +471,7 @@
       const LABELS = [
         ['address', /^(소재지|물건주소)$/], ['location', /^물건위치$/], ['structure', /^구조$/], ['usage', /^사용용도$/], ['rentStatus', /^임대현황$/], ['expRent', /^예상임대료$/], ['station', /^주변역$/], ['road', /^도로(조건|상황|현황)$/],
         ['landArea', /^대지면적$/], ['landArea2', /^면적$/], ['zoning', /^(용도)?지역$/], ['publicPrice', /^공시지가$/],
-        ['completion', /^(준공|사용승인)/], ['totalFloorArea', /^연면적$/], ['buildingArea', /^건축면적$/],
+        ['completion', /^(준공|사용승인)/], ['totalFloorArea', /^연면적$/], ['buildingArea', /^건축면적$/], ['groundFloorArea', /^지상층연면적$/], ['parkElev', /^주차대수\/승강기$/],
         ['floors', /^(층수|(건축)?규모)$/], ['ratios', /^건폐율.*용적[률율]$/], ['coverage', /^건폐율$/], ['far', /^용적[률율]$/],
         ['mainUse', /^주용도/], ['parking', /^주차(장|대수)?$/], ['elevator', /^승강기$/], ['heating', /^냉난방$/],
         ['deposit', /^보증금$/], ['rent', /^(월)?임대료$/], ['maint', /^관리비$/], ['yield', /^(년)?수익[률율]$/], ['bond', /^채권최고액$/],
@@ -544,10 +593,12 @@
       const cm = join('completion'); let comp = null;
       const m8 = cm.match(/\b(\d{4})(\d{2})(\d{2})\b/); const mk = cm.match(/(\d{4})\s*년\s*(\d{1,2})\s*월\s*(\d{1,2})\s*일/);
       const my = cm.match(/(\d{4})\s*년\s*(\d{1,2})\s*월/);
-      if (mk) comp = `${mk[1]}-${String(mk[2]).padStart(2, '0')}-${String(mk[3]).padStart(2, '0')}`; else if (m8) comp = `${m8[1]}-${m8[2]}-${m8[3]}`; else if (my) comp = `${my[1]}-${String(my[2]).padStart(2, '0')}${/예정/.test(cm) ? ' (준공예정)' : ''}`; else { const m = cm.match(/\d{4}[-.]\d{1,2}[-.]\d{1,2}|\d{4}/); comp = m ? m[0] : null; }
+      const md = cm.match(/(\d{4})\s*[.\-/]\s*(\d{1,2})\s*[.\-/]\s*(\d{1,2})/);
+      if (mk) comp = `${mk[1]}-${String(mk[2]).padStart(2, '0')}-${String(mk[3]).padStart(2, '0')}`; else if (md) comp = `${md[1]}-${String(md[2]).padStart(2, '0')}-${String(md[3]).padStart(2, '0')}`; else if (m8) comp = `${m8[1]}-${m8[2]}-${m8[3]}`; else if (my) comp = `${my[1]}-${String(my[2]).padStart(2, '0')}${/예정/.test(cm) ? ' (준공예정)' : ''}`; else { const m = cm.match(/\d{4}[-.]\d{1,2}[-.]\d{1,2}|\d{4}/); comp = m ? m[0] : null; }
       put('completionYear', comp, '준공(사용승인)');
       put('totalFloorArea', m2('totalFloorArea'), '연면적');
       put('buildingArea', m2('buildingArea'), '건축면적');
+      put('groundFloorArea', m2('groundFloorArea'), '지상층연면적');
       const fl = join('floors').match(/지하\s*(\d+)\s*층?\s*\/?\s*지상\s*(\d+)/);
       if (fl) { put('floorUnderground', Number(fl[1]), '지하 층수'); put('floorGround', Number(fl[2]), '지상 층수'); }
       let cov = null, far = null;
@@ -558,6 +609,10 @@
       const pkAll = [...join('parking').matchAll(/(\d+)\s*대/g)].map(m => Number(m[1]));
       const pkVal = pkAll.length > 1 && !/[()]/.test(join('parking')) ? pkAll.reduce((a, b) => a + b, 0) : pkAll[0];
       put('parking', pkVal > 0 ? pkVal : null, '주차대수');
+      if (join('parkElev') && !join('parking') && !join('elevator')) {   // '3대 / 무' 처럼 한 칸에 같이 적힌 경우
+        const pe = join('parkElev').split('/'); const pn = (pe[0] || '').match(/(\d+)\s*대/); if (pn && Number(pn[1]) > 0) put('parking', Number(pn[1]), '주차대수');
+        const en = (pe[1] || '').match(/(\d+)\s*[대기]/); if (en && Number(en[1]) > 0) put('elevators', Number(en[1]), '엘리베이터');
+      }
       const el = join('elevator').match(/(\d+)\s*[대기]/); put('elevators', el && Number(el[1]) > 0 ? Number(el[1]) : null, '엘리베이터');
       const sale = parseMan(join('sale'));
       if (sale > 0) { put('sale', sale, '매매가'); fields.transactionType = '매매'; }
