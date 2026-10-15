@@ -1420,7 +1420,7 @@
                     {selectable && <td className="px-2.5 text-center" onClick={(e) => e.stopPropagation()}><input type="checkbox" checked={checkedIds.includes(prop.id)} onChange={() => toggleOne(prop.id)} className="w-4 h-4 accent-ink-900 cursor-pointer" /></td>}
                     <td className="px-2.5 text-center"><span className={`px-2 py-0.5 rounded text-[11px] font-bold ${STATUS_BADGE_COLORS[prop.status || '보류']}`}>{prop.status || '보류'}</span></td>
                     <td className="px-2.5 text-slate-700">{prop.type}</td>
-                    <td className="px-2.5 max-w-[190px]"><span className="flex items-center gap-1.5"><span className="font-semibold text-blue-600 hover:underline truncate" title={prop.name}>{prop.name}</span>{prop.is_shared && !showRegistrant && <span className="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-bold bg-gold-100 text-gold-700">공유</span>}</span></td>
+                    <td className="px-2.5 max-w-[190px]"><span className="flex items-center gap-1.5"><span className="font-semibold text-blue-600 hover:underline truncate" title={prop.name}>{prop.name}</span>{prop.is_celeb && !showRegistrant ? <span className="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-700">연예인</span> : (prop.is_shared && !showRegistrant && <span className="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-bold bg-gold-100 text-gold-700">공유</span>)}</span></td>
                     <td className="px-2.5 max-w-[210px]">
                       <span className="flex items-center gap-1.5 text-slate-600">
                         <a href={`https://map.naver.com/v5/search/${encodeURIComponent(prop.address || '')}`} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} title="네이버 지도" className="text-purple-500 hover:text-purple-700 shrink-0"><MapPin className="w-3.5 h-3.5" /></a>
@@ -1524,7 +1524,7 @@
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
             <button type="button" onClick={onBack} className="flex items-center gap-2 text-slate-500 hover:text-ink-900 transition-colors px-3 py-2 sm:-ml-3 rounded-lg hover:bg-white font-semibold text-sm"><ArrowLeft className="w-4 h-4" /> 목록으로</button>
             <div className="grid grid-cols-2 gap-2 w-full sm:flex sm:flex-wrap sm:w-auto">
-              {!readOnly && (
+              {!readOnly && !property.is_celeb && (
                 <button type="button" onClick={() => onToggleShare(property)} className={`only:col-span-2 whitespace-nowrap sm:flex-none px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors shadow-sm flex items-center justify-center gap-2 ${property.is_shared ? 'bg-gold-50 border border-gold-300 text-gold-700 hover:bg-gold-100' : 'bg-gold-400 hover:bg-gold-300 text-ink-900'}`}><ShareIcon className="w-4 h-4" /> {property.is_shared ? '공유 해제' : '공유하기'}</button>
               )}
               {onToggleCeleb && String(property.user_id || '').toLowerCase() === String((currentUser && currentUser.loginId) || '').toLowerCase() && (
@@ -2912,14 +2912,14 @@
 
       const filteredSharedProperties = useMemo(() => {
         const q = searchTerm.toLowerCase();
-        return properties.filter(p => p.is_shared === true).filter(p =>
+        return properties.filter(p => p.is_shared === true && !p.is_celeb).filter(p =>
           (p.name || '').toLowerCase().includes(q) || (p.address || '').toLowerCase().includes(q)
         );
       }, [properties, searchTerm]);
 
       // 공유 물건·공유 매수자에 새로 올라온 것 알림 (이 컴퓨터에서 마지막으로 열어 본 뒤 올라온 것만 센다)
       const [seenShared, setSeenShared] = useState({ props: null, custs: null });
-      const sharedPropIds = useMemo(() => properties.filter(p => p.is_shared === true && !(currentUser && p.user_id && p.user_id.toLowerCase() === currentUser.loginId.toLowerCase())).map(p => p.id), [properties, currentUser]);
+      const sharedPropIds = useMemo(() => properties.filter(p => p.is_shared === true && !p.is_celeb && !(currentUser && p.user_id && p.user_id.toLowerCase() === currentUser.loginId.toLowerCase())).map(p => p.id), [properties, currentUser]);
       const sharedCustIds = useMemo(() => { const mine = new Set(customers.map(c => c.id)); return sharedCustomers.filter(c => !mine.has(c.id)).map(c => c.id); }, [sharedCustomers, customers]);
       const seenKey = currentUser ? 'crm_seen_' + currentUser.loginId : null;
       useEffect(() => {
@@ -3092,7 +3092,8 @@
       const handleToggleCeleb = async (prop) => {
         const turnOn = !prop.is_celeb;
         const patch = { is_celeb: turnOn };
-        if (turnOn && !prop.is_shared) patch.is_shared = true;   // 다른 사람에게도 보이려면 공유가 켜져 있어야 한다
+        if (turnOn && !prop.is_shared) patch.is_shared = true;   // 다른 사람에게도 보이려면 서버에서는 공유 상태여야 한다 (공유 물건 목록에는 나오지 않는다)
+        if (!turnOn) patch.is_shared = false;                    // 연예인 빌딩을 끄면 다시 비공개로 돌린다
         const next = { ...prop, ...patch };
         setProperties(prev => prev.map(p => p.id === prop.id ? next : p));
         setSelectedProperty(next);
