@@ -160,6 +160,9 @@
       return { deposit: pick('deposit'), rent: pick('rent'), maintenance: pick('maintenance') };
     };
 
+    // 등록한 시각(밀리초): 물건 번호 'P-1792042744260'에 들어 있다. 없으면 등록일로 계산한다. 값이 클수록 최근.
+    const regTime = (p) => { const m = String((p && p.id) || '').match(/^P-(\d{10,})/); return m ? Number(m[1]) : new Date((p && p.date) || 0).getTime() || 0; };
+
     // 같은 주소 찾기: '구·동·지번'이 모두 같아야 같은 주소로 본다. 124 / 124-1 / 124-12 는 서로 다른 지번이다.
     const addrKey = (addr) => {
       const t = String(addr || '').replace(/\([^)]*\)/g, ' ').replace(/번지/g, ' ').replace(/\s+/g, ' ').trim();
@@ -1291,7 +1294,7 @@
           });
         }
         result.sort((a, b) => {
-          if (sortConfig.key === 'date') return sortConfig.direction === 'desc' ? new Date(b.date || 0) - new Date(a.date || 0) : new Date(a.date || 0) - new Date(b.date || 0);
+          if (sortConfig.key === 'date') { const d = regTime(b) - regTime(a); return sortConfig.direction === 'desc' ? d : -d; }   // 같은 날 올린 물건도 올린 시각 순서로
           if (sortConfig.key === 'yield') {
             const yA = Number(getYield(a.price?.sale, a.price?.deposit, a.price?.rent)); const yB = Number(getYield(b.price?.sale, b.price?.deposit, b.price?.rent));
             return sortConfig.direction === 'desc' ? yB - yA : yA - yB;
