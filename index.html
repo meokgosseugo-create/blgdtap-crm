@@ -2193,7 +2193,7 @@
               </div>
               {formData.status === '매매' && (
                 <div className="mt-3 p-3 rounded-xl bg-orange-50 border border-orange-300 text-orange-800 text-xs sm:text-sm font-bold">
-                  건물이 팔렸다는 뜻이에요. 저장하면 <u>빌딩매매사례</u>에 올라가서 로그인한 모든 사용자가 볼 수 있어요. (소유자 이름·연락처는 비공개)
+                  건물이 팔렸다는 뜻이에요. 저장하면 <u>빌딩매매사례</u>에 올라가서 로그인한 모든 사용자가 볼 수 있어요. (소유자 이름·연락처는 비공개 / 공유 물건과는 별개예요)
                 </div>
               )}
               <div className="mt-4">
@@ -3049,8 +3049,7 @@
             registrantPhone: prop.registrantPhone || currentUser?.phone || '',
             date: prop.date || new Date().toISOString().split('T')[0]
           };
-          // 상태를 '매매'로 저장하면 '빌딩매매사례'에 올라가고 모든 사용자에게 보이도록 공유도 켠다. (다른 상태로 바꿔도 공유 설정은 그대로 둔다)
-          if (finalProp.status === '매매') finalProp.is_shared = true;
+          // 상태를 '매매'로 저장하면 '빌딩매매사례'에 올라가 모든 사용자에게 보인다. '공유 물건'은 공유하기 버튼을 누른 것만 나오므로 공유 설정은 건드리지 않는다.
 
           setProperties(prev => {
             const idx = prev.findIndex(p => p.id === finalProp.id);
