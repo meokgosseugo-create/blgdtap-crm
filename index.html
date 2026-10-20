@@ -1271,7 +1271,7 @@
       const filteredAndSortedProperties = useMemo(() => {
         let result = [...properties];
         
-        if (statusFilter !== '전체') result = result.filter(p => { const st = p.status || '보류'; return showRegistrant && statusFilter === '완료' ? (st === '완료' || st === '매매') : st === statusFilter; });   // 공유 목록에서는 '매매' 상태도 '완료'로 본다
+        if (statusFilter !== '전체') result = result.filter(p => (p.status || '보류') === statusFilter);
         if (typeFilters.length > 0) result = result.filter(p => typeFilters.includes(p.transactionType));
         if (flagFilters.length > 0) result = result.filter(p => flagFilters.some(f => p[f]));
         if (addressFilter.trim() !== '') result = result.filter(p => (p.address || '').includes(addressFilter.trim()));
@@ -1302,7 +1302,7 @@
           return 0;
         });
         return result;
-      }, [properties, showRegistrant, statusFilter, typeFilters, flagFilters, addressFilter, minPrice, maxPrice, minLandArea, maxLandArea, minYield, sortConfig]);
+      }, [properties, statusFilter, typeFilters, flagFilters, addressFilter, minPrice, maxPrice, minLandArea, maxLandArea, minYield, sortConfig]);
 
       const visibleIds = filteredAndSortedProperties.map(p => p.id);
       const checkedIds = selectedIds.filter(id => visibleIds.includes(id));
@@ -1312,8 +1312,6 @@
       const colCount = 13 + (showRegistrant ? 1 : 0) + (selectable ? 1 : 0);
       const counts = { '전체': properties.length };
       ['보류', '매매', '완료'].forEach(st => { counts[st] = properties.filter(p => (p.status || '보류') === st).length; });
-      if (showRegistrant) counts['완료'] = properties.filter(p => ['완료', '매매'].includes(p.status || '보류')).length;
-      const statusLabel = (st) => (showRegistrant && st === '매매' ? '완료' : st);   // 공유 목록: 거래방식 '매매'와 글자가 겹치지 않게
       const TYPE_BADGE = { '매매': 'bg-sky-100 text-sky-800', '전세': 'bg-emerald-100 text-emerald-800', '월세': 'bg-rose-100 text-rose-800', '연세': 'bg-purple-100 text-purple-800' };
       const TYPE_BADGE_OFF = { '매매': 'text-sky-700 border-sky-200 hover:bg-sky-50', '전세': 'text-emerald-700 border-emerald-200 hover:bg-emerald-50', '월세': 'text-red-700 border-red-200 hover:bg-red-50' };
       const fieldCls = "h-8 px-2.5 border border-stone-300 rounded-md bg-white text-xs focus:outline-none focus:ring-2 focus:ring-gold-400/40 focus:border-gold-400 transition-all placeholder-slate-400";
@@ -1348,7 +1346,7 @@
               <div className="grid grid-cols-[4.5rem_minmax(0,1fr)] items-center gap-2 md:flex">
                 <span className="text-xs font-bold text-slate-600">상태</span>
                 <div className="grid grid-cols-4 gap-1.5 md:flex md:gap-1">
-                  {(showRegistrant ? ['전체', '보류', '완료'] : ['전체', '보류', '완료', '매매']).map(st => (
+                  {['전체', '보류', '완료', '매매'].map(st => (
                     <button key={st} onClick={() => setStatusFilter(st)} className={`h-8 md:h-7 px-2 md:px-3 whitespace-nowrap rounded-md text-xs font-bold border transition-colors ${statusFilter === st ? 'bg-ink-900 text-gold-200 border-ink-900' : 'bg-white border-stone-300 text-slate-500 hover:text-ink-900'}`}>{st} <span className="opacity-60 font-medium">{counts[st]}</span></button>
                   ))}
                 </div>
@@ -1423,7 +1421,7 @@
                 {filteredAndSortedProperties.length > 0 ? filteredAndSortedProperties.map((prop, idx) => (
                   <tr key={prop.id} onClick={() => onViewDetail(prop)} className="h-11 border-b border-stone-100 hover:bg-gold-100/70 cursor-pointer transition-colors">
                     {selectable && <td className="px-2.5 text-center" onClick={(e) => e.stopPropagation()}><input type="checkbox" checked={checkedIds.includes(prop.id)} onChange={() => toggleOne(prop.id)} className="w-4 h-4 accent-ink-900 cursor-pointer" /></td>}
-                    <td className="px-2.5 text-center"><span className={`px-2 py-0.5 rounded text-[11px] font-bold ${STATUS_BADGE_COLORS[statusLabel(prop.status || '보류')]}`}>{statusLabel(prop.status || '보류')}</span></td>
+                    <td className="px-2.5 text-center"><span className={`px-2 py-0.5 rounded text-[11px] font-bold ${STATUS_BADGE_COLORS[prop.status || '보류']}`}>{prop.status || '보류'}</span></td>
                     <td className="px-2.5 text-slate-700">{prop.type}</td>
                     <td className="px-2.5 max-w-[190px]"><span className="flex items-center gap-1.5"><span className="font-semibold text-blue-600 hover:underline truncate" title={prop.name}>{prop.name}</span>{prop.is_celeb && !showRegistrant ? <span className="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-700">연예인</span> : (prop.is_shared && !showRegistrant && <span className="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-bold bg-gold-100 text-gold-700">공유</span>)}</span></td>
                     <td className="px-2.5 max-w-[210px]">
