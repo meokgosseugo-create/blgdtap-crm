@@ -3105,9 +3105,14 @@
 
       const handleToggleShare = async (prop) => {
         const next = { ...prop, is_shared: !prop.is_shared };
+        const patch = { is_shared: next.is_shared };
+        // 공유하기를 누르면 상태가 자동으로 '완료'가 된다 (이미 '매매'면 그대로). 공유를 해제하면 '완료'는 다시 '보류'로 돌아간다.
+        const curStatus = prop.status || '보류';
+        if (next.is_shared && curStatus !== '매매' && curStatus !== '완료') { next.status = '완료'; patch.status = '완료'; }
+        else if (!next.is_shared && curStatus === '완료') { next.status = '보류'; patch.status = '보류'; }
         setProperties(prev => prev.map(p => p.id === prop.id ? next : p));
         setSelectedProperty(next);
-        const { error } = await supabase.from('crm_properties').update({ is_shared: next.is_shared }).eq('id', prop.id);
+        const { error } = await supabase.from('crm_properties').update(patch).eq('id', prop.id);
         if (error) {
           setProperties(prev => prev.map(p => p.id === prop.id ? prop : p));
           setSelectedProperty(prop);
