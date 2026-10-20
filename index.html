@@ -673,8 +673,8 @@
     const STATUS_FORM_COLORS = { '보류': 'bg-yellow-200 text-yellow-900', '완료': 'bg-blue-100 text-blue-800', '매매': 'bg-red-100 text-red-700' };
     const STATUS_BADGE_COLORS = { '보류': 'bg-yellow-200 text-yellow-900', '완료': 'bg-blue-100 text-blue-800', '매매': 'bg-red-100 text-red-700' };
 
-    const SVG_PATHS = {"banknote": "<rect width=\"20\" height=\"12\" x=\"2\" y=\"6\" rx=\"2\"/><circle cx=\"12\" cy=\"12\" r=\"2\"/><path d=\"M6 12h.01M18 12h.01\"/>", "star": "<polygon points=\"12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2\"/>", "calendar": "<rect width=\"18\" height=\"18\" x=\"3\" y=\"4\" rx=\"2\"/><path d=\"M16 2v4M8 2v4M3 10h18\"/>", "building2": "<path d=\"M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z\"/><path d=\"M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2\"/><path d=\"M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2\"/><path d=\"M10 6h4M10 10h4M10 14h4M10 18h4\"/>", "building": "<rect width=\"16\" height=\"20\" x=\"4\" y=\"2\" rx=\"2\"/><path d=\"M9 22v-4h6v4M8 6h.01M16 6h.01M12 6h.01M12 10h.01M12 14h.01M16 10h.01M16 14h.01M8 10h.01M8 14h.01\"/>", "share": "<circle cx=\"18\" cy=\"5\" r=\"3\"/><circle cx=\"6\" cy=\"12\" r=\"3\"/><circle cx=\"18\" cy=\"19\" r=\"3\"/><path d=\"m8.59 13.51 6.83 3.98M15.41 6.51l-6.82 3.98\"/>", "users": "<path d=\"M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2\"/><circle cx=\"9\" cy=\"7\" r=\"4\"/><path d=\"M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75\"/>", "usersround": "<path d=\"M18 21a8 8 0 0 0-16 0\"/><circle cx=\"10\" cy=\"8\" r=\"5\"/><path d=\"M22 20c0-3.37-2-6.5-4-8a5 5 0 0 0-.45-8.3\"/>", "usercircle": "<circle cx=\"12\" cy=\"12\" r=\"10\"/><circle cx=\"12\" cy=\"10\" r=\"3\"/><path d=\"M7 20.662V19a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v1.662\"/>", "logout": "<path d=\"M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9\"/>", "store": "<path d=\"m2 7 4.41-4.41A2 2 0 0 1 7.83 2h8.34a2 2 0 0 1 1.42.59L22 7\"/><path d=\"M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8\"/><path d=\"M15 22v-4a2 2 0 0 0-2-2h-2a2 2 0 0 0-2 2v4\"/><path d=\"M2 7h20\"/>", "briefcase": "<rect width=\"20\" height=\"14\" x=\"2\" y=\"7\" rx=\"2\"/><path d=\"M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16\"/>", "home": "<path d=\"M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8\"/><path d=\"M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z\"/>", "door": "<path d=\"M18 20V6a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v14\"/><path d=\"M2 20h20\"/><path d=\"M14 12v.01\"/>"};
-    const FA2SVG = { 'fa-money-bill-wave': 'banknote', 'fa-star': 'star', 'fa-calendar-alt': 'calendar', 'fa-building': 'building2', 'fa-share-alt': 'share', 'fa-users': 'users', 'fa-user-circle': 'usercircle', 'fa-user-friends': 'usersround' };
+    const SVG_PATHS = {"star": "<polygon points=\"12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2\"/>", "calendar": "<rect width=\"18\" height=\"18\" x=\"3\" y=\"4\" rx=\"2\"/><path d=\"M16 2v4M8 2v4M3 10h18\"/>", "building2": "<path d=\"M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z\"/><path d=\"M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2\"/><path d=\"M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2\"/><path d=\"M10 6h4M10 10h4M10 14h4M10 18h4\"/>", "building": "<rect width=\"16\" height=\"20\" x=\"4\" y=\"2\" rx=\"2\"/><path d=\"M9 22v-4h6v4M8 6h.01M16 6h.01M12 6h.01M12 10h.01M12 14h.01M16 10h.01M16 14h.01M8 10h.01M8 14h.01\"/>", "share": "<circle cx=\"18\" cy=\"5\" r=\"3\"/><circle cx=\"6\" cy=\"12\" r=\"3\"/><circle cx=\"18\" cy=\"19\" r=\"3\"/><path d=\"m8.59 13.51 6.83 3.98M15.41 6.51l-6.82 3.98\"/>", "users": "<path d=\"M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2\"/><circle cx=\"9\" cy=\"7\" r=\"4\"/><path d=\"M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75\"/>", "usersround": "<path d=\"M18 21a8 8 0 0 0-16 0\"/><circle cx=\"10\" cy=\"8\" r=\"5\"/><path d=\"M22 20c0-3.37-2-6.5-4-8a5 5 0 0 0-.45-8.3\"/>", "usercircle": "<circle cx=\"12\" cy=\"12\" r=\"10\"/><circle cx=\"12\" cy=\"10\" r=\"3\"/><path d=\"M7 20.662V19a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v1.662\"/>", "logout": "<path d=\"M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9\"/>", "store": "<path d=\"m2 7 4.41-4.41A2 2 0 0 1 7.83 2h8.34a2 2 0 0 1 1.42.59L22 7\"/><path d=\"M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8\"/><path d=\"M15 22v-4a2 2 0 0 0-2-2h-2a2 2 0 0 0-2 2v4\"/><path d=\"M2 7h20\"/>", "briefcase": "<rect width=\"20\" height=\"14\" x=\"2\" y=\"7\" rx=\"2\"/><path d=\"M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16\"/>", "home": "<path d=\"M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8\"/><path d=\"M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z\"/>", "door": "<path d=\"M18 20V6a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v14\"/><path d=\"M2 20h20\"/><path d=\"M14 12v.01\"/>"};
+    const FA2SVG = { 'fa-star': 'star', 'fa-calendar-alt': 'calendar', 'fa-building': 'building2', 'fa-share-alt': 'share', 'fa-users': 'users', 'fa-user-circle': 'usercircle', 'fa-user-friends': 'usersround' };
     const SvgIcon = ({ k, className }) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className={className} dangerouslySetInnerHTML={{ __html: SVG_PATHS[k] }} />;
     const TYPE_ICON = { '빌딩': 'building2', '상가': 'store', '오피스텔': 'briefcase', '아파트': 'building', '빌라': 'home', '원룸': 'door', '투룸': 'door', '쓰리룸+': 'door' };
     const TypeIcon = ({ type }) => <span className="inline-flex w-6 h-6 rounded-lg bg-gold-50 text-gold-500 items-center justify-center shrink-0"><SvgIcon k={TYPE_ICON[type] || 'building2'} className="w-3.5 h-3.5" /></span>;
@@ -1242,7 +1242,7 @@
       );
     }
 
-    function PropertyListView({ properties, onViewDetail, showRegistrant, selectable, onBulkDelete, caseView, newIds }) {
+    function PropertyListView({ properties, onViewDetail, showRegistrant, selectable, onBulkDelete }) {
       const [statusFilter, setStatusFilter] = useState('전체');
       const [addressFilter, setAddressFilter] = useState('');
       const [minPrice, setMinPrice] = useState('');
@@ -1313,7 +1313,7 @@
       const counts = { '전체': properties.length };
       ['보류', '매매', '완료'].forEach(st => { counts[st] = properties.filter(p => (p.status || '보류') === st).length; });
       if (showRegistrant) counts['완료'] = properties.filter(p => ['완료', '매매'].includes(p.status || '보류')).length;
-      const statusLabel = (st) => (showRegistrant && !caseView && st === '매매' ? '완료' : st);   // 공유 목록: 거래방식 '매매'와 글자가 겹치지 않게
+      const statusLabel = (st) => (showRegistrant && st === '매매' ? '완료' : st);   // 공유 목록: 거래방식 '매매'와 글자가 겹치지 않게
       const TYPE_BADGE = { '매매': 'bg-sky-100 text-sky-800', '전세': 'bg-emerald-100 text-emerald-800', '월세': 'bg-rose-100 text-rose-800', '연세': 'bg-purple-100 text-purple-800' };
       const TYPE_BADGE_OFF = { '매매': 'text-sky-700 border-sky-200 hover:bg-sky-50', '전세': 'text-emerald-700 border-emerald-200 hover:bg-emerald-50', '월세': 'text-red-700 border-red-200 hover:bg-red-50' };
       const fieldCls = "h-8 px-2.5 border border-stone-300 rounded-md bg-white text-xs focus:outline-none focus:ring-2 focus:ring-gold-400/40 focus:border-gold-400 transition-all placeholder-slate-400";
@@ -1345,7 +1345,6 @@
                 ))}
                 </div>
               </div>
-              {!caseView && (
               <div className="grid grid-cols-[4.5rem_minmax(0,1fr)] items-center gap-2 md:flex">
                 <span className="text-xs font-bold text-slate-600">상태</span>
                 <div className="grid grid-cols-4 gap-1.5 md:flex md:gap-1">
@@ -1354,7 +1353,6 @@
                   ))}
                 </div>
               </div>
-              )}
                           <div className="grid grid-cols-[4.5rem_minmax(0,1fr)] items-center gap-2 md:flex">
                 <span className="text-xs font-bold text-slate-600">급매·금액</span>
                 <div className="grid grid-cols-3 gap-1.5 md:flex md:gap-1">
@@ -1427,7 +1425,7 @@
                     {selectable && <td className="px-2.5 text-center" onClick={(e) => e.stopPropagation()}><input type="checkbox" checked={checkedIds.includes(prop.id)} onChange={() => toggleOne(prop.id)} className="w-4 h-4 accent-ink-900 cursor-pointer" /></td>}
                     <td className="px-2.5 text-center"><span className={`px-2 py-0.5 rounded text-[11px] font-bold ${STATUS_BADGE_COLORS[statusLabel(prop.status || '보류')]}`}>{statusLabel(prop.status || '보류')}</span></td>
                     <td className="px-2.5 text-slate-700">{prop.type}</td>
-                    <td className="px-2.5 max-w-[190px]"><span className="flex items-center gap-1.5"><span className="font-semibold text-blue-600 hover:underline truncate" title={prop.name}>{prop.name}</span>{newIds && newIds.includes(prop.id) && <span className="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-red-500 text-white">NEW</span>}{prop.is_celeb && !showRegistrant ? <span className="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-700">연예인</span> : (prop.is_shared && !showRegistrant && <span className="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-bold bg-gold-100 text-gold-700">공유</span>)}</span></td>
+                    <td className="px-2.5 max-w-[190px]"><span className="flex items-center gap-1.5"><span className="font-semibold text-blue-600 hover:underline truncate" title={prop.name}>{prop.name}</span>{prop.is_celeb && !showRegistrant ? <span className="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-700">연예인</span> : (prop.is_shared && !showRegistrant && <span className="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-bold bg-gold-100 text-gold-700">공유</span>)}</span></td>
                     <td className="px-2.5 max-w-[210px]">
                       <span className="flex items-center gap-1.5 text-slate-600">
                         <a href={`https://map.naver.com/v5/search/${encodeURIComponent(prop.address || '')}`} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} title="네이버 지도" className="text-purple-500 hover:text-purple-700 shrink-0"><MapPin className="w-3.5 h-3.5" /></a>
@@ -2191,11 +2189,6 @@
                   return <button key={st} type="button" onClick={() => setFormData(prev => ({ ...prev, status: st }))} className={`py-3 sm:py-3.5 rounded-2xl border-2 text-sm sm:text-base font-bold transition-colors ${on ? 'shadow-sm' : 'bg-white'} ${tone}`}>{on ? '✓ ' : ''}{st}</button>;
                 })}
               </div>
-              {formData.status === '매매' && (
-                <div className="mt-3 p-3 rounded-xl bg-orange-50 border border-orange-300 text-orange-800 text-xs sm:text-sm font-bold">
-                  건물이 팔렸다는 뜻이에요. 저장하면 <u>빌딩매매사례</u>에 올라가서 로그인한 모든 사용자가 볼 수 있어요. (소유자 이름·연락처는 비공개 / 공유 물건과는 별개예요)
-                </div>
-              )}
               <div className="mt-4">
                 <label className="block text-sm sm:text-base font-bold text-ink-800 mb-1">작업자</label>
                 <p className="text-xs sm:text-sm text-slate-500 mb-2">이 물건을 맡아서 작업하는 사람 이름을 적으면, 공유 물건 목록의 등록자 옆에 보여요.</p>
@@ -2888,7 +2881,7 @@
           const st = e.state;
           if (!st) return;
           const found = st.sel ? propsRef.current.find(p => p.id === st.sel) : null;
-          const needsProperty = (st.tab === 'properties' || st.tab === 'shared' || st.tab === 'celeb' || st.tab === 'cases') && st.view !== 'list' && !(st.view === 'form' && !st.sel);
+          const needsProperty = (st.tab === 'properties' || st.tab === 'shared' || st.tab === 'celeb') && st.view !== 'list' && !(st.view === 'form' && !st.sel);
           setActiveTab(st.tab);
           setCurrentEmployeeView(st.emp || 'list');
           const foundCust = st.selc ? custRef.current.find(c => c.id === st.selc) : null;
@@ -2913,14 +2906,6 @@
         );
       }, [myProperties, searchTerm]);
 
-      // 빌딩매매사례: 상태가 '매매'인 물건 (연예인 빌딩은 연예인 빌딩 목록에만)
-      const filteredCaseProperties = useMemo(() => {
-        const q = searchTerm.toLowerCase();
-        return properties.filter(p => p.status === '매매' && !p.is_celeb).filter(p =>
-          (p.name || '').toLowerCase().includes(q) || (p.address || '').toLowerCase().includes(q)
-        );
-      }, [properties, searchTerm]);
-
       // 연예인 빌딩: 내가 올린 것 + 다른 사람이 공유해 둔 것
       const filteredCelebProperties = useMemo(() => {
         const q = searchTerm.toLowerCase();
@@ -2938,33 +2923,26 @@
       }, [properties, searchTerm]);
 
       // 공유 물건·공유 매수자에 새로 올라온 것 알림 (이 컴퓨터에서 마지막으로 열어 본 뒤 올라온 것만 센다)
-      const [seenShared, setSeenShared] = useState({ props: null, custs: null, cases: null });
-      const [newCaseIds, setNewCaseIds] = useState([]);   // 빌딩매매사례를 열 때 '새로 올라온 것' 표시용
+      const [seenShared, setSeenShared] = useState({ props: null, custs: null });
       const sharedPropIds = useMemo(() => properties.filter(p => p.is_shared === true && !p.is_celeb && !(currentUser && p.user_id && p.user_id.toLowerCase() === currentUser.loginId.toLowerCase())).map(p => p.id), [properties, currentUser]);
-      const caseIds = useMemo(() => properties.filter(p => p.status === '매매' && !p.is_celeb && !(currentUser && p.user_id && p.user_id.toLowerCase() === currentUser.loginId.toLowerCase())).map(p => p.id), [properties, currentUser]);
       const sharedCustIds = useMemo(() => { const mine = new Set(customers.map(c => c.id)); return sharedCustomers.filter(c => !mine.has(c.id)).map(c => c.id); }, [sharedCustomers, customers]);
       const seenKey = currentUser ? 'crm_seen_' + currentUser.loginId : null;
       useEffect(() => {
         if (!seenKey) return;
-        try { const r = JSON.parse(localStorage.getItem(seenKey) || 'null'); setSeenShared(r && r.props && r.custs ? { ...r, cases: r.cases || null } : { props: null, custs: null, cases: null }); } catch (e) { setSeenShared({ props: null, custs: null, cases: null }); }
+        try { const r = JSON.parse(localStorage.getItem(seenKey) || 'null'); setSeenShared(r && r.props && r.custs ? r : { props: null, custs: null }); } catch (e) { setSeenShared({ props: null, custs: null }); }
       }, [seenKey]);
-      useEffect(() => {
-        if (activeTab === 'cases') setNewCaseIds(caseIds.filter(id => !(seenShared.cases || []).includes(id)));
-      }, [activeTab]);
       useEffect(() => {
         if (!seenKey || !hasFetched) return;
         setSeenShared(prev => {
           const next = { ...prev };
           if (prev.props === null || activeTab === 'shared') next.props = sharedPropIds;
           if (prev.custs === null || activeTab === 'sharedCustomers') next.custs = sharedCustIds;
-          if (prev.cases === null || activeTab === 'cases') next.cases = caseIds;
-          if (next.props === prev.props && next.custs === prev.custs && next.cases === prev.cases) return prev;
+          if (next.props === prev.props && next.custs === prev.custs) return prev;
           try { localStorage.setItem(seenKey, JSON.stringify(next)); } catch (e) {}
           return next;
         });
-      }, [activeTab, sharedPropIds, sharedCustIds, caseIds, hasFetched, seenKey]);
+      }, [activeTab, sharedPropIds, sharedCustIds, hasFetched, seenKey]);
       const unreadProps = seenShared.props ? sharedPropIds.filter(id => !seenShared.props.includes(id)).length : 0;
-      const unreadCases = seenShared.cases ? caseIds.filter(id => !seenShared.cases.includes(id)).length : 0;
       const unreadCusts = seenShared.custs ? sharedCustIds.filter(id => !seenShared.custs.includes(id)).length : 0;
 
       const filteredEmployees = useMemo(() => {
@@ -3049,8 +3027,7 @@
             registrantPhone: prop.registrantPhone || currentUser?.phone || '',
             date: prop.date || new Date().toISOString().split('T')[0]
           };
-          // 상태를 '매매'로 저장하면 '빌딩매매사례'에 올라가 모든 사용자에게 보인다. '공유 물건'은 공유하기 버튼을 누른 것만 나오므로 공유 설정은 건드리지 않는다.
-
+          
           setProperties(prev => {
             const idx = prev.findIndex(p => p.id === finalProp.id);
             if(idx >= 0) { const newList = [...prev]; newList[idx] = finalProp; return newList; }
@@ -3105,14 +3082,9 @@
 
       const handleToggleShare = async (prop) => {
         const next = { ...prop, is_shared: !prop.is_shared };
-        const patch = { is_shared: next.is_shared };
-        // 공유하기를 누르면 상태가 자동으로 '완료'가 된다 (이미 '매매'면 그대로). 공유를 해제하면 '완료'는 다시 '보류'로 돌아간다.
-        const curStatus = prop.status || '보류';
-        if (next.is_shared && curStatus !== '매매' && curStatus !== '완료') { next.status = '완료'; patch.status = '완료'; }
-        else if (!next.is_shared && curStatus === '완료') { next.status = '보류'; patch.status = '보류'; }
         setProperties(prev => prev.map(p => p.id === prop.id ? next : p));
         setSelectedProperty(next);
-        const { error } = await supabase.from('crm_properties').update(patch).eq('id', prop.id);
+        const { error } = await supabase.from('crm_properties').update({ is_shared: next.is_shared }).eq('id', prop.id);
         if (error) {
           setProperties(prev => prev.map(p => p.id === prop.id ? prop : p));
           setSelectedProperty(prop);
@@ -3319,7 +3291,6 @@
               <SidebarItem icon={<ShareIcon />} label="공유 물건" badge={unreadProps} active={activeTab === 'shared'} onClick={() => { changeTab('shared'); setCurrentView('list'); setSelectedProperty(null); }} collapsed={sidebarCollapsed} />
               <SidebarItem icon={<UserFriends />} label="공유 매수자" badge={unreadCusts} active={activeTab === 'sharedCustomers'} onClick={() => { changeTab('sharedCustomers'); setCurrentCustomerView('list'); setSelectedCustomer(null); }} collapsed={sidebarCollapsed} />
               <SidebarItem icon={<StarIcon />} label="연예인 빌딩" active={activeTab === 'celeb'} onClick={() => { changeTab('celeb'); setCurrentView('list'); setSelectedProperty(null); }} collapsed={sidebarCollapsed} />
-              <SidebarItem icon={<Banknote />} label="빌딩매매사례" badge={unreadCases} active={activeTab === 'cases'} onClick={() => { changeTab('cases'); setCurrentView('list'); setSelectedProperty(null); }} collapsed={sidebarCollapsed} />
               <SidebarItem icon={<Users />} label="고객 관리(매수자)" active={activeTab === 'customers'} onClick={() => { changeTab('customers'); setCurrentCustomerView('list'); setSelectedCustomer(null); }} collapsed={sidebarCollapsed} />
               {isMaster && <SidebarItem icon={<UserCircle />} label="사원 목록" active={activeTab === 'employees'} onClick={() => { changeTab('employees'); setCurrentEmployeeView('list'); }} collapsed={sidebarCollapsed} />}
 
@@ -3360,13 +3331,12 @@
             <header className="bg-white/80 backdrop-blur border-b border-stone-200 flex flex-col sm:flex-row items-start sm:items-center justify-between px-5 py-4 md:px-10 gap-4 z-10 shrink-0 no-print">
               <div>
                 <p className="text-[10px] tracking-[0.3em] text-gold-600 uppercase font-semibold mb-1">
-                  {(activeTab === 'properties' || activeTab === 'shared' || activeTab === 'celeb' || activeTab === 'cases') && currentView === 'report' ? 'Report' : activeTab === 'properties' ? 'Portfolio' : activeTab === 'shared' ? 'Shared' : activeTab === 'celeb' ? 'Celebrity' : activeTab === 'cases' ? 'Deals' : activeTab === 'employees' ? 'Team' : activeTab === 'customers' ? 'Clients' : activeTab === 'sharedCustomers' ? 'Shared Clients' : 'Schedule'}
+                  {(activeTab === 'properties' || activeTab === 'shared' || activeTab === 'celeb') && currentView === 'report' ? 'Report' : activeTab === 'properties' ? 'Portfolio' : activeTab === 'shared' ? 'Shared' : activeTab === 'celeb' ? 'Celebrity' : activeTab === 'employees' ? 'Team' : activeTab === 'customers' ? 'Clients' : activeTab === 'sharedCustomers' ? 'Shared Clients' : 'Schedule'}
                 </p>
                 <h2 className="text-xl md:text-2xl font-semibold tracking-tight text-ink-900 flex items-center gap-2">
-                  {(activeTab === 'properties' || activeTab === 'shared' || activeTab === 'celeb' || activeTab === 'cases') && currentView === 'report' ? '프리미엄 컨설팅 리포트 출력' : 
+                  {(activeTab === 'properties' || activeTab === 'shared' || activeTab === 'celeb') && currentView === 'report' ? '프리미엄 컨설팅 리포트 출력' : 
                    activeTab === 'properties' ? '내 물건 관리' : 
                    activeTab === 'shared' ? '공유 물건' : 
-                   activeTab === 'cases' ? '빌딩매매사례' : 
                    activeTab === 'celeb' ? '연예인 빌딩' : 
                    activeTab === 'employees' ? '사원 목록' :
                    activeTab === 'customers' ? '고객 관리(매수자)' :
@@ -3446,26 +3416,6 @@
                   {currentView === 'detail' && (
                     <PropertyDetailView
                       property={selectedProperty}
-                      readOnly
-                      onBack={() => { setCurrentView('list'); setSelectedProperty(null); }}
-                      onReport={() => setCurrentView('report')}
-                      currentUser={currentUser}
-                      comments={comments.filter(c => selectedProperty && c.property_id === selectedProperty.id)}
-                      onAddComment={handleAddComment}
-                      onDeleteComment={handleDeleteComment}
-                    />
-                  )}
-                  {currentView === 'report' && (
-                    <PropertyReportView property={selectedProperty} onBack={() => setCurrentView('detail')} currentUser={currentUser} />
-                  )}
-                </>
-              )}
-              {activeTab === 'cases' && (
-                <>
-                  {currentView === 'list' && <PropertyListView properties={filteredCaseProperties} showRegistrant caseView newIds={newCaseIds} onViewDetail={(p) => { setSelectedProperty(p); setCurrentView('detail'); }} />}
-                  {currentView === 'detail' && (
-                    <PropertyDetailView
-                      property={filteredCaseProperties.find(x => selectedProperty && x.id === selectedProperty.id) || selectedProperty}
                       readOnly
                       onBack={() => { setCurrentView('list'); setSelectedProperty(null); }}
                       onReport={() => setCurrentView('report')}
