@@ -3287,8 +3287,8 @@
               <SidebarItem icon={<CalendarIcon />} label="개인 캘린더" active={activeTab === 'calendar'} onClick={() => changeTab('calendar')} collapsed={sidebarCollapsed} />
               <SidebarItem icon={<Building2 />} label="내 물건 관리" active={activeTab === 'properties'} onClick={() => { changeTab('properties'); setCurrentView('list'); }} collapsed={sidebarCollapsed} />
               <SidebarItem icon={<ShareIcon />} label="공유 물건" badge={unreadProps} active={activeTab === 'shared'} onClick={() => { changeTab('shared'); setCurrentView('list'); setSelectedProperty(null); }} collapsed={sidebarCollapsed} />
-              <SidebarItem icon={<StarIcon />} label="연예인 빌딩" active={activeTab === 'celeb'} onClick={() => { changeTab('celeb'); setCurrentView('list'); setSelectedProperty(null); }} collapsed={sidebarCollapsed} />
               <SidebarItem icon={<UserFriends />} label="공유 매수자" badge={unreadCusts} active={activeTab === 'sharedCustomers'} onClick={() => { changeTab('sharedCustomers'); setCurrentCustomerView('list'); setSelectedCustomer(null); }} collapsed={sidebarCollapsed} />
+              <SidebarItem icon={<StarIcon />} label="연예인 빌딩" active={activeTab === 'celeb'} onClick={() => { changeTab('celeb'); setCurrentView('list'); setSelectedProperty(null); }} collapsed={sidebarCollapsed} />
               <SidebarItem icon={<Users />} label="고객 관리(매수자)" active={activeTab === 'customers'} onClick={() => { changeTab('customers'); setCurrentCustomerView('list'); setSelectedCustomer(null); }} collapsed={sidebarCollapsed} />
               {isMaster && <SidebarItem icon={<UserCircle />} label="사원 목록" active={activeTab === 'employees'} onClick={() => { changeTab('employees'); setCurrentEmployeeView('list'); }} collapsed={sidebarCollapsed} />}
 
