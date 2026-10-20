@@ -2209,6 +2209,8 @@
 
     // 마스터(전체 관리자) 아이디: 이 아이디로 로그인한 사람만 '사원 목록'을 볼 수 있다
     const MASTER_IDS = ['wony0205'];
+    // 공유 물건 메뉴를 볼 수 있는 아이디 (나머지 사용자에게는 메뉴가 보이지 않음)
+    const SHARED_VIEWERS = ['kimlila', 'kimys', 'wony0205'];
     // 전화번호: 숫자만 받아서 010-0000-0000 모양으로 맞추고, 번호를 끝까지 넣었는지 검사한다
     const formatPhone = (v) => {
       const d = String(v || '').replace(/\D/g, '').slice(0, 11);
@@ -2754,6 +2756,7 @@
       const [isAuthenticated, setIsAuthenticated] = useState(false);
       const [currentUser, setCurrentUser] = useState(null);
       const isMaster = !!currentUser && MASTER_IDS.includes(String(currentUser.loginId || '').toLowerCase());
+      const canSeeShared = !!currentUser && SHARED_VIEWERS.includes(String(currentUser.loginId || '').toLowerCase());
       const [isAuthLoading, setIsAuthLoading] = useState(true);
       const [isFetchingData, setIsFetchingData] = useState(false);
       const [hasFetched, setHasFetched] = useState(false);
@@ -2942,7 +2945,7 @@
           return next;
         });
       }, [activeTab, sharedPropIds, sharedCustIds, hasFetched, seenKey]);
-      const unreadProps = seenShared.props ? sharedPropIds.filter(id => !seenShared.props.includes(id)).length : 0;
+      const unreadProps = canSeeShared && seenShared.props ? sharedPropIds.filter(id => !seenShared.props.includes(id)).length : 0;
       const unreadCusts = seenShared.custs ? sharedCustIds.filter(id => !seenShared.custs.includes(id)).length : 0;
 
       const filteredEmployees = useMemo(() => {
@@ -3235,8 +3238,10 @@
       };
 
       useEffect(() => { if (currentUser && !isMaster && activeTab === 'employees') setActiveTab('calendar'); }, [currentUser, isMaster, activeTab]);
+      useEffect(() => { if (currentUser && !canSeeShared && activeTab === 'shared') setActiveTab('calendar'); }, [currentUser, canSeeShared, activeTab]);
       const changeTab = (tab) => {
         if (tab === 'employees' && !isMaster) return;
+        if (tab === 'shared' && !canSeeShared) return;
         setActiveTab(tab); setSearchTerm(''); setIsMobileMenuOpen(false); 
       };
 
@@ -3259,7 +3264,7 @@
           </div>
 
           <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-white border-t border-stone-200 flex pb-[env(safe-area-inset-bottom)]">
-            {[['calendar', '캘린더', 'calendar'], ['properties', '내 물건', 'building2'], ['shared', '공유 물건', 'share'], ['sharedCustomers', '공유 매수자', 'usersround'], ['customers', '고객', 'users']].map(([k, label, ic]) => (
+            {[['calendar', '캘린더', 'calendar'], ['properties', '내 물건', 'building2'], ['shared', '공유 물건', 'share'], ['sharedCustomers', '공유 매수자', 'usersround'], ['customers', '고객', 'users']].filter(([k]) => k !== 'shared' || canSeeShared).map(([k, label, ic]) => (
               <button key={k} onClick={() => { changeTab(k); if (k === 'properties' || k === 'shared') { setCurrentView('list'); setSelectedProperty(null); } if (k === 'customers' || k === 'sharedCustomers') { setCurrentCustomerView('list'); setSelectedCustomer(null); } }} className={`flex-1 min-w-0 flex flex-col items-center gap-1 pt-2.5 pb-2 text-[10px] font-semibold whitespace-nowrap ${activeTab === k ? 'text-gold-400' : 'text-slate-400'}`}>
                 <span className="relative"><SvgIcon k={ic} className="w-6 h-6" />{k === 'shared' && unreadProps > 0 && <span className="absolute -top-1.5 -right-3 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">{unreadProps > 99 ? '99+' : unreadProps}</span>}{k === 'sharedCustomers' && unreadCusts > 0 && <span className="absolute -top-1.5 -right-3 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">{unreadCusts > 99 ? '99+' : unreadCusts}</span>}</span>{label}
               </button>
@@ -3288,7 +3293,7 @@
               <p className={`${sidebarCollapsed ? "md:hidden" : ""} px-5 pb-2 text-[10px] tracking-[0.25em] text-slate-500 uppercase`}>Menu</p>
               <SidebarItem icon={<CalendarIcon />} label="개인 캘린더" active={activeTab === 'calendar'} onClick={() => changeTab('calendar')} collapsed={sidebarCollapsed} />
               <SidebarItem icon={<Building2 />} label="내 물건 관리" active={activeTab === 'properties'} onClick={() => { changeTab('properties'); setCurrentView('list'); }} collapsed={sidebarCollapsed} />
-              <SidebarItem icon={<ShareIcon />} label="공유 물건" badge={unreadProps} active={activeTab === 'shared'} onClick={() => { changeTab('shared'); setCurrentView('list'); setSelectedProperty(null); }} collapsed={sidebarCollapsed} />
+              {canSeeShared && <SidebarItem icon={<ShareIcon />} label="공유 물건" badge={unreadProps} active={activeTab === 'shared'} onClick={() => { changeTab('shared'); setCurrentView('list'); setSelectedProperty(null); }} collapsed={sidebarCollapsed} />}
               <SidebarItem icon={<UserFriends />} label="공유 매수자" badge={unreadCusts} active={activeTab === 'sharedCustomers'} onClick={() => { changeTab('sharedCustomers'); setCurrentCustomerView('list'); setSelectedCustomer(null); }} collapsed={sidebarCollapsed} />
               <SidebarItem icon={<StarIcon />} label="연예인 빌딩" active={activeTab === 'celeb'} onClick={() => { changeTab('celeb'); setCurrentView('list'); setSelectedProperty(null); }} collapsed={sidebarCollapsed} />
               <SidebarItem icon={<Users />} label="고객 관리(매수자)" active={activeTab === 'customers'} onClick={() => { changeTab('customers'); setCurrentCustomerView('list'); setSelectedCustomer(null); }} collapsed={sidebarCollapsed} />
@@ -3410,7 +3415,7 @@
                   )}
                 </>
               )}
-              {activeTab === 'shared' && (
+              {activeTab === 'shared' && canSeeShared && (
                 <>
                   {currentView === 'list' && <PropertyListView properties={filteredSharedProperties} showRegistrant onViewDetail={(p) => { setSelectedProperty(p); setCurrentView('detail'); }} />}
                   {currentView === 'detail' && (
