@@ -1242,7 +1242,7 @@
       );
     }
 
-    function PropertyListView({ properties, onViewDetail, showRegistrant, selectable, onBulkDelete, caseView }) {
+    function PropertyListView({ properties, onViewDetail, showRegistrant, selectable, onBulkDelete, caseView, newIds }) {
       const [statusFilter, setStatusFilter] = useState('전체');
       const [addressFilter, setAddressFilter] = useState('');
       const [minPrice, setMinPrice] = useState('');
@@ -1427,7 +1427,7 @@
                     {selectable && <td className="px-2.5 text-center" onClick={(e) => e.stopPropagation()}><input type="checkbox" checked={checkedIds.includes(prop.id)} onChange={() => toggleOne(prop.id)} className="w-4 h-4 accent-ink-900 cursor-pointer" /></td>}
                     <td className="px-2.5 text-center"><span className={`px-2 py-0.5 rounded text-[11px] font-bold ${STATUS_BADGE_COLORS[statusLabel(prop.status || '보류')]}`}>{statusLabel(prop.status || '보류')}</span></td>
                     <td className="px-2.5 text-slate-700">{prop.type}</td>
-                    <td className="px-2.5 max-w-[190px]"><span className="flex items-center gap-1.5"><span className="font-semibold text-blue-600 hover:underline truncate" title={prop.name}>{prop.name}</span>{prop.is_celeb && !showRegistrant ? <span className="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-700">연예인</span> : (prop.is_shared && !showRegistrant && <span className="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-bold bg-gold-100 text-gold-700">공유</span>)}</span></td>
+                    <td className="px-2.5 max-w-[190px]"><span className="flex items-center gap-1.5"><span className="font-semibold text-blue-600 hover:underline truncate" title={prop.name}>{prop.name}</span>{newIds && newIds.includes(prop.id) && <span className="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-red-500 text-white">NEW</span>}{prop.is_celeb && !showRegistrant ? <span className="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-700">연예인</span> : (prop.is_shared && !showRegistrant && <span className="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-bold bg-gold-100 text-gold-700">공유</span>)}</span></td>
                     <td className="px-2.5 max-w-[210px]">
                       <span className="flex items-center gap-1.5 text-slate-600">
                         <a href={`https://map.naver.com/v5/search/${encodeURIComponent(prop.address || '')}`} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} title="네이버 지도" className="text-purple-500 hover:text-purple-700 shrink-0"><MapPin className="w-3.5 h-3.5" /></a>
@@ -2191,6 +2191,11 @@
                   return <button key={st} type="button" onClick={() => setFormData(prev => ({ ...prev, status: st }))} className={`py-3 sm:py-3.5 rounded-2xl border-2 text-sm sm:text-base font-bold transition-colors ${on ? 'shadow-sm' : 'bg-white'} ${tone}`}>{on ? '✓ ' : ''}{st}</button>;
                 })}
               </div>
+              {formData.status === '매매' && (
+                <div className="mt-3 p-3 rounded-xl bg-orange-50 border border-orange-300 text-orange-800 text-xs sm:text-sm font-bold">
+                  건물이 팔렸다는 뜻이에요. 저장하면 <u>빌딩매매사례</u>에 올라가서 로그인한 모든 사용자가 볼 수 있어요. (소유자 이름·연락처는 비공개)
+                </div>
+              )}
               <div className="mt-4">
                 <label className="block text-sm sm:text-base font-bold text-ink-800 mb-1">작업자</label>
                 <p className="text-xs sm:text-sm text-slate-500 mb-2">이 물건을 맡아서 작업하는 사람 이름을 적으면, 공유 물건 목록의 등록자 옆에 보여요.</p>
@@ -2933,26 +2938,33 @@
       }, [properties, searchTerm]);
 
       // 공유 물건·공유 매수자에 새로 올라온 것 알림 (이 컴퓨터에서 마지막으로 열어 본 뒤 올라온 것만 센다)
-      const [seenShared, setSeenShared] = useState({ props: null, custs: null });
+      const [seenShared, setSeenShared] = useState({ props: null, custs: null, cases: null });
+      const [newCaseIds, setNewCaseIds] = useState([]);   // 빌딩매매사례를 열 때 '새로 올라온 것' 표시용
       const sharedPropIds = useMemo(() => properties.filter(p => p.is_shared === true && !p.is_celeb && p.status !== '매매' && !(currentUser && p.user_id && p.user_id.toLowerCase() === currentUser.loginId.toLowerCase())).map(p => p.id), [properties, currentUser]);
+      const caseIds = useMemo(() => properties.filter(p => p.status === '매매' && !p.is_celeb && !(currentUser && p.user_id && p.user_id.toLowerCase() === currentUser.loginId.toLowerCase())).map(p => p.id), [properties, currentUser]);
       const sharedCustIds = useMemo(() => { const mine = new Set(customers.map(c => c.id)); return sharedCustomers.filter(c => !mine.has(c.id)).map(c => c.id); }, [sharedCustomers, customers]);
       const seenKey = currentUser ? 'crm_seen_' + currentUser.loginId : null;
       useEffect(() => {
         if (!seenKey) return;
-        try { const r = JSON.parse(localStorage.getItem(seenKey) || 'null'); setSeenShared(r && r.props && r.custs ? r : { props: null, custs: null }); } catch (e) { setSeenShared({ props: null, custs: null }); }
+        try { const r = JSON.parse(localStorage.getItem(seenKey) || 'null'); setSeenShared(r && r.props && r.custs ? { ...r, cases: r.cases || null } : { props: null, custs: null, cases: null }); } catch (e) { setSeenShared({ props: null, custs: null, cases: null }); }
       }, [seenKey]);
+      useEffect(() => {
+        if (activeTab === 'cases') setNewCaseIds(caseIds.filter(id => !(seenShared.cases || []).includes(id)));
+      }, [activeTab]);
       useEffect(() => {
         if (!seenKey || !hasFetched) return;
         setSeenShared(prev => {
           const next = { ...prev };
           if (prev.props === null || activeTab === 'shared') next.props = sharedPropIds;
           if (prev.custs === null || activeTab === 'sharedCustomers') next.custs = sharedCustIds;
-          if (next.props === prev.props && next.custs === prev.custs) return prev;
+          if (prev.cases === null || activeTab === 'cases') next.cases = caseIds;
+          if (next.props === prev.props && next.custs === prev.custs && next.cases === prev.cases) return prev;
           try { localStorage.setItem(seenKey, JSON.stringify(next)); } catch (e) {}
           return next;
         });
-      }, [activeTab, sharedPropIds, sharedCustIds, hasFetched, seenKey]);
+      }, [activeTab, sharedPropIds, sharedCustIds, caseIds, hasFetched, seenKey]);
       const unreadProps = seenShared.props ? sharedPropIds.filter(id => !seenShared.props.includes(id)).length : 0;
+      const unreadCases = seenShared.cases ? caseIds.filter(id => !seenShared.cases.includes(id)).length : 0;
       const unreadCusts = seenShared.custs ? sharedCustIds.filter(id => !seenShared.custs.includes(id)).length : 0;
 
       const filteredEmployees = useMemo(() => {
@@ -3303,8 +3315,8 @@
               <SidebarItem icon={<Building2 />} label="내 물건 관리" active={activeTab === 'properties'} onClick={() => { changeTab('properties'); setCurrentView('list'); }} collapsed={sidebarCollapsed} />
               <SidebarItem icon={<ShareIcon />} label="공유 물건" badge={unreadProps} active={activeTab === 'shared'} onClick={() => { changeTab('shared'); setCurrentView('list'); setSelectedProperty(null); }} collapsed={sidebarCollapsed} />
               <SidebarItem icon={<UserFriends />} label="공유 매수자" badge={unreadCusts} active={activeTab === 'sharedCustomers'} onClick={() => { changeTab('sharedCustomers'); setCurrentCustomerView('list'); setSelectedCustomer(null); }} collapsed={sidebarCollapsed} />
-              <SidebarItem icon={<Banknote />} label="빌딩매매사례" active={activeTab === 'cases'} onClick={() => { changeTab('cases'); setCurrentView('list'); setSelectedProperty(null); }} collapsed={sidebarCollapsed} />
               <SidebarItem icon={<StarIcon />} label="연예인 빌딩" active={activeTab === 'celeb'} onClick={() => { changeTab('celeb'); setCurrentView('list'); setSelectedProperty(null); }} collapsed={sidebarCollapsed} />
+              <SidebarItem icon={<Banknote />} label="빌딩매매사례" badge={unreadCases} active={activeTab === 'cases'} onClick={() => { changeTab('cases'); setCurrentView('list'); setSelectedProperty(null); }} collapsed={sidebarCollapsed} />
               <SidebarItem icon={<Users />} label="고객 관리(매수자)" active={activeTab === 'customers'} onClick={() => { changeTab('customers'); setCurrentCustomerView('list'); setSelectedCustomer(null); }} collapsed={sidebarCollapsed} />
               {isMaster && <SidebarItem icon={<UserCircle />} label="사원 목록" active={activeTab === 'employees'} onClick={() => { changeTab('employees'); setCurrentEmployeeView('list'); }} collapsed={sidebarCollapsed} />}
 
@@ -3447,7 +3459,7 @@
               )}
               {activeTab === 'cases' && (
                 <>
-                  {currentView === 'list' && <PropertyListView properties={filteredCaseProperties} showRegistrant caseView onViewDetail={(p) => { setSelectedProperty(p); setCurrentView('detail'); }} />}
+                  {currentView === 'list' && <PropertyListView properties={filteredCaseProperties} showRegistrant caseView newIds={newCaseIds} onViewDetail={(p) => { setSelectedProperty(p); setCurrentView('detail'); }} />}
                   {currentView === 'detail' && (
                     <PropertyDetailView
                       property={filteredCaseProperties.find(x => selectedProperty && x.id === selectedProperty.id) || selectedProperty}
