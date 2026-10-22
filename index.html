@@ -2280,7 +2280,7 @@
       );
     }
 
-    function CustomerListView({ customers, shared, onToggleShare, onViewDetail, selectable, onBulkDelete }) {
+    function CustomerListView({ customers, shared, onToggleShare, onToggleUrgent, onViewDetail, selectable, onBulkDelete }) {
       const [selectedIds, setSelectedIds] = useState([]);
       const [showBulkConfirm, setShowBulkConfirm] = useState(false);
       const [minEok, setMinEok] = useState('');
@@ -2314,7 +2314,7 @@
             </div>
           )}
           <div className="p-4 md:p-5 border-b border-slate-200 flex flex-wrap justify-between items-center gap-3 bg-slate-50/50">
-            <h3 className="font-semibold text-ink-800 flex items-center gap-2 text-sm md:text-base"><Users className="w-5 h-5 text-blue-600" /> {shared ? '공유 매수자' : '등록된 매수자'} <span className="text-blue-600 bg-blue-100 px-2 py-0.5 rounded-full text-xs">{filtering ? `${shown.length} / ${customers.length}` : customers.length}</span></h3>
+            <h3 className="font-semibold text-ink-800 flex items-center gap-2 text-sm md:text-base"><Users className="w-5 h-5 text-blue-600" /> {shared ? '공유 매수자' : '등록된 매수자'} <span className="text-blue-600 bg-blue-100 px-2 py-0.5 rounded-full text-xs">{filtering ? `${shown.length} / ${customers.length}` : customers.length}</span>{shown.some(c => c.is_urgent) && <span className="text-red-600 bg-red-100 px-2 py-0.5 rounded-full text-xs font-extrabold">급매수 {shown.filter(c => c.is_urgent).length}</span>}</h3>
             <div className="flex flex-wrap items-center gap-2 text-xs md:text-sm">
               <span className="font-bold text-slate-700">금액(억)</span>
               <input type="text" inputMode="decimal" value={minEok} onChange={(e) => setMinEok(cleanMoneyInput(e.target.value))} placeholder="최소" className="w-20 h-9 px-3 border border-slate-300 rounded-lg outline-none focus:border-blue-500 text-right bg-white" />
@@ -2335,20 +2335,21 @@
                   {!shared && <th className={th}>이름</th>}{!shared && <th className={th}>전화번호</th>}
                   <th className={th}>투자금액</th><th className={th}>희망 지역</th><th className={th}>건물 유형</th><th className="p-3 md:p-4 font-medium">구매사유</th>
                   {shared && <th className={th}>등록자</th>}{shared && <th className={th}>등록일</th>}
-                  {!shared && <th className={th + " text-center"}>공유</th>}
+                  {!shared && <th className={th + " text-center"}>공유</th>}{!shared && <th className={th + " text-center"}>급매수</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-xs md:text-sm">
                 {shown.map(cust => (
-                  <tr key={cust.id} onClick={() => onViewDetail && onViewDetail(cust)} className="hover:bg-blue-50/50 transition-colors align-top cursor-pointer">
+                  <tr key={cust.id} onClick={() => onViewDetail && onViewDetail(cust)} className={`transition-colors align-top cursor-pointer ${cust.is_urgent ? 'bg-red-50 hover:bg-red-100/70 border-l-4 border-red-500' : 'hover:bg-blue-50/50'}`}>
                     {selectable && <td className="p-3 md:p-4 text-center" onClick={(e) => e.stopPropagation()}><input type="checkbox" checked={checkedIds.includes(cust.id)} onChange={() => toggleOne(cust.id)} className="w-4 h-4 accent-blue-600 cursor-pointer" /></td>}
                     {!shared && <td className="p-3 md:p-4 font-bold text-ink-800 whitespace-nowrap">{cust.name}</td>}{!shared && <td className={td}>{cust.phone}</td>}
-                    <td className="p-3 md:p-4 font-bold text-red-600 whitespace-nowrap">{formatBudgetRange(cust.budget, cust.budget_max)}</td>
+                    <td className="p-3 md:p-4 font-bold text-red-600 whitespace-nowrap">{shared && cust.is_urgent && <><span className="inline-block px-2 py-1 rounded text-xs font-extrabold bg-red-600 text-white mb-1">📌 급매수</span><br /></>}{formatBudgetRange(cust.budget, cust.budget_max)}</td>
                     <td className={td}>{cust.region}</td>
                     <td className={td}>{cust.buildingtype || '-'}</td>
                     <td className="p-3 md:p-4 text-slate-600 whitespace-pre-line min-w-[260px]">{cust.reason}</td>
                     {shared && <td className={td}>{cust.registrant}</td>}{shared && <td className={td}>{cust.date}</td>}
                     {!shared && <td className="p-3 md:p-4 text-center"><button type="button" onClick={(e) => { e.stopPropagation(); onToggleShare && onToggleShare(cust.id); }} title="공유 매수자에 올리거나 내리기" className={`px-3 py-1 rounded-full text-xs font-bold border transition-colors ${cust.is_shared ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-500 border-slate-300'}`}>{cust.is_shared ? '공유 중' : '비공개'}</button></td>}
+                    {!shared && <td className="p-3 md:p-4 text-center"><button type="button" onClick={(e) => { e.stopPropagation(); onToggleUrgent && onToggleUrgent(cust.id); }} title="급매수로 표시하면 공유 매수자 맨 위에 고정돼요" className={`px-3 py-1 rounded-lg text-xs font-extrabold border-2 transition-colors ${cust.is_urgent ? 'bg-red-600 text-white border-red-600' : 'bg-white text-slate-500 border-slate-300'}`}>{cust.is_urgent ? '급매수 ON' : '급매수'}</button></td>}
                   </tr>
                 ))}
                 {shown.length === 0 && <tr><td colSpan={8} className="p-8 text-center text-slate-400">{shared ? '공유된 매수자가 없습니다.' : '조건에 맞는 매수자가 없습니다.'}</td></tr>}
@@ -2960,7 +2961,7 @@
       const filteredSharedCustomers = useMemo(() => {
         const q = searchTerm.toLowerCase();
         const ct = (c) => { const m = String((c && c.id) || '').match(/^C-(\d{10,})/); return m ? Number(m[1]) : new Date((c && c.date) || 0).getTime() || 0; };
-        return sharedCustomers.filter(c => !q || (c.region || '').toLowerCase().includes(q) || (c.reason || '').toLowerCase().includes(q) || (c.registrant || '').toLowerCase().includes(q)).sort((x, y) => ct(y) - ct(x));   // 최신 등록순
+        return sharedCustomers.filter(c => !q || (c.region || '').toLowerCase().includes(q) || (c.reason || '').toLowerCase().includes(q) || (c.registrant || '').toLowerCase().includes(q)).sort((x, y) => (!!y.is_urgent - !!x.is_urgent) || (ct(y) - ct(x)));   // 급매수 먼저(맨 위 고정), 그 안에서는 최신 등록순
       }, [sharedCustomers, searchTerm]);
 
       const filteredCustomers = useMemo(() => {
@@ -3150,7 +3151,7 @@
       const handleSaveCustomer = async (newCust) => {
         const cust = { ...newCust, id: `C-${Date.now()}`, date: new Date().toISOString().split('T')[0], user_id: currentUser.loginId, registrant: currentUser.name, registrantphone: currentUser.phone || '' };
         setCustomers(prev => [cust, ...prev]);
-        if (cust.is_shared) setSharedCustomers(prev => [{ id: cust.id, budget: cust.budget, budget_max: cust.budget_max, region: cust.region, buildingtype: cust.buildingtype, reason: cust.reason, registrant: cust.registrant, registrantphone: cust.registrantphone, date: cust.date }, ...prev]);
+        if (cust.is_shared) setSharedCustomers(prev => [{ id: cust.id, budget: cust.budget, budget_max: cust.budget_max, region: cust.region, buildingtype: cust.buildingtype, reason: cust.reason, registrant: cust.registrant, registrantphone: cust.registrantphone, date: cust.date, is_urgent: !!cust.is_urgent }, ...prev]);
         setCurrentCustomerView('list');
         const { error } = await supabase.from('crm_customers').insert([{ ...cust, ...((cust.budget_max === null || cust.budget_max === undefined) ? { budget_max: undefined } : {}) }]);
         if (error) {
@@ -3165,7 +3166,7 @@
         const old = customers.find(x => x.id === id);
         if (!old) return;
         const upd = { ...old, ...data };
-        const sc = { id, budget: upd.budget, budget_max: upd.budget_max, region: upd.region, buildingtype: upd.buildingtype, reason: upd.reason, registrant: upd.registrant, registrantphone: upd.registrantphone, date: upd.date };
+        const sc = { id, budget: upd.budget, budget_max: upd.budget_max, region: upd.region, buildingtype: upd.buildingtype, reason: upd.reason, registrant: upd.registrant, registrantphone: upd.registrantphone, date: upd.date, is_urgent: !!upd.is_urgent };
         setCustomers(prev => prev.map(x => x.id === id ? upd : x));
         setSharedCustomers(prev => upd.is_shared ? (prev.some(x => x.id === id) ? prev.map(x => x.id === id ? sc : x) : [sc, ...prev]) : prev.filter(x => x.id !== id));
         setSelectedCustomer(upd);
@@ -3213,12 +3214,26 @@
         if (!cust) return;
         const next = !cust.is_shared;
         setCustomers(prev => prev.map(x => x.id === id ? { ...x, is_shared: next } : x));
-        setSharedCustomers(prev => next ? [{ id: cust.id, budget: cust.budget, budget_max: cust.budget_max, region: cust.region, buildingtype: cust.buildingtype, reason: cust.reason, registrant: cust.registrant, registrantphone: cust.registrantphone, date: cust.date }, ...prev.filter(x => x.id !== id)] : prev.filter(x => x.id !== id));
+        setSharedCustomers(prev => next ? [{ id: cust.id, budget: cust.budget, budget_max: cust.budget_max, region: cust.region, buildingtype: cust.buildingtype, reason: cust.reason, registrant: cust.registrant, registrantphone: cust.registrantphone, date: cust.date, is_urgent: !!cust.is_urgent }, ...prev.filter(x => x.id !== id)] : prev.filter(x => x.id !== id));
         const { error } = await supabase.from('crm_customers').update({ is_shared: next }).eq('id', id);
         if (error) {
           setCustomers(prev => prev.map(x => x.id === id ? { ...x, is_shared: !next } : x));
-          setSharedCustomers(prev => !next ? [{ id: cust.id, budget: cust.budget, budget_max: cust.budget_max, region: cust.region, buildingtype: cust.buildingtype, reason: cust.reason, registrant: cust.registrant, registrantphone: cust.registrantphone, date: cust.date }, ...prev.filter(x => x.id !== id)] : prev.filter(x => x.id !== id));
+          setSharedCustomers(prev => !next ? [{ id: cust.id, budget: cust.budget, budget_max: cust.budget_max, region: cust.region, buildingtype: cust.buildingtype, reason: cust.reason, registrant: cust.registrant, registrantphone: cust.registrantphone, date: cust.date, is_urgent: !!cust.is_urgent }, ...prev.filter(x => x.id !== id)] : prev.filter(x => x.id !== id));
           alert('공유 설정을 바꾸지 못했어요.\n\n(원인: ' + error.message + ')');
+        }
+      };
+
+      const handleToggleCustomerUrgent = async (id) => {
+        const cust = customers.find(x => x.id === id);
+        if (!cust) return;
+        const next = !cust.is_urgent;
+        setCustomers(prev => prev.map(x => x.id === id ? { ...x, is_urgent: next } : x));
+        setSharedCustomers(prev => prev.map(x => x.id === id ? { ...x, is_urgent: next } : x));
+        const { error } = await supabase.from('crm_customers').update({ is_urgent: next }).eq('id', id);
+        if (error) {
+          setCustomers(prev => prev.map(x => x.id === id ? { ...x, is_urgent: !next } : x));
+          setSharedCustomers(prev => prev.map(x => x.id === id ? { ...x, is_urgent: !next } : x));
+          alert('급매수 표시를 바꾸지 못했어요. Supabase에서 supabase/urgent-customers.sql 내용을 실행했는지 확인해 주세요.\n\n(원인: ' + error.message + ')');
         }
       };
 
@@ -3484,7 +3499,7 @@
               )}
               {activeTab === 'customers' && (
                 <>
-                  {currentCustomerView === 'list' && <CustomerListView customers={filteredCustomers} selectable onBulkDelete={handleBulkDeleteCustomers} onToggleShare={handleToggleCustomerShare} onViewDetail={(c) => { setSelectedCustomer(c); setCurrentCustomerView('detail'); }} />}
+                  {currentCustomerView === 'list' && <CustomerListView customers={filteredCustomers} selectable onBulkDelete={handleBulkDeleteCustomers} onToggleShare={handleToggleCustomerShare} onToggleUrgent={handleToggleCustomerUrgent} onViewDetail={(c) => { setSelectedCustomer(c); setCurrentCustomerView('detail'); }} />}
                   {currentCustomerView === 'form' && <CustomerFormView onBack={() => setCurrentCustomerView('list')} onSave={handleSaveCustomer} />}
                   {currentCustomerView === 'detail' && selectedCustomer && (
                     <CustomerDetailView customer={customers.find(x => x.id === selectedCustomer.id) || selectedCustomer} onBack={() => { setCurrentCustomerView('list'); setSelectedCustomer(null); }} onEdit={() => setCurrentCustomerView('edit')} onDelete={() => handleDeleteCustomer(selectedCustomer.id)} onToggleShare={handleToggleCustomerShare} />
