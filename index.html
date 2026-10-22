@@ -2959,7 +2959,8 @@
 
       const filteredSharedCustomers = useMemo(() => {
         const q = searchTerm.toLowerCase();
-        return sharedCustomers.filter(c => !q || (c.region || '').toLowerCase().includes(q) || (c.reason || '').toLowerCase().includes(q) || (c.registrant || '').toLowerCase().includes(q));
+        const ct = (c) => { const m = String((c && c.id) || '').match(/^C-(\d{10,})/); return m ? Number(m[1]) : new Date((c && c.date) || 0).getTime() || 0; };
+        return sharedCustomers.filter(c => !q || (c.region || '').toLowerCase().includes(q) || (c.reason || '').toLowerCase().includes(q) || (c.registrant || '').toLowerCase().includes(q)).sort((x, y) => ct(y) - ct(x));   // 최신 등록순
       }, [sharedCustomers, searchTerm]);
 
       const filteredCustomers = useMemo(() => {
